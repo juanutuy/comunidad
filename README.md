@@ -1409,6 +1409,108 @@ el post de bienvenida partía sin fijar, y venía fijado de la
 semilla): se corrigió la prueba con un ciclo completo sobre un
 post nuevo, no el producto.
 
+## Fase 17 (hecha) — dinero visible: Ingresos y órdenes, moneda del tenant, pagos manuales y página de planes
+
+La sección de dinero de la consola de la referencia, con código y
+textos propios, y la regla de siempre intacta: **nada se finge**.
+Stripe sigue EN OSCURO (sin claves) y ningún pago se marca cobrado
+sin una confirmación real: la de Stripe por su webhook firmado, o
+la de un administrador que revisa un pago manual declarado.
+
+- **Ingresos** (`/admin/earnings`, entrada nueva en el riel):
+  KPIs reales desde `payments` — ingresos totales (suma histórica
+  de pagos `paid`), ingresos de este mes y órdenes de este mes — y
+  la tabla de órdenes con las columnas de la referencia adaptadas a
+  nuestros datos: Cliente, Producto (canal/curso/plan según el
+  pago), Tipo de producto, Tipo de precio (único/suscripción),
+  Pasarela (Stripe/Manual), Monto (en la moneda en que se registró
+  el pago), Próxima renovación (si la suscripción sigue activa),
+  Pago, Suscripción y Fecha. Sin buscador, sin filtros y sin
+  exportar: la referencia tampoco los tiene (paridad honesta).
+  Acceso: admin completo; **moderador solo lectura** (como en la
+  referencia, donde Moderator tiene 1 permiso de Earnings: ver).
+- **Moneda del tenant** (`tenants.currency`, default `USD`): se
+  elige en **Ajustes → Pagos** entre USD, GTQ, MXN, EUR, COP, PEN,
+  ARS, CLP, BRL y DOP. Un solo criterio de formato
+  (`Intl.NumberFormat('es-419')` con símbolo angosto: USD se ve
+  «$22.00», GTQ «Q 22.00») aplicado en la página de planes, las
+  tarjetas de canales pagos y su checkout, el precio de cursos,
+  Ingresos y el Panel. Cambiar la moneda cambia el formato y la
+  interpretación de los montos guardados — **no convierte** entre
+  monedas; la UI lo dice con una línea honesta. El checkout de
+  Stripe ya crea la sesión en la moneda del tenant cuando se
+  carguen las claves.
+- **Pagos manuales** (encienden las ventas sin esperar a Stripe):
+  tabla `manual_payment_methods` (tipo transferencia / billetera /
+  enlace / otro, título e instrucciones que ve el comprador,
+  activo) con CRUD en Ajustes → Pagos e interruptor
+  `tenants.manual_payments_enabled` (default apagado). En los
+  checkouts existentes (canal pago, plan, curso pago) el comprador
+  elige «Pago manual», ve los métodos con sus instrucciones, paga
+  POR FUERA y declara el pago con una referencia opcional: eso
+  crea la orden en `payments` con `gateway='manual'` y
+  `status='pending'` y **no concede nada**. La cola «Pagos
+  pendientes» de Ingresos (solo admin) permite **Aprobar** — marca
+  `paid` y concede reutilizando `grantPaymentAccess`, la misma
+  función de concesión que usa el webhook de Stripe
+  (`channel_access` / suscripción / inscripción) — o **Rechazar**
+  (marca `rejected`, sin acceso). El comprador recibe notificación
+  in-app en ambos casos. Con un pago pendiente para el mismo
+  producto no se puede declarar otro: la UI muestra «Tu pago está
+  en revisión». Sin ningún método activo (Stripe oscuro + manuales
+  apagados) el checkout mantiene el mensaje honesto de siempre.
+- **Página de planes por niveles**: `plans.display_order` y
+  `plans.featured` (aditivos; el orden nace del que ya tenían). El
+  admin ordena con flechas y destaca un plan con la estrella desde
+  `/admin/plans`; `/pricing` renderiza las tarjetas en ese orden,
+  con el destacado resaltado («Destacado»), los precios en la
+  moneda del tenant y el botón según los métodos activos (Stripe /
+  Pago manual / aviso honesto). La sección de canales pagos se
+  llama ahora **«Accesos únicos»**. La página sigue siendo vitrina
+  pública sin sesión, sin filtrar contenido.
+- **Corrección que salió de la verificación**: el índice único de
+  `payments.stripe_session_id` pasó a **parcial**
+  (`WHERE stripe_session_id <> ''`). La unicidad protege la
+  idempotencia de Stripe; los pagos manuales no tienen sesión
+  (`''`), y con el índice pleno el *segundo* pago manual de la
+  base devolvía 500 por violación de unicidad. Migración
+  DROP + CREATE en cada init, sin tocar datos; las sesiones reales
+  de Stripe siguen siendo únicas.
+- Las órdenes suman `gateway` (default `stripe`, así las filas
+  anteriores a la fase se leen como Stripe), `reference`,
+  `method_id` y quién/cuándo decidió (`decided_by`, `decided_at`).
+  La configuración de pagos vive en **Ajustes → Pagos** (una sola
+  casa: moneda, estado de Stripe, interruptor y métodos), no en
+  Planes.
+
+Verificación local por contenido (`scripts/test-fase17.mjs`,
+45 PASS / 0 FAIL, contra `wrangler dev` con D1 local; build y
+typecheck en 0 y `scripts/test-realtime.mjs` en PASS): los KPIs y
+la tabla de Ingresos coinciden con sumas cruzadas por SQL sobre
+`payments`; el moderador lee la página (200) pero la cola de
+pendientes y aprobar/rechazar le responden 403; moneda GTQ →
+`/pricing` y la página del canal premium muestran «Q …», y volver
+a USD restaura «$ …»; flujo manual completo con dos compradores
+nuevos — declarar el pago del canal deja el canal BLOQUEADO
+(teaser), el duplicado responde 409 sin crear fila, el admin lo ve
+en la cola con comprador/producto/método/referencia y al aprobar
+el comprador entra al canal completo, el pago figura `paid` en
+Ingresos y el KPI sube el monto exacto; segundo caso (curso):
+rechazar deja al comprador sin inscripción, el pago `rejected` y
+la notificación de rechazo presente; reordenar y destacar planes
+se refleja en el HTML de `/pricing`; con los defaults (manuales
+apagados) el pago manual responde 409 y `/api/billing/status`
+sigue `enabled:false`. La batería limpia todo lo que crea:
+tenant de vuelta en USD con manuales apagados, sin pagos, métodos,
+accesos, inscripciones ni usuarios de prueba (verificado por SQL).
+
+- Diferencias con la referencia, a propósito: **una sola página
+  de planes por tenant**, sin los «grupos de paywalls» múltiples
+  de la referencia (cada tenant vende con una lista de planes, una
+  de accesos únicos y sus cursos); Earnings sin buscador, filtros
+  ni exportar, igual que la referencia; la moneda no convierte
+  montos ya cargados (queda documentado en la propia UI).
+
 ## Pendiente a propósito (fuera de esta fase)
 
 - Migraciones versionadas con `drizzle-kit` para D1 (hoy: esquema
