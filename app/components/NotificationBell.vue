@@ -17,7 +17,9 @@ const api = useApi()
 const router = useRouter()
 
 const items = ref<NotificationView[]>([])
-const unread = ref(0)
+// Fase 10: el contador vive en el estado compartido useNotifBadge —
+// la barra inferior móvil muestra el mismo número que esta campana.
+const { unread } = useNotifBadge()
 const open = ref(false)
 // Fase 5: filtro por tipo dentro del desplegable.
 const filter = ref('all')

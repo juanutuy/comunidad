@@ -675,6 +675,74 @@ responden 400. Suite `scripts/test-realtime.mjs` en PASS. Build y
 typecheck en 0 errores. Semilla local regenerada limpia
 (`d1-init.sql` incluye las tablas de gamificación sembradas).
 
+## Fase 10 (hecha) — navegación móvil/tableta organizada
+
+Un solo marco que se repliega por niveles, como la referencia
+(mapa verificado en las capturas de emulación de dispositivos):
+
+- **Escritorio amplio (≥1280 px)**: todo — pastillas centrales en la
+  barra superior, lateral fijo y riel derecho. Sin cambios visuales.
+- **Tableta / laptop chica (768–1279 px)**: lateral fijo visible y
+  columna única; **sin riel derecho y sin pastillas centrales** (la
+  navegación vive en el lateral). La grilla pasa a
+  `md:grid-cols-[240px_1fr]` y las pastillas a `xl:flex`.
+- **Teléfono (<768 px)**: una columna; navegación en **panel
+  deslizable** + **barra inferior fija**. Desaparece la fila
+  deslizable horizontal de destinos de la Fase 7.
+
+Piezas nuevas:
+
+- **`MobilePanel.vue`** (slideover izquierdo, scroll interno): cabecera
+  de usuario (avatar con punto de presencia, nombre, `@slug`, toque →
+  perfil), **tarjeta de nivel/XP** con el nivel y los puntos reales
+  del usuario (mismo payload que la tarjeta de su perfil:
+  `/api/profiles/[slug]`, gamificación por tenant de la Fase 9 — con
+  barra y «Te faltan N pts para {siguiente}»), **selector de tema
+  segmentado Claro/Oscuro/Sistema**, fila de comunidad (endpoint nuevo
+  **`GET /api/my-tenants`**: las membresías del usuario; la fila es
+  informativa si hay una sola comunidad — lo habitual, cada una vive
+  en su dominio — y si hay más, las demás se enlazan a su dominio
+  propio registrado), navegación principal completa con icono +
+  etiqueta + chevron (Mensajes con badge de no leídos), sección
+  **Canales** con los grupos y corona/candado como el lateral fijo,
+  accesos a Ajustes y Panel admin, y **Cerrar sesión en rojo** al pie
+  (visitante: Iniciar sesión / Crear cuenta).
+- **`MobileBottomBar.vue`** (solo con sesión, respeta
+  `safe-area-inset-bottom` y el layout deja el respiro al final):
+  Inicio · Mensajes (badge) · **Crear** · Avisos (badge) · Menú.
+  «Crear» monta el `PostComposer` en la nueva variante **`bare`**
+  (solo el disparador + su modal; al publicar refresca los datos en
+  pantalla) — nada decorativo. El badge de Avisos sale del estado
+  compartido **`useNotifBadge`**, la misma fuente que la campana de la
+  barra superior (que ahora escribe en ese estado); el de Mensajes,
+  del mismo conteo `/api/members` que ya usaba la barra superior.
+- **Compositor**: en teléfono su editor abre **a pantalla completa**
+  (`UModal fullscreen` bajo 768 px, vía `useIsPhone()` con
+  `matchMedia`; sin dependencias nuevas).
+- Barra superior en teléfono: botón de menú, logo, buscar, campana y
+  avatar — **el avatar también abre el panel** (el menú desplegable de
+  usuario queda desde `md`). El pase rápido de pantallas confirmó que
+  las filas del admin ya usan `flex-wrap` y listas flexibles (sin
+  tablas que fuercen zoom) y que el `RightRail` ya apila en el orden
+  eventos → recientes → líderes → miembros → en línea.
+
+Verificado con `wrangler dev` (build y typecheck en 0): rutas
+`/feeds`, `/profile/marco-solis`, `/messages`, `/courses`, `/events`,
+`/members`, `/leaderboard`, `/admin` y `/admin/gamification` en 200;
+el SSR de `/feeds` como miembro trae las pastillas en `xl:flex`, el
+lateral en `md:block`, la barra inferior con Crear/Menú/Avisos y el
+`safe-area`, y ya NO trae la fila deslizable (`overflow-x-auto`: 0);
+en escritorio el SSR conserva pastillas y riel. `/api/my-tenants`
+devuelve la membresía real (member y admin) y la fuente de la tarjeta
+de nivel responde los datos reales del miembro de prueba (22 pts,
+Nivel Inicial, «Te faltan 3 pts para Activo»). El contenido del
+slideover es un portal del cliente (no aparece en el SSR): su
+presencia se verificó en el bundle del cliente y por revisión del
+componente; la apertura/cierre táctil no es reproducible headless en
+este entorno y queda declarada. Suite `scripts/test-realtime.mjs` en
+PASS. Semilla local intacta (el estado de prueba vive en `.wrangler`,
+descartable).
+
 ## Pendiente a propósito (fuera de esta fase)
 
 - Migraciones versionadas con `drizzle-kit` para D1 (hoy: esquema

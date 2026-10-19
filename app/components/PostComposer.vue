@@ -6,7 +6,7 @@
 // encuesta, foto subida o por URL, video de YouTube, publicar ahora,
 // guardar borrador o programar — sumando los toggles «Permitir
 // comentarios» y «Publicar como anuncio» (admin, nace fijado).
-const props = defineProps<{ channelSlug?: string }>()
+const props = withDefaults(defineProps<{ channelSlug?: string, variant?: 'bar' | 'bare' }>(), { variant: 'bar' })
 const emit = defineEmits<{ published: [] }>()
 
 const { user } = useAuth()
@@ -21,6 +21,9 @@ const publishable = computed(() =>
 const channelOptions = computed(() => publishable.value.map(c => ({ label: c.name, value: c.slug })))
 
 const open = ref(false)
+// Fase 10: en teléfono el editor abre a pantalla completa (UModal
+// fullscreen); en pantallas medianas y grandes sigue siendo un modal.
+const isPhone = useIsPhone()
 const form = reactive({ channelSlug: '', title: '', body: '', mediaType: 'none', mediaUrl: '' })
 const kind = ref<'post' | 'poll'>('post')
 const pollOptions = ref<string[]>(['', ''])
@@ -127,9 +130,12 @@ const chevronItems = computed(() => [
 </script>
 
 <template>
-  <div v-if="user">
+  <div v-if="user" :class="variant === 'bare' ? 'contents' : undefined">
+    <!-- Disparador externo (variante «bare», Fase 10): la barra
+         inferior móvil pone su propio botón y solo usa el modal. -->
+    <slot v-if="variant === 'bare'" name="trigger" :open-modal="openModal" />
     <!-- Barra compacta -->
-    <UCard :ui="{ body: 'p-0 sm:p-0' }">
+    <UCard v-if="variant === 'bar'" :ui="{ body: 'p-0 sm:p-0' }">
       <div class="flex items-center gap-3 px-4 pt-4">
         <UAvatar :src="user.avatarUrl || undefined" :text="initials(user.name)" size="md" />
         <button type="button" class="min-w-0 flex-1 rounded-full bg-elevated px-4 py-2.5 text-left text-sm text-muted transition hover:bg-accented" @click="openModal()">
@@ -145,8 +151,8 @@ const chevronItems = computed(() => [
       </div>
     </UCard>
 
-    <!-- Editor en modal -->
-    <UModal v-model:open="open" title="Crear publicación" :ui="{ content: 'sm:max-w-2xl' }">
+    <!-- Editor en modal (pantalla completa en teléfono, Fase 10) -->
+    <UModal v-model:open="open" title="Crear publicación" :fullscreen="isPhone" :ui="{ content: 'sm:max-w-2xl' }">
       <template #body>
         <div class="space-y-4">
           <div class="flex flex-wrap items-center gap-3">

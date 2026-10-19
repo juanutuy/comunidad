@@ -4,13 +4,20 @@ const { initials } = useFormat()
 const api = useApi()
 const router = useRouter()
 const route = useRoute()
-const showChannels = ref(false)
+// Fase 10: panel deslizable móvil (un solo cajón organizado) y
+// contador de avisos compartido entre la campana y la barra inferior.
+const { openPanel, closePanel } = useMobilePanel()
+const { refresh: refreshNotif } = useNotifBadge()
 
 const { data: channelData, refresh: refreshChannels } = await useAsyncData('layout-channels', () =>
   api<{ groups: { id: number, name: string, channels: { id: number, slug: string, name: string, icon: string, type: string, priceCents: number, following: boolean }[] }[] }>('/api/channels'))
 
 // Fase 7: navegación principal en pastillas, centrada en la barra
-// superior (Inicio / Cursos / Eventos / Miembros / Ranking).
+// superior (Inicio / Cursos / Eventos / Miembros / Ranking). Fase 10:
+// las pastillas solo viven en escritorio amplio (xl); en tableta la
+// navegación está en el lateral fijo y en teléfono en el panel
+// deslizable + la barra inferior (la fila deslizable de la Fase 7
+// desaparece).
 const mainNav = [
   { label: 'Inicio', to: '/feeds' },
   { label: 'Cursos', to: '/courses' },
@@ -18,29 +25,17 @@ const mainNav = [
   { label: 'Miembros', to: '/members' },
   { label: 'Ranking', to: '/leaderboard' },
 ]
-// En móvil la fila deslizable conserva todos los destinos.
-const mobileNav = [
-  { label: 'Inicio', to: '/feeds' },
-  { label: 'Mensajes', to: '/messages' },
-  { label: 'Miembros', to: '/members' },
-  { label: 'Cursos', to: '/courses' },
-  { label: 'Eventos', to: '/events' },
-  { label: 'Videos', to: '/videos' },
-  { label: 'Biblioteca', to: '/library' },
-  { label: 'Ranking', to: '/leaderboard' },
-  { label: 'Precios', to: '/pricing' },
-  { label: 'Reglas', to: '/guidelines' },
-]
 
 // Badge de mensajes sin leer en el icono de la barra: suma de los
 // no leídos por conversación (mismo dato que usa /messages).
 const { data: dmData, refresh: refreshDm } = await useAsyncData('layout-dm-unread', () =>
   user.value ? api<{ members: { unread: number }[] }>('/api/members') : Promise.resolve({ members: [] as { unread: number }[] }))
 const dmUnread = computed(() => (dmData.value?.members || []).reduce((acc, m) => acc + (m.unread || 0), 0))
-watch(user, (u) => { if (u) refreshDm() })
-watch(() => route.fullPath, () => { refreshDm() })
+watch(user, (u) => { if (u) { refreshDm(); refreshNotif() } })
+watch(() => route.fullPath, () => { refreshDm(); refreshNotif() })
 
 async function doLogout() {
+  closePanel()
   await logout()
   await refreshChannels()
   router.push('/feeds')
@@ -84,14 +79,14 @@ const isProfilePage = computed(() => route.path.startsWith('/profile/'))
   <div class="min-h-screen bg-neutral-50 dark:bg-neutral-950">
     <header class="sticky top-0 z-40 border-b border-default bg-white/90 backdrop-blur dark:bg-neutral-900/90">
       <div class="relative mx-auto flex h-14 max-w-[1400px] items-center gap-3 px-4">
-        <UButton class="lg:hidden" color="neutral" variant="ghost" icon="i-lucide-menu" @click="showChannels = !showChannels" />
+        <UButton class="md:hidden" color="neutral" variant="ghost" icon="i-lucide-menu" aria-label="Abrir el menú" @click="openPanel" />
         <NuxtLink to="/feeds" class="flex shrink-0 items-center gap-2">
           <span class="flex h-8 w-8 items-center justify-center rounded-lg font-bold text-white" :style="{ backgroundColor: tenant?.brandColor || '#2563eb' }">
             {{ (tenant?.name || 'C').charAt(0) }}
           </span>
           <span class="hidden font-bold sm:block">{{ tenant?.name || 'Comunidad' }}</span>
         </NuxtLink>
-        <nav class="absolute left-1/2 hidden -translate-x-1/2 items-center gap-1 lg:flex">
+        <nav class="absolute left-1/2 hidden -translate-x-1/2 items-center gap-1 xl:flex">
           <NuxtLink
             v-for="item in mainNav" :key="item.to" :to="item.to"
             class="rounded-full px-3.5 py-1.5 text-sm font-medium whitespace-nowrap text-muted transition hover:bg-elevated hover:text-highlighted"
@@ -105,37 +100,41 @@ const isProfilePage = computed(() => route.path.startsWith('/profile/'))
           <UInput v-model="searchQuery" placeholder="Buscar en la comunidad…" icon="i-lucide-search" size="sm" class="w-52" />
         </form>
         <UButton to="/search" color="neutral" variant="ghost" icon="i-lucide-search" class="md:hidden" aria-label="Buscar" />
-        <span v-if="user" class="relative inline-flex">
+        <span v-if="user" class="relative hidden sm:inline-flex">
           <UButton to="/messages" color="neutral" variant="ghost" icon="i-lucide-message-circle" aria-label="Mensajes" />
           <span v-if="dmUnread" class="pointer-events-none absolute -top-0.5 -right-0.5 flex h-4.5 min-w-4.5 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">{{ dmUnread }}</span>
         </span>
         <NotificationBell />
-        <UColorModeButton />
+        <UColorModeButton class="hidden md:inline-flex" />
         <template v-if="user">
-          <UDropdownMenu :items="userMenuItems">
-            <UButton color="neutral" variant="ghost" class="gap-2">
-              <UAvatar :src="user.avatarUrl || undefined" :text="initials(user.name)" size="sm" />
-              <span class="hidden max-w-32 truncate sm:block">{{ user.name }}</span>
-            </UButton>
-          </UDropdownMenu>
+          <!-- En teléfono el avatar abre el panel deslizable (como en
+               la referencia); el menú desplegable queda desde md. -->
+          <UButton color="neutral" variant="ghost" class="md:hidden" aria-label="Abrir el menú" @click="openPanel">
+            <UAvatar :src="user.avatarUrl || undefined" :text="initials(user.name)" size="sm" />
+          </UButton>
+          <span class="hidden md:inline-flex">
+            <UDropdownMenu :items="userMenuItems">
+              <UButton color="neutral" variant="ghost" class="gap-2">
+                <UAvatar :src="user.avatarUrl || undefined" :text="initials(user.name)" size="sm" />
+                <span class="hidden max-w-32 truncate sm:block">{{ user.name }}</span>
+              </UButton>
+            </UDropdownMenu>
+          </span>
         </template>
         <template v-else>
           <UButton to="/login" color="neutral" variant="ghost" label="Iniciar sesión" />
           <UButton to="/register" label="Unirse" :style="{ backgroundColor: tenant?.brandColor }" />
         </template>
       </div>
-      <nav class="flex gap-1 overflow-x-auto px-4 pb-2 lg:hidden">
-        <NuxtLink v-for="item in mobileNav" :key="item.to" :to="item.to" class="rounded-full px-3 py-1.5 text-sm font-medium whitespace-nowrap text-muted hover:bg-elevated" active-class="bg-elevated font-semibold text-highlighted">
-          {{ item.label }}
-        </NuxtLink>
-      </nav>
     </header>
 
     <div
-      class="mx-auto grid max-w-[1400px] gap-6 px-4 py-6 lg:grid-cols-[240px_minmax(0,1fr)]"
+      class="mx-auto grid max-w-[1400px] gap-6 px-4 py-6 md:grid-cols-[240px_minmax(0,1fr)]"
       :class="isProfilePage ? '' : 'xl:grid-cols-[240px_minmax(0,1fr)_290px]'"
     >
-      <aside :class="showChannels ? 'block' : 'hidden lg:block'" class="space-y-5">
+      <!-- Lateral fijo desde tableta (md); en teléfono la navegación
+           vive en el panel deslizable (Fase 10). -->
+      <aside class="hidden space-y-5 md:block">
         <div>
           <ul class="space-y-0.5">
             <li>
@@ -226,5 +225,12 @@ const isProfilePage = computed(() => route.path.startsWith('/profile/'))
         <NuxtLink to="/privacy" class="hover:underline">Política de privacidad</NuxtLink>
       </div>
     </footer>
+
+    <!-- Fase 10: respiro para que la barra inferior fija no tape el
+         final del contenido en teléfono. -->
+    <div v-if="user" aria-hidden="true" class="h-[calc(4rem+env(safe-area-inset-bottom))] md:hidden" />
+
+    <MobilePanel :dm-unread="dmUnread" :groups="channelData?.groups || []" @logout="doLogout" />
+    <MobileBottomBar v-if="user" :dm-unread="dmUnread" />
   </div>
 </template>
