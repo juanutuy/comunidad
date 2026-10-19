@@ -3,6 +3,7 @@
 // publicaciones se devuelven bloqueadas (solo teaser).
 import { POST_SELECT, canAccessChannel, channelBySlug, currentAuth, publishDuePosts, resolveTenant, serializePost } from '../../utils/community'
 import { dbFor } from '../../utils/db'
+import { getPrivacySettings } from '../../utils/privacy'
 import { hiddenFilterSql } from '../../utils/blocks'
 
 export default defineEventHandler(async (event) => {
@@ -12,6 +13,15 @@ export default defineEventHandler(async (event) => {
   if (!channel) throw createError({ statusCode: 404, message: 'Canal no encontrado.' })
   const { user, role } = await currentAuth(event, tenant.id)
   const access = await canAccessChannel(event, user?.id ?? null, role, channel)
+  // Fase 15: un canal privado, para quien no tiene acceso, no existe
+  // (404 también acá: ni el nombre ni sus publicaciones se filtran).
+  if (channel.type === 'private' && !access)
+    throw createError({ statusCode: 404, message: 'Canal no encontrado.' })
+  const priv = await getPrivacySettings(event, tenant.id)
+  // Fase 15: con «dónde aparecen» en 'hidden', el no comprador no ve
+  // ni las tarjetas bloqueadas: la página del canal queda como su
+  // pantalla de acceso (cabecera + compra), sin publicaciones.
+  const hideLockedPosts = channel.type === 'paid' && !access && priv.paidLockedWhere === 'hidden'
   const db = await dbFor(event)
   const following = user ? !!await db.prepare('SELECT id FROM follows WHERE tenant_id = ? AND user_id = ? AND channel_id = ?').get(tenant.id, user.id, channel.id) : false
   await publishDuePosts(event, tenant.id)
@@ -32,6 +42,8 @@ export default defineEventHandler(async (event) => {
       description: channel.description, type: channel.type, priceCents: channel.price_cents,
       following, hasAccess: access,
     },
-    posts: await Promise.all(rows.map(r => serializePost(event, r, user?.id ?? null, access, role))),
+    posts: hideLockedPosts
+      ? []
+      : await Promise.all(rows.map(r => serializePost(event, r, user?.id ?? null, access, role))),
   }
 })

@@ -3,11 +3,26 @@
 // sale de la fila del tenant.
 import { requireAdmin, resolveTenant } from '../../utils/community'
 import { dbFor } from '../../utils/db'
+import { resolveNavMenu, resolveSidebar, resolveSocialLinks } from '../../utils/privacy'
+import type { NavItem, SidebarBlock, SocialLink } from '../../utils/privacy'
+
+interface SettingsBody {
+  name?: string, tagline?: string, brandColor?: string, guidelines?: string[], terms?: string, privacy?: string
+  moderationReview?: boolean
+  joinApproval?: boolean, joinQuestions?: string[], joinCooldownDays?: number, autoJoinChannels?: number[]
+  // Fase 15: privacidad y presentación.
+  visibility?: string, directoryAudience?: string, libraryAudience?: string
+  paidPreviewMode?: string, paidPreviewPct?: number, paidPreviewChars?: number
+  paidMediaMode?: string, paidTitleMode?: string, paidLockedWhere?: string
+  feedSidebar?: SidebarBlock[], navMenu?: NavItem[], anyoneCanRegister?: boolean
+  logoUrl?: string, logoDarkUrl?: string, iconUrl?: string, faviconUrl?: string
+  supportEmail?: string, websiteUrl?: string, socialLinks?: SocialLink[]
+}
 
 export default defineEventHandler(async (event) => {
   const tenant = await resolveTenant(event)
   await requireAdmin(event, tenant.id)
-  const body = await readBody<{ name?: string, tagline?: string, brandColor?: string, guidelines?: string[], terms?: string, privacy?: string, moderationReview?: boolean, joinApproval?: boolean, joinQuestions?: string[], joinCooldownDays?: number, autoJoinChannels?: number[] }>(event)
+  const body = await readBody<SettingsBody>(event)
   const name = (body.name || '').trim()
   if (!name) throw createError({ statusCode: 400, message: 'La comunidad necesita un nombre.' })
   const brandColor = /^#[0-9a-fA-F]{6}$/.test(body.brandColor || '') ? body.brandColor! : tenant.brand_color
@@ -60,6 +75,73 @@ export default defineEventHandler(async (event) => {
     }
     await db.prepare('UPDATE tenants SET auto_join_channels = ? WHERE id = ?')
       .run(JSON.stringify(ids), tenant.id).catch(() => {})
+  }
+  // Fase 15: privacidad y presentación — mismo patrón que los bloques
+  // anteriores: cada campo se guarda solo si viene en el cuerpo. Los
+  // escalares se validan con error claro; las listas JSON (barra
+  // lateral, menú, redes) se resuelven contra los valores reales y lo
+  // inválido se descarta.
+  const enumField = async (value: string | undefined, allowed: string[], column: string, message: string) => {
+    if (value === undefined) return
+    if (!allowed.includes(value)) throw createError({ statusCode: 400, message })
+    await db.prepare(`UPDATE tenants SET ${column} = ? WHERE id = ?`).run(value, tenant.id).catch(() => {})
+  }
+  await enumField(body.visibility, ['private', 'public'], 'visibility', 'La visibilidad tiene que ser «private» o «public».')
+  await enumField(body.directoryAudience, ['members', 'everyone', 'paid', 'disabled'], 'directory_audience', 'Audiencia del directorio inválida.')
+  await enumField(body.libraryAudience, ['members', 'everyone'], 'library_audience', 'Audiencia de la biblioteca inválida.')
+  await enumField(body.paidPreviewMode, ['preview', 'full', 'title'], 'paid_preview_mode', 'Modo de anticipo de canales pagos inválido.')
+  await enumField(body.paidMediaMode, ['count', 'hide'], 'paid_media_mode', 'Modo de medios del anticipo inválido.')
+  await enumField(body.paidTitleMode, ['full', '40', '60', '80', '120'], 'paid_title_mode', 'Modo de título del anticipo inválido.')
+  await enumField(body.paidLockedWhere, ['feed', 'channel', 'hidden'], 'paid_locked_where', 'Valor inválido para dónde aparecen las publicaciones bloqueadas.')
+  if (body.paidPreviewPct !== undefined) {
+    const pct = Number(body.paidPreviewPct)
+    if (!Number.isInteger(pct) || pct < 5 || pct > 50)
+      throw createError({ statusCode: 400, message: 'El porcentaje del anticipo tiene que ser un entero entre 5 y 50.' })
+    await db.prepare('UPDATE tenants SET paid_preview_pct = ? WHERE id = ?').run(pct, tenant.id).catch(() => {})
+  }
+  if (body.paidPreviewChars !== undefined) {
+    const chars = Number(body.paidPreviewChars)
+    if (!Number.isInteger(chars) || !(chars === 0 || (chars >= 150 && chars <= 2000)))
+      throw createError({ statusCode: 400, message: 'El tope de caracteres del anticipo tiene que ser 0 (sin tope) o un entero entre 150 y 2000.' })
+    await db.prepare('UPDATE tenants SET paid_preview_chars = ? WHERE id = ?').run(chars, tenant.id).catch(() => {})
+  }
+  if (typeof body.anyoneCanRegister === 'boolean') {
+    await db.prepare('UPDATE tenants SET anyone_can_register = ? WHERE id = ?')
+      .run(body.anyoneCanRegister ? 1 : 0, tenant.id).catch(() => {})
+  }
+  if (Array.isArray(body.feedSidebar)) {
+    await db.prepare('UPDATE tenants SET feed_sidebar = ? WHERE id = ?')
+      .run(JSON.stringify(resolveSidebar(body.feedSidebar)), tenant.id).catch(() => {})
+  }
+  if (Array.isArray(body.navMenu)) {
+    await db.prepare('UPDATE tenants SET nav_menu = ? WHERE id = ?')
+      .run(JSON.stringify(resolveNavMenu(body.navMenu)), tenant.id).catch(() => {})
+  }
+  // Marca: solo se aceptan archivos subidos por la propia plataforma
+  // (quedan bajo /api/files/) o la cadena vacía para quitar la imagen.
+  for (const [field, column] of [['logoUrl', 'logo_url'], ['logoDarkUrl', 'logo_dark_url'], ['iconUrl', 'icon_url'], ['faviconUrl', 'favicon_url']] as const) {
+    const value = body[field]
+    if (value === undefined) continue
+    const url = String(value).trim()
+    if (url !== '' && !url.startsWith('/api/files/'))
+      throw createError({ statusCode: 400, message: 'Las imágenes de marca tienen que subirse desde esta misma pantalla.' })
+    await db.prepare(`UPDATE tenants SET ${column} = ? WHERE id = ?`).run(url.slice(0, 300), tenant.id).catch(() => {})
+  }
+  if (body.supportEmail !== undefined) {
+    const email = String(body.supportEmail || '').trim().slice(0, 120)
+    if (email !== '' && !email.includes('@'))
+      throw createError({ statusCode: 400, message: 'El correo de soporte no parece válido.' })
+    await db.prepare('UPDATE tenants SET support_email = ? WHERE id = ?').run(email, tenant.id).catch(() => {})
+  }
+  if (body.websiteUrl !== undefined) {
+    const url = String(body.websiteUrl || '').trim().slice(0, 300)
+    if (url !== '' && !/^https?:\/\//i.test(url))
+      throw createError({ statusCode: 400, message: 'La dirección del sitio web tiene que empezar con http:// o https://.' })
+    await db.prepare('UPDATE tenants SET website_url = ? WHERE id = ?').run(url, tenant.id).catch(() => {})
+  }
+  if (Array.isArray(body.socialLinks)) {
+    await db.prepare('UPDATE tenants SET social_links = ? WHERE id = ?')
+      .run(JSON.stringify(resolveSocialLinks(body.socialLinks)), tenant.id).catch(() => {})
   }
   return { ok: true, settings: { name, tagline: (body.tagline || '').trim(), brandColor, guidelines } }
 })

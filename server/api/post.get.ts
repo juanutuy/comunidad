@@ -1,7 +1,10 @@
 // Detalle de una publicación por canal+slug, con comentarios.
-// Sin acceso al canal: solo teaser (locked).
+// Sin acceso al canal: solo anticipo (locked), según las reglas del
+// tenant (Fase 15). Un canal privado, para quien no tiene acceso, no
+// existe: ni su nombre ni sus publicaciones salen por esta ruta.
 import { POST_SELECT, canAccessChannel, channelBySlug, currentAuth, resolveTenant, serializePost } from '../utils/community'
 import { dbFor } from '../utils/db'
+import { getPrivacySettings } from '../utils/privacy'
 import { blockedByMe } from '../utils/blocks'
 
 export default defineEventHandler(async (event) => {
@@ -19,11 +22,26 @@ export default defineEventHandler(async (event) => {
   if (row.status && row.status !== 'published' && user?.id !== row.author_id && !(row.status === 'review' && role === 'admin'))
     throw createError({ statusCode: 404, message: 'Publicación no encontrada.' })
   const access = await canAccessChannel(event, user?.id ?? null, role, channel)
+  // Fase 15: canal privado sin acceso = no existe (antes se servía la
+  // tarjeta con el anticipo guardado: el título y el resumen de un
+  // canal «solo para miembros» salían sin sesión).
+  if (channel.type === 'private' && !access)
+    throw createError({ statusCode: 404, message: 'Publicación no encontrada.' })
+  const priv = await getPrivacySettings(event, tenant.id)
+  // Fase 15: leer no es participar. Con el anticipo en modo «completo»
+  // el no comprador de un canal pago LEE el detalle entero, pero los
+  // comentarios no viajan (participar sigue exigiendo la compra) y el
+  // serializador marca canInteract = false.
+  const readAccess = access || (channel.type === 'paid' && priv.paidPreviewMode === 'full')
+  // En el modo público, el visitante lee la publicación pero NO los
+  // comentarios (decisión propia de esta fase): los comentarios son
+  // conversación de miembros.
+  const visitorPublic = !user && priv.visibility === 'public'
   const blocked = await blockedByMe(event, tenant.id, user?.id ?? null)
-  const comments = access
+  const comments = access && !visitorPublic
     ? (await db.prepare(`SELECT c.*, u.name AS author_name, u.slug AS author_slug, u.avatar_url AS author_avatar FROM comments c JOIN users u ON u.id = c.author_id WHERE c.post_id = ? ORDER BY c.created_at`).all(row.id as number) as Record<string, unknown>[])
         .filter(c => !blocked.has(Number(c.author_id)))
         .map(c => ({ id: c.id, body: c.body, createdAt: c.created_at, author: { name: c.author_name, slug: c.author_slug, avatarUrl: c.author_avatar || '' } }))
     : []
-  return { post: await serializePost(event, row, user?.id ?? null, access, role), comments }
+  return { post: await serializePost(event, row, user?.id ?? null, readAccess, role, { canInteract: access }), comments }
 })

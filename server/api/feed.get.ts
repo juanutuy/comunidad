@@ -2,6 +2,7 @@
 // usuario. Las de canales pagos/privados sin acceso van como teaser.
 import { POST_SELECT, canAccessChannel, channelBySlug, currentAuth, publishDuePosts, resolveTenant, serializePost } from '../utils/community'
 import { dbFor } from '../utils/db'
+import { getPrivacySettings } from '../utils/privacy'
 import { hiddenFilterSql } from '../utils/blocks'
 
 export default defineEventHandler(async (event) => {
@@ -32,11 +33,24 @@ export default defineEventHandler(async (event) => {
   const followed = new Set(user
     ? (await db.prepare('SELECT channel_id FROM follows WHERE tenant_id = ? AND user_id = ?').all(tenant.id, user.id) as unknown as { channel_id: number }[]).map(f => f.channel_id)
     : [])
+  const priv = await getPrivacySettings(event, tenant.id)
   const posts = []
   for (const r of rows) {
     const channel = (await channelBySlug(event, tenant.id, r.channel_slug as string))!
     const access = await canAccessChannel(event, user?.id ?? null, role, channel)
-    if (channel.type !== 'free' && !followed.has(channel.id) && !access) continue
+    if (channel.type === 'paid' && !access && r.status === 'published') {
+      // Fase 15 — tarjeta bloqueada de un canal pago según el ajuste
+      // «dónde aparecen» del tenant: 'feed' la muestra en el feed (el
+      // valor por defecto, como en la referencia); 'channel' la deja
+      // solo en la página del canal; 'hidden' no la muestra en
+      // ninguna parte hasta la compra.
+      if (priv.paidLockedWhere !== 'feed') continue
+      // Un visitante solo ve tarjetas bloqueadas en el modo público:
+      // en el modo privado su feed queda como siempre (canales
+      // abiertos), sin superficies de venta nuevas.
+      if (!user && priv.visibility !== 'public') continue
+    }
+    else if (channel.type !== 'free' && !followed.has(channel.id) && !access) continue
     posts.push(await serializePost(event, r, user?.id ?? null, access, role))
   }
   return { posts }

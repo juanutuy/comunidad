@@ -234,6 +234,31 @@ const MIGRATIONS = [
   `ALTER TABLE tenants ADD COLUMN join_cooldown_days INTEGER NOT NULL DEFAULT 0`,
   `ALTER TABLE tenants ADD COLUMN auto_join_channels TEXT NOT NULL DEFAULT '[]'`,
   `ALTER TABLE tenants ADD COLUMN level_gates TEXT NOT NULL DEFAULT '{}'`,
+  // Fase 15: privacidad y presentación. TODOS los defaults reproducen
+  // el comportamiento anterior a la fase: comunidad privada (las
+  // superficies públicas nuevas quedan apagadas), directorio y
+  // biblioteca «de miembros», anticipo de canales pagos en modo
+  // vista previa, registro abierto y sin marca personalizada. Nada
+  // cambia hasta que un administrador toca un ajuste.
+  `ALTER TABLE tenants ADD COLUMN visibility TEXT NOT NULL DEFAULT 'private'`,
+  `ALTER TABLE tenants ADD COLUMN directory_audience TEXT NOT NULL DEFAULT 'members'`,
+  `ALTER TABLE tenants ADD COLUMN library_audience TEXT NOT NULL DEFAULT 'members'`,
+  `ALTER TABLE tenants ADD COLUMN paid_preview_mode TEXT NOT NULL DEFAULT 'preview'`,
+  `ALTER TABLE tenants ADD COLUMN paid_preview_pct INTEGER NOT NULL DEFAULT 25`,
+  `ALTER TABLE tenants ADD COLUMN paid_preview_chars INTEGER NOT NULL DEFAULT 350`,
+  `ALTER TABLE tenants ADD COLUMN paid_media_mode TEXT NOT NULL DEFAULT 'count'`,
+  `ALTER TABLE tenants ADD COLUMN paid_title_mode TEXT NOT NULL DEFAULT 'full'`,
+  `ALTER TABLE tenants ADD COLUMN paid_locked_where TEXT NOT NULL DEFAULT 'feed'`,
+  `ALTER TABLE tenants ADD COLUMN feed_sidebar TEXT NOT NULL DEFAULT '[]'`,
+  `ALTER TABLE tenants ADD COLUMN nav_menu TEXT NOT NULL DEFAULT '[]'`,
+  `ALTER TABLE tenants ADD COLUMN anyone_can_register INTEGER NOT NULL DEFAULT 1`,
+  `ALTER TABLE tenants ADD COLUMN logo_url TEXT NOT NULL DEFAULT ''`,
+  `ALTER TABLE tenants ADD COLUMN logo_dark_url TEXT NOT NULL DEFAULT ''`,
+  `ALTER TABLE tenants ADD COLUMN icon_url TEXT NOT NULL DEFAULT ''`,
+  `ALTER TABLE tenants ADD COLUMN favicon_url TEXT NOT NULL DEFAULT ''`,
+  `ALTER TABLE tenants ADD COLUMN support_email TEXT NOT NULL DEFAULT ''`,
+  `ALTER TABLE tenants ADD COLUMN website_url TEXT NOT NULL DEFAULT ''`,
+  `ALTER TABLE tenants ADD COLUMN social_links TEXT NOT NULL DEFAULT '[]'`,
 ]
 
 async function runMigrations(db: AsyncDb): Promise<void> {

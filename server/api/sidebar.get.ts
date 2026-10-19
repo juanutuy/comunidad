@@ -5,12 +5,24 @@ import { isOnline } from '../utils/chat'
 import { levelFor } from '../utils/levels'
 import { getGamification } from '../utils/gamification'
 import { dbFor } from '../utils/db'
+import { getPrivacySettings } from '../utils/privacy'
 import { hiddenFilterSql } from '../utils/blocks'
 
 export default defineEventHandler(async (event) => {
   const tenant = await resolveTenant(event)
   const { user } = await currentAuth(event, tenant.id)
   const db = await dbFor(event)
+  // Fase 15: el riel se renderiza según la config del tenant (orden,
+  // visibilidad y audiencia por bloque). Para el visitante del modo
+  // público, `blocks` solo trae los de audiencia 'everyone' y los
+  // datos de los bloques de miembros ni siquiera viajan.
+  const priv = await getPrivacySettings(event, tenant.id)
+  const visitorPublic = !user && priv.visibility === 'public'
+  const blocks = priv.feedSidebar
+    .filter(b => b.visible)
+    .filter(b => !visitorPublic || b.audience === 'everyone')
+    .map(b => ({ key: b.key, audience: b.audience }))
+  const blockOn = (key: string) => blocks.some(b => b.key === key)
   // Fase 7: los eventos del rail llevan anfitrión (como la referencia).
   const events = await db.prepare(`SELECT e.slug, e.title, e.starts_at, u.name AS host_name FROM events e LEFT JOIN users u ON u.id = e.host_id WHERE e.tenant_id = ? AND e.starts_at >= datetime('now') ORDER BY e.starts_at LIMIT 3`).all(tenant.id)
   const hf = hiddenFilterSql(user?.id ?? null)
@@ -42,5 +54,12 @@ export default defineEventHandler(async (event) => {
     .sort((a, b) => Number(isOnline(b.last_seen_at as string)) - Number(isOnline(a.last_seen_at as string)))
     .slice(0, 5)
     .map(r => ({ id: r.id, name: r.name, slug: r.slug, avatarUrl: r.avatar_url || '', online: isOnline(r.last_seen_at as string) }))
-  return { events, recent, leaders, online, members }
+  return {
+    blocks,
+    events: blockOn('upcoming_events') ? events : [],
+    recent: blockOn('recent_posts') ? recent : [],
+    leaders: blockOn('leaders') ? leaders : [],
+    online: blockOn('online_now') ? online : [],
+    members: blockOn('members') ? members : [],
+  }
 })

@@ -6,9 +6,19 @@
 import { currentAuth, resolveTenant } from '../utils/community'
 import { hasPremiumAccess } from '../utils/levels'
 import { dbFor } from '../utils/db'
+import { getPrivacySettings } from '../utils/privacy'
 
 export default defineEventHandler(async (event) => {
   const tenant = await resolveTenant(event)
+  // Fase 15: en el modo público, la biblioteca se abre a visitantes
+  // solo si su audiencia es 'everyone'; con 'members' pide sesión
+  // (las descargas con candado ya exigían acceso premium aparte).
+  const { user: earlyUser } = await currentAuth(event, tenant.id)
+  if (!earlyUser) {
+    const priv = await getPrivacySettings(event, tenant.id)
+    if (priv.visibility === 'public' && priv.libraryAudience !== 'everyone')
+      throw createError({ statusCode: 401, message: 'Iniciá sesión para ver la biblioteca.' })
+  }
   const kind = String(getQuery(event).kind || 'all')
   const db = await dbFor(event)
   const rows = (kind === 'all'

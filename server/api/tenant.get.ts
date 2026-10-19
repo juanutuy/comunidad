@@ -7,6 +7,7 @@
 // ofrecer el compositor o los mensajes directos.
 import { currentAuth, publicUser, resolveTenant } from '../utils/community'
 import { myGateStates } from '../utils/members'
+import { getPrivacySettings } from '../utils/privacy'
 
 export default defineEventHandler(async (event) => {
   const tenant = await resolveTenant(event)
@@ -14,11 +15,22 @@ export default defineEventHandler(async (event) => {
   const gates = user && status === 'active'
     ? await myGateStates(event, tenant.id, user.id, role).catch(() => null)
     : null
+  // Fase 15: visibilidad, marca, contacto y menú resuelto — el layout
+  // (logos por tema, favicon, navegación y bloque de contacto) se
+  // alimenta de acá.
+  const priv = await getPrivacySettings(event, tenant.id)
   return {
     tenant: {
       id: tenant.id, slug: tenant.slug, name: tenant.name, tagline: tenant.tagline,
       brandColor: tenant.brand_color,
       guidelines: JSON.parse(tenant.guidelines || '[]') as string[],
+      visibility: priv.visibility,
+      anyoneCanRegister: priv.anyoneCanRegister,
+      logoUrl: priv.logoUrl, logoDarkUrl: priv.logoDarkUrl,
+      iconUrl: priv.iconUrl, faviconUrl: priv.faviconUrl,
+      supportEmail: priv.supportEmail, websiteUrl: priv.websiteUrl,
+      socialLinks: priv.socialLinks,
+      navMenu: priv.navMenu,
     },
     user: user ? { ...publicUser(user), role } : null,
     status: user ? (status || 'active') : null,

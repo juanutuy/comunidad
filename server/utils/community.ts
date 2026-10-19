@@ -7,9 +7,17 @@ import { readSession } from './auth'
 import { isOnline } from './chat'
 import { dbFor } from './db'
 import { getReviewEnabled } from './moderation'
+import { getPrivacySettings, paidTeaserText, truncateTitle } from './privacy'
 import { sanitizeHtml } from './sanitize'
 
-export interface TenantRow { id: number, slug: string, name: string, tagline: string, brand_color: string, guidelines: string }
+export interface TenantRow {
+  id: number, slug: string, name: string, tagline: string, brand_color: string, guidelines: string
+  // Fase 15: columnas de privacidad y presentación (opcionales en el
+  // tipo porque resolveTenant puede correr sobre bases anteriores; la
+  // lectura canónica de estos ajustes es getPrivacySettings).
+  visibility?: string, directory_audience?: string, library_audience?: string
+  anyone_can_register?: number
+}
 export interface UserRow { id: number, name: string, slug: string, email: string, bio: string, location: string, avatar_url: string, created_at: string, cover_url?: string, website?: string, last_seen_at?: string }
 export interface ChannelRow { id: number, tenant_id: number, group_id: number | null, slug: string, name: string, icon: string, description: string, type: string, price_cents: number }
 
@@ -180,9 +188,16 @@ export interface PollView {
   myOptionId: number | null
 }
 
-export async function serializePost(event: H3Event, row: Record<string, unknown>, userId: number | null, fullAccess: boolean, viewerRole: string | null = null) {
+// `fullAccess` es el acceso de LECTURA: quien lo tiene recibe el
+// cuerpo completo. `opts.canInteract` (Fase 15) separa leer de
+// participar: en un canal pago con anticipo «completo», el no
+// comprador LEE el post entero pero no comenta, reacciona ni vota —
+// interactuar sigue exigiendo el acceso comprado. Sin opts, interactuar
+// equivale a tener acceso completo (el comportamiento de siempre).
+export async function serializePost(event: H3Event, row: Record<string, unknown>, userId: number | null, fullAccess: boolean, viewerRole: string | null = null, opts?: { canInteract?: boolean }) {
   const db = await dbFor(event)
   const postId = row.id as number
+  const canInteract = opts?.canInteract ?? fullAccess
   const reactionRows = await db.prepare('SELECT type, COUNT(*) AS n FROM reactions WHERE post_id = ? GROUP BY type').all(postId) as { type: string, n: number }[]
   const reactions: Record<string, number> = { love: 0, like: 0, fire: 0, clap: 0 }
   for (const r of reactionRows) reactions[r.type] = r.n
@@ -197,7 +212,7 @@ export async function serializePost(event: H3Event, row: Record<string, unknown>
   // porcentajes y el voto del usuario actual (solo con acceso completo:
   // en un canal bloqueado la encuesta también queda detrás del teaser).
   let poll: PollView | null = null
-  if (row.kind === 'poll' && fullAccess) {
+  if (row.kind === 'poll' && canInteract) {
     const optionRows = await db.prepare('SELECT * FROM poll_options WHERE post_id = ? ORDER BY sort, id').all(postId) as Record<string, unknown>[]
     const voteRows = await db.prepare('SELECT option_id, COUNT(*) AS n FROM poll_votes WHERE post_id = ? GROUP BY option_id').all(postId) as { option_id: number, n: number }[]
     const counts = new Map(voteRows.map(v => [Number(v.option_id), Number(v.n)]))
@@ -235,20 +250,57 @@ export async function serializePost(event: H3Event, row: Record<string, unknown>
       : viewerRole === 'admin'
         ? { name: 'Anónimo', slug: '', avatarUrl: '', role: 'member', online: false, anonymous: true, mine: false, realAuthor: { name: realAuthor.name, slug: realAuthor.slug, avatarUrl: realAuthor.avatarUrl }, realRole: realAuthor.role }
         : { name: 'Anónimo', slug: '', avatarUrl: '', role: 'member', online: false, anonymous: true, mine: false }
+  // Fase 15 — anticipo granular de canales pagos. ESTE es el único
+  // lugar donde se serializa un post para un no comprador de un canal
+  // pago, así que feed, detalle, canal y búsqueda quedan consistentes:
+  //   - mode 'preview': el texto sale cortado en el menor de los dos
+  //     límites (% del cuerpo y tope de caracteres), nunca entero.
+  //   - mode 'title': solo viajan título (acortado si así está
+  //     configurado) y metadatos; ni una línea del cuerpo.
+  //   - mode 'full': el cuerpo viaja completo (lectura), pero
+  //     canInteract queda en falso: participar exige la compra.
+  // Sin acceso de lectura, la URL del adjunto NO viaja (solo el conteo
+  // de adjuntos si el ajuste de medios lo permite): servir la URL era
+  // entregar el archivo por la puerta de atrás.
+  const isPaidLocked = !fullAccess && String(row.channel_type || '') === 'paid'
+  const isPaidNonBuyer = !canInteract && String(row.channel_type || '') === 'paid'
+  let titleOut = row.title as string
+  let teaserOut = (row.teaser as string) || String(row.body || '').slice(0, 160)
+  let mediaUrlOut = row.media_url as string
+  let mediaCount: number | null = null
+  if (isPaidNonBuyer) {
+    const priv = await getPrivacySettings(event, Number(row.tenant_id))
+    // El acortado del título es una regla de presentación para no
+    // compradores: aplica también cuando el anticipo es completo.
+    titleOut = truncateTitle(String(row.title || ''), priv.paidTitleMode)
+    if (isPaidLocked) {
+      teaserOut = priv.paidPreviewMode === 'title'
+        ? ''
+        : paidTeaserText(String(row.body || ''), priv.paidPreviewPct, priv.paidPreviewChars)
+      mediaUrlOut = ''
+      mediaCount = priv.paidMediaMode === 'count'
+        ? (row.media_type && row.media_type !== 'none' ? 1 : 0)
+        : null
+    }
+  }
   return {
     id: postId,
     slug: row.slug,
-    title: row.title,
+    title: titleOut,
     body: fullAccess ? row.body : '',
     // Fase 8: cuerpo con formato, re-sanitizado al servir (ya viene
     // sanitizado de la escritura; esto cubre datos viejos o editados
     // por otras vías). El texto plano (`body`) sigue mandando en
     // teasers, búsqueda y notificaciones.
     bodyHtml: fullAccess ? sanitizeHtml(String(row.body_html || '')) : '',
-    teaser: row.teaser || String(row.body || '').slice(0, 160),
+    teaser: teaserOut,
     locked: !fullAccess,
+    // Fase 15: leer no es participar (canales pagos con anticipo
+    // completo). Los endpoints de escritura validan el acceso real.
+    canInteract,
+    mediaCount,
     mediaType: row.media_type,
-    mediaUrl: row.media_url,
+    mediaUrl: mediaUrlOut,
     attachmentName: (row.attachment_name as string) || '',
     pinned: !!row.pinned,
     kind: (row.kind as string) || 'post',

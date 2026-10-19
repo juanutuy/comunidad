@@ -19,6 +19,7 @@ import { nowIso, dbFor, slugify } from '../../utils/db'
 import { sendEmail } from '../../utils/email'
 import { applyAutoJoin, getJoinSettings, invitationByToken, invitationState, joinCooldownUntil } from '../../utils/members'
 import { notifyAdmins } from '../../utils/moderation'
+import { getPrivacySettings } from '../../utils/privacy'
 
 interface RegisterBody {
   name?: string
@@ -48,6 +49,13 @@ export default defineEventHandler(async (event) => {
     if (invitation.kind === 'email' && invitation.email.toLowerCase() !== email)
       throw createError({ statusCode: 400, message: 'Esta invitación es para otro correo. Registrate con el correo que recibió la invitación.' })
   }
+
+  // Fase 15: registro público cerrado — sin una invitación válida no
+  // se crea ninguna cuenta (ni siquiera una reaplicación tras un
+  // rechazo: el ingreso vuelve a ser una decisión del equipo).
+  const priv = await getPrivacySettings(event, tenant.id)
+  if (!priv.anyoneCanRegister && !invitation)
+    throw createError({ statusCode: 403, message: 'El registro público está cerrado en esta comunidad. Necesitás una invitación de un administrador para crear tu cuenta.' })
 
   const existing = await db.prepare('SELECT * FROM users WHERE email = ?').get(email) as (import('../../utils/community').UserRow & { password_hash: string }) | undefined
   let userId: number

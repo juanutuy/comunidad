@@ -1,10 +1,16 @@
 // Grupos y canales del tenant, con estado de seguimiento del usuario.
 import { currentAuth, resolveTenant } from '../../utils/community'
 import { dbFor } from '../../utils/db'
+import { getPrivacySettings } from '../../utils/privacy'
 
 export default defineEventHandler(async (event) => {
   const tenant = await resolveTenant(event)
   const { user } = await currentAuth(event, tenant.id)
+  // Fase 15: en el modo público, el visitante no ve los canales
+  // privados en el listado (ni el nombre): para él no existen. Con
+  // sesión, o en el modo privado de siempre, el listado no cambia.
+  const priv = await getPrivacySettings(event, tenant.id)
+  const hidePrivate = !user && priv.visibility === 'public'
   const db = await dbFor(event)
   const groups = await db.prepare('SELECT * FROM channel_groups WHERE tenant_id = ? ORDER BY sort').all(tenant.id) as unknown as { id: number, name: string }[]
   const channels = await db.prepare('SELECT * FROM channels WHERE tenant_id = ? ORDER BY sort').all(tenant.id) as Record<string, unknown>[]
@@ -14,10 +20,14 @@ export default defineEventHandler(async (event) => {
   const access = new Set(user
     ? (await db.prepare('SELECT channel_id FROM channel_access WHERE tenant_id = ? AND user_id = ?').all(tenant.id, user.id) as unknown as { channel_id: number }[]).map(f => f.channel_id)
     : [])
+  const visibleChannels = hidePrivate ? channels.filter(c => c.type !== 'private') : channels
+  const visibleGroups = hidePrivate
+    ? groups.filter(g => visibleChannels.some(c => c.group_id === g.id))
+    : groups
   return {
-    groups: groups.map(g => ({
+    groups: visibleGroups.map(g => ({
       id: g.id, name: g.name,
-      channels: channels.filter(c => c.group_id === g.id).map(c => ({
+      channels: visibleChannels.filter(c => c.group_id === g.id).map(c => ({
         id: c.id, slug: c.slug, name: c.name, icon: c.icon, description: c.description,
         type: c.type, priceCents: c.price_cents,
         following: follows.has(c.id as number),

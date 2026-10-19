@@ -1,6 +1,7 @@
 // Comentar una publicación (solo miembros con sesión).
 // Se notifica al autor de la publicación y a quienes sean mencionados.
-import { currentAuth, requireCanWrite, requireUser, resolveTenant } from '../../../utils/community'
+import { canAccessChannel, currentAuth, requireCanWrite, requireUser, resolveTenant } from '../../../utils/community'
+import type { ChannelRow } from '../../../utils/community'
 import { nowIso, dbFor } from '../../../utils/db'
 import { assertGate, containsLink } from '../../../utils/members'
 import { notify, notifyMentions } from '../../../utils/notify'
@@ -17,8 +18,15 @@ export default defineEventHandler(async (event) => {
   await requireCanWrite(event, tenant.id, user.id)
   if (containsLink(text)) await assertGate(event, tenant.id, user.id, role, 'feed_link')
   const db = await dbFor(event)
-  const post = await db.prepare(`SELECT p.author_id, p.title, p.slug, p.status, p.allow_comments, c.slug AS channel_slug FROM posts p JOIN channels c ON c.id = p.channel_id WHERE p.id = ? AND p.tenant_id = ?`).get(postId, tenant.id) as { author_id: number, title: string, slug: string, status: string, allow_comments: number, channel_slug: string } | undefined
+  const post = await db.prepare(`SELECT p.author_id, p.title, p.slug, p.status, p.allow_comments, c.id AS channel_id, c.slug AS channel_slug, c.type AS channel_type FROM posts p JOIN channels c ON c.id = p.channel_id WHERE p.id = ? AND p.tenant_id = ?`).get(postId, tenant.id) as { author_id: number, title: string, slug: string, status: string, allow_comments: number, channel_id: number, channel_slug: string, channel_type: string } | undefined
   if (!post) throw createError({ statusCode: 404, message: 'Publicación no encontrada.' })
+  // Fase 15: participar exige el acceso real al canal. Con el
+  // anticipo en modo «completo» un no comprador puede LEER el post de
+  // un canal pago, pero comentar sigue siendo de compradores (antes
+  // este endpoint no verificaba el acceso al canal).
+  const postChannel = { id: post.channel_id, tenant_id: tenant.id, group_id: null, slug: post.channel_slug, name: '', icon: '', description: '', type: post.channel_type, price_cents: 0 } as ChannelRow
+  if (!(await canAccessChannel(event, user.id, role, postChannel)))
+    throw createError({ statusCode: 403, message: 'Necesitás acceso a este canal para comentar en esta publicación.' })
   // Fase 12: en un post que no está publicado (p. ej. en revisión)
   // solo pueden comentar su autor y los admins; para el resto no existe.
   if (post.status !== 'published' && post.author_id !== user.id && role !== 'admin')

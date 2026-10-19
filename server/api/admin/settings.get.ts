@@ -4,6 +4,7 @@
 // canales para los selectores de auto-ingreso.
 import { requireAdmin, resolveTenant } from '../../utils/community'
 import { getJoinSettings } from '../../utils/members'
+import { getPrivacySettings } from '../../utils/privacy'
 import { dbFor } from '../../utils/db'
 
 export default defineEventHandler(async (event) => {
@@ -12,6 +13,7 @@ export default defineEventHandler(async (event) => {
   const db = await dbFor(event)
   const row = await db.prepare('SELECT terms, privacy, moderation_review FROM tenants WHERE id = ?').get(tenant.id).catch(() => undefined) as { terms: string, privacy: string, moderation_review?: number } | undefined
   const join = await getJoinSettings(event, tenant.id)
+  const priv = await getPrivacySettings(event, tenant.id)
   const channels = await db.prepare('SELECT id, name, slug, type FROM channels WHERE tenant_id = ? ORDER BY sort, name').all(tenant.id) as { id: number, name: string, slug: string, type: string }[]
   return {
     settings: {
@@ -25,6 +27,25 @@ export default defineEventHandler(async (event) => {
       joinQuestions: join.questions,
       joinCooldownDays: join.cooldownDays,
       autoJoinChannels: join.autoJoinChannels,
+      // Fase 15: privacidad y presentación (los bloques JSON van
+      // resueltos contra los valores reales: el formulario siempre
+      // edita la lista completa, nunca el JSON crudo).
+      visibility: priv.visibility,
+      directoryAudience: priv.directoryAudience,
+      libraryAudience: priv.libraryAudience,
+      paidPreviewMode: priv.paidPreviewMode,
+      paidPreviewPct: priv.paidPreviewPct,
+      paidPreviewChars: priv.paidPreviewChars,
+      paidMediaMode: priv.paidMediaMode,
+      paidTitleMode: priv.paidTitleMode,
+      paidLockedWhere: priv.paidLockedWhere,
+      feedSidebar: priv.feedSidebar,
+      navMenu: priv.navMenu,
+      anyoneCanRegister: priv.anyoneCanRegister,
+      logoUrl: priv.logoUrl, logoDarkUrl: priv.logoDarkUrl,
+      iconUrl: priv.iconUrl, faviconUrl: priv.faviconUrl,
+      supportEmail: priv.supportEmail, websiteUrl: priv.websiteUrl,
+      socialLinks: priv.socialLinks,
     },
     channels: channels.map(c => ({ id: c.id, name: c.name, slug: c.slug, type: c.type })),
   }

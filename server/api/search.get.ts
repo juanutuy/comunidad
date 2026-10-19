@@ -4,6 +4,7 @@
 // nunca con el cuerpo completo.
 import { POST_SELECT, canAccessChannel, channelBySlug, currentAuth, resolveTenant, serializePost } from '../utils/community'
 import type { ChannelRow } from '../utils/community'
+import { getPrivacySettings } from '../utils/privacy'
 import { courseListed } from '../utils/courses'
 import type { CourseRow } from '../utils/courses'
 import { dbFor } from '../utils/db'
@@ -16,6 +17,12 @@ export default defineEventHandler(async (event) => {
   const like = `%${q}%`
   const db = await dbFor(event)
   const { user, role } = await currentAuth(event, tenant.id)
+  const priv = await getPrivacySettings(event, tenant.id)
+  // Fase 15: la búsqueda NO se abre a visitantes en el modo público
+  // (buscar miembros y contenido sigue siendo cosa de la sesión). En
+  // el modo privado queda como siempre.
+  if (!user && priv.visibility === 'public')
+    throw createError({ statusCode: 401, message: 'Iniciá sesión para buscar en la comunidad.' })
 
   const hf = hiddenFilterSql(user?.id ?? null)
   const postRows = await db.prepare(`${POST_SELECT} WHERE p.tenant_id = ? AND p.status = 'published' AND (p.title LIKE ? OR p.body LIKE ?)${hf.sql} ORDER BY p.created_at DESC LIMIT 10`).all(tenant.id, like, like, ...hf.params) as Record<string, unknown>[]
@@ -32,6 +39,10 @@ export default defineEventHandler(async (event) => {
     const ch = (await channelBySlug(event, tenant.id, r.channel_slug as string))!
     const access = await canAccessChannel(event, user?.id ?? null, role, ch)
     if (ch.type === 'private' && !access) continue // privado sin acceso: ni el teaser sale del canal
+    // Fase 15: «dónde aparecen» también limpia la búsqueda — con
+    // 'channel' o 'hidden', la tarjeta bloqueada no sale acá (como en
+    // la referencia: «Main feed and search stay clear»).
+    if (ch.type === 'paid' && !access && priv.paidLockedWhere !== 'feed') continue
     posts.push(await serializePost(event, r, user?.id ?? null, access, role))
   }
 
