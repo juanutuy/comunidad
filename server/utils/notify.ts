@@ -9,19 +9,22 @@ export interface NotifyInput {
   tenantId: number
   userId: number // destinatario
   actorId: number | null
-  type: 'reaction' | 'comment' | 'new_post' | 'mention' | 'dm'
+  type: 'reaction' | 'comment' | 'new_post' | 'mention' | 'dm' | 'follow'
   title: string
   link: string
 }
 
 // Fase 5: preferencias de notificación por tipo (Ajustes de cuenta).
 // Clave en user_prefs por tipo; por defecto todo activado (sin fila).
+// 'follow' (Fase 6) tiene su propia categoría de preferencia
+// (notify_follow), no se mezcla con menciones: son avisos distintos.
 const PREF_BY_TYPE: Record<NotifyInput['type'], string> = {
   reaction: 'notify_reaction',
   comment: 'notify_comment',
   mention: 'notify_mention',
   new_post: 'notify_new_post',
   dm: 'notify_dm',
+  follow: 'notify_follow',
 }
 
 export async function notify(event: H3Event, n: NotifyInput): Promise<void> {

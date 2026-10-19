@@ -6,15 +6,15 @@ const api = useApi()
 const toast = useToast()
 
 interface SettingsData {
-  profile: { name: string, bio: string, location: string, email: string, avatarUrl: string }
+  profile: { name: string, bio: string, location: string, email: string, avatarUrl: string, coverUrl: string, website: string }
   prefs: Record<string, boolean>
 }
 const { data, refresh } = await useAsyncData('account-settings', () =>
   user.value ? api<SettingsData>('/api/settings') : Promise.resolve(null))
 
-const profile = reactive({ name: '', bio: '', location: '' })
+const profile = reactive({ name: '', bio: '', location: '', website: '' })
 const prefs = reactive<Record<string, boolean>>({
-  notify_reaction: true, notify_comment: true, notify_mention: true, notify_new_post: true, notify_dm: true,
+  notify_reaction: true, notify_comment: true, notify_mention: true, notify_new_post: true, notify_dm: true, notify_follow: true,
   directory_visible: true,
 })
 watchEffect(() => {
@@ -22,6 +22,7 @@ watchEffect(() => {
     profile.name = data.value.profile.name
     profile.bio = data.value.profile.bio
     profile.location = data.value.profile.location
+    profile.website = data.value.profile.website
     Object.assign(prefs, data.value.prefs)
   }
 })
@@ -59,6 +60,36 @@ async function onAvatarChange(e: Event) {
     toast.add({ title: 'No se pudo subir la foto', description: (err as { data?: { message?: string } }).data?.message || '', color: 'error' })
   }
   finally { uploadingAvatar.value = false }
+}
+
+// Fase 6: foto de portada del perfil (kind 'cover' en /api/uploads).
+const uploadingCover = ref(false)
+async function onCoverChange(e: Event) {
+  const file = (e.target as HTMLInputElement).files?.[0]
+  if (!file) return
+  uploadingCover.value = true
+  try {
+    const fd = new FormData()
+    fd.append('file', file)
+    fd.append('kind', 'cover')
+    await api('/api/uploads', { method: 'POST', body: fd })
+    toast.add({ title: 'Foto de portada actualizada', color: 'success' })
+    await fetchMe()
+    await refresh()
+  }
+  catch (err) {
+    toast.add({ title: 'No se pudo subir la portada', description: (err as { data?: { message?: string } }).data?.message || '', color: 'error' })
+  }
+  finally { uploadingCover.value = false }
+}
+async function removeCover() {
+  try {
+    await api('/api/settings/profile', { method: 'PUT', body: { ...profile, coverUrl: '' } })
+    toast.add({ title: 'Portada eliminada', description: 'Tu perfil vuelve al fondo de color por defecto.', color: 'success' })
+    await fetchMe()
+    await refresh()
+  }
+  catch { toast.add({ title: 'No se pudo quitar la portada', color: 'error' }) }
 }
 
 const savingPrefs = ref(false)
@@ -117,6 +148,7 @@ const notifyItems = [
   { key: 'notify_mention', label: 'Menciones (@mi-usuario)', icon: 'i-lucide-at-sign' },
   { key: 'notify_new_post', label: 'Publicaciones nuevas en canales que sigo', icon: 'i-lucide-pen-square' },
   { key: 'notify_dm', label: 'Mensajes directos', icon: 'i-lucide-mail' },
+  { key: 'notify_follow', label: 'Nuevos seguidores', icon: 'i-lucide-user-plus' },
 ]
 </script>
 
@@ -141,6 +173,20 @@ const notifyItems = [
               <input type="file" accept="image/png,image/jpeg,image/webp,image/gif" class="hidden" :disabled="uploadingAvatar" @change="onAvatarChange">
             </label>
           </div>
+          <div>
+            <p class="mb-2 text-sm font-medium">Foto de portada</p>
+            <div class="relative h-28 overflow-hidden rounded-lg bg-gradient-to-r from-primary/60 to-primary/20">
+              <img v-if="data?.profile.coverUrl" :src="data.profile.coverUrl" alt="Tu foto de portada" class="h-full w-full object-cover">
+            </div>
+            <div class="mt-2 flex flex-wrap items-center gap-3">
+              <label class="inline-flex cursor-pointer items-center gap-2 text-sm font-medium text-primary hover:underline">
+                <UIcon name="i-lucide-image" />
+                {{ uploadingCover ? 'Subiendo…' : 'Cambiar portada' }}
+                <input type="file" accept="image/png,image/jpeg,image/webp,image/gif" class="hidden" :disabled="uploadingCover" @change="onCoverChange">
+              </label>
+              <UButton v-if="data?.profile.coverUrl" size="sm" color="neutral" variant="ghost" icon="i-lucide-trash-2" label="Quitar portada" @click="removeCover" />
+            </div>
+          </div>
           <UFormField label="Nombre">
             <UInput v-model="profile.name" class="w-full" />
           </UFormField>
@@ -152,6 +198,9 @@ const notifyItems = [
           </UFormField>
           <UFormField label="Ubicación">
             <UInput v-model="profile.location" class="w-full" />
+          </UFormField>
+          <UFormField label="Sitio web" hint="Se muestra como enlace en tu perfil. Podés escribirlo sin https://">
+            <UInput v-model="profile.website" class="w-full" placeholder="tusitioweb.com" icon="i-lucide-globe" />
           </UFormField>
           <div class="flex justify-end">
             <UButton label="Guardar perfil" icon="i-lucide-save" :loading="savingProfile" :disabled="!profile.name.trim()" @click="saveProfile" />

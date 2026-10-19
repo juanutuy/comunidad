@@ -7,7 +7,7 @@ import { readSession } from './auth'
 import { dbFor } from './db'
 
 export interface TenantRow { id: number, slug: string, name: string, tagline: string, brand_color: string, guidelines: string }
-export interface UserRow { id: number, name: string, slug: string, email: string, bio: string, location: string, avatar_url: string, created_at: string }
+export interface UserRow { id: number, name: string, slug: string, email: string, bio: string, location: string, avatar_url: string, created_at: string, cover_url?: string, website?: string, last_seen_at?: string }
 export interface ChannelRow { id: number, tenant_id: number, group_id: number | null, slug: string, name: string, icon: string, description: string, type: string, price_cents: number }
 
 export async function resolveTenant(event: H3Event): Promise<TenantRow> {

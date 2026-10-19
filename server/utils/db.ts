@@ -112,6 +112,9 @@ CREATE TABLE IF NOT EXISTS user_blocks (id INTEGER PRIMARY KEY AUTOINCREMENT, te
 CREATE UNIQUE INDEX IF NOT EXISTS user_blocks_unique ON user_blocks (tenant_id, blocker_id, blocked_id);
 CREATE TABLE IF NOT EXISTS user_hidden_posts (id INTEGER PRIMARY KEY AUTOINCREMENT, tenant_id INTEGER NOT NULL, user_id INTEGER NOT NULL, post_id INTEGER NOT NULL, created_at TEXT NOT NULL);
 CREATE UNIQUE INDEX IF NOT EXISTS user_hidden_posts_unique ON user_hidden_posts (tenant_id, user_id, post_id);
+CREATE TABLE IF NOT EXISTS user_follows (id INTEGER PRIMARY KEY AUTOINCREMENT, tenant_id INTEGER NOT NULL, follower_id INTEGER NOT NULL, followee_id INTEGER NOT NULL, created_at TEXT NOT NULL);
+CREATE UNIQUE INDEX IF NOT EXISTS user_follows_unique ON user_follows (tenant_id, follower_id, followee_id);
+CREATE INDEX IF NOT EXISTS user_follows_followee ON user_follows (tenant_id, followee_id);
 `
 
 // Migraciones aditivas (Fase 2) para bases creadas en la Fase 1 — ya hay
@@ -144,6 +147,9 @@ const MIGRATIONS = [
   `ALTER TABLE lessons ADD COLUMN video_url TEXT NOT NULL DEFAULT ''`,
   // Fase 5: agenda por sesiones del evento (texto, una sesión por línea).
   `ALTER TABLE events ADD COLUMN agenda TEXT NOT NULL DEFAULT ''`,
+  // Fase 6: foto de portada real y sitio web del miembro (perfil).
+  `ALTER TABLE users ADD COLUMN cover_url TEXT NOT NULL DEFAULT ''`,
+  `ALTER TABLE users ADD COLUMN website TEXT NOT NULL DEFAULT ''`,
 ]
 
 async function runMigrations(db: AsyncDb): Promise<void> {

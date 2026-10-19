@@ -12,7 +12,7 @@ import type { H3Event } from 'h3'
 import { dbFor } from './db'
 import { extraPoints } from './points'
 
-export interface Level { name: string, min: number, nextAt: number | null }
+export interface Level { name: string, min: number, nextAt: number | null, nextName: string | null }
 
 export const LEVELS: { name: string, min: number }[] = [
   { name: 'Leyenda', min: 250 },
@@ -26,7 +26,7 @@ export function levelFor(points: number): Level {
   const idx = LEVELS.findIndex(l => points >= l.min)
   const current = LEVELS[idx]!
   const next = idx > 0 ? LEVELS[idx - 1]! : null
-  return { name: current.name, min: current.min, nextAt: next ? next.min : null }
+  return { name: current.name, min: current.min, nextAt: next ? next.min : null, nextName: next ? next.name : null }
 }
 
 export interface MemberStats {

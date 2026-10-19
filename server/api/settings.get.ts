@@ -3,7 +3,7 @@
 import { requireUser, resolveTenant } from '../utils/community'
 import { dbFor } from '../utils/db'
 
-const NOTIFY_PREF_KEYS = ['notify_reaction', 'notify_comment', 'notify_mention', 'notify_new_post', 'notify_dm']
+const NOTIFY_PREF_KEYS = ['notify_reaction', 'notify_comment', 'notify_mention', 'notify_new_post', 'notify_dm', 'notify_follow']
 
 export default defineEventHandler(async (event) => {
   const tenant = await resolveTenant(event)
@@ -15,7 +15,7 @@ export default defineEventHandler(async (event) => {
   prefs.directory_visible = true
   for (const r of rows) prefs[r.key] = r.value !== '0'
   return {
-    profile: { name: user.name, bio: user.bio, location: user.location, email: user.email, avatarUrl: user.avatar_url || '' },
+    profile: { name: user.name, bio: user.bio, location: user.location, email: user.email, avatarUrl: user.avatar_url || '', coverUrl: user.cover_url || '', website: user.website || '' },
     prefs,
   }
 })

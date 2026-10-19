@@ -486,6 +486,57 @@ aditivas e idempotentes (tablas nuevas en el `CREATE_SQL` y columnas
 nuevas en `MIGRATIONS`, `server/utils/db.ts`); `scripts/d1-init.sql`
 regenerado con las 38 tablas.
 
+## Fase 6 (hecha) — perfil de miembro completo
+
+- **Foto de portada real** (`users.cover_url`, migración aditiva):
+  subida con el pipeline existente (`/api/uploads`, kind `cover`,
+  carpeta `covers/`, máx. 2 MB, mismos tipos que el avatar). Control
+  «Cambiar portada» sobre la portada del perfil propio y en Ajustes
+  (con «Quitar portada», que vuelve al degradado de marca por defecto).
+- **Cabecera rediseñada**: portada a lo ancho, avatar superpuesto con
+  punto de presencia sobre la foto, nombre + `@slug`, línea «Miembro
+  desde · ubicación · Activo ahora / Última vez hace X» (relativo
+  honesto desde `last_seen_at`) y fila de estadísticas visibles:
+  Publicaciones, Comentarios, Reacciones recibidas, Cursos
+  completados, Seguidores y Siguiendo.
+- **Seguir miembros** (`user_follows`, único el par por tenant):
+  `POST`/`DELETE /api/users/[slug]/follow` (uno mismo → 400, slug que
+  no es miembro → 404, con un bloqueo en cualquier sentido → 400).
+  Botón Seguir/Siguiendo en perfiles ajenos. Al seguir se crea una
+  notificación tipo `follow` («{nombre} empezó a seguirte», enlace al
+  perfil del seguidor) con su **propia** preferencia `notify_follow`
+  en Ajustes — no se mezcló con menciones — y chip «Seguidores» en la
+  campana y en la página de notificaciones. Seguir dos veces no
+  duplica relación ni aviso.
+- **Pestañas Eventos y Guardados**: Eventos lista los RSVP del miembro
+  (próximos primero, pasados al final) con enlace al evento. Guardados
+  muestra sus bookmarks con `PostCard` y es **solo del perfil propio**:
+  para cualquier otro visitante — incluido un admin — la pestaña no
+  aparece y la API ni siquiera incluye la clave `saved`.
+- **Columna lateral** (dos columnas en pantallas grandes, apilada en
+  móvil): tarjeta «Acerca de» (bio, ubicación, sitio web, miembro
+  desde), tarjeta de nivel con barra de progreso («Te faltan N pts
+  para {nivel}» o «Nivel máximo alcanzado») y panel de insignias
+  «{ganadas} de {total}» con grilla — ganadas a color, bloqueadas
+  atenuadas y descripción en el `title`.
+- **Sitio web del miembro** (`users.website`): editable en Ajustes →
+  Perfil. Se guarda tal cual se escribió (el protocolo es opcional) y
+  se normaliza al enlazar en «Acerca de»; lo que no parsea como URL
+  con host válido responde 400 y no se guarda.
+
+Verificado en local con `wrangler dev` sobre estado fresco (suite de
+36 comprobaciones contra la API y las páginas SSR con los usuarios
+demo): portada subida, visible y quitada; member sigue a lucia con
+conteos 1/1 en ambos perfiles, notificación `follow` recibida,
+duplicado sin efecto, preferencia `notify_follow` apagada que suprime
+el aviso, dejar de seguir vuelve a 0; pestaña Eventos con el RSVP y
+Guardados invisible para el admin; sitio web válido/inválido; nivel
+con nombre del siguiente e insignias coherentes; regresión de
+bloqueos de la Fase 5 intacta y la suite de tiempo real
+(`scripts/test-realtime.mjs`) en PASS. Build y typecheck en 0
+errores. Migraciones aditivas e idempotentes; `scripts/d1-init.sql`
+regenerado con las 39 tablas.
+
 ## Pendiente a propósito (fuera de esta fase)
 
 - Migraciones versionadas con `drizzle-kit` para D1 (hoy: esquema

@@ -28,6 +28,7 @@ const filterChips = [
   { label: 'Comentarios', value: 'comment' },
   { label: 'Publicaciones', value: 'new_post' },
   { label: 'Mensajes', value: 'dm' },
+  { label: 'Seguidores', value: 'follow' },
 ]
 const visibleItems = computed(() =>
   items.value.filter(n => filter.value === 'all' || n.type === filter.value).slice(0, 8))
@@ -38,6 +39,7 @@ const typeIcons: Record<string, string> = {
   new_post: 'i-lucide-pen-square',
   mention: 'i-lucide-at-sign',
   dm: 'i-lucide-mail',
+  follow: 'i-lucide-user-plus',
 }
 
 async function load() {

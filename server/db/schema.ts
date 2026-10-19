@@ -26,6 +26,9 @@ export const users = sqliteTable('users', {
   avatarUrl: text('avatar_url').notNull().default(''),
   // Fase 3 (migración aditiva): última conexión por WebSocket de tiempo real.
   lastSeenAt: text('last_seen_at').notNull().default(''),
+  // Fase 6 (migración aditiva): foto de portada y sitio web del miembro.
+  coverUrl: text('cover_url').notNull().default(''),
+  website: text('website').notNull().default(''),
   createdAt: text('created_at').notNull(),
 })
 
@@ -319,6 +322,15 @@ export const userHiddenPosts = sqliteTable('user_hidden_posts', {
   postId: integer('post_id').notNull().references(() => posts.id),
   createdAt: text('created_at').notNull(),
 }, t => [uniqueIndex('user_hidden_posts_unique').on(t.tenantId, t.userId, t.postId)])
+
+// Fase 6: seguimiento entre miembros (Seguir / Siguiendo del perfil).
+export const userFollows = sqliteTable('user_follows', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  tenantId: integer('tenant_id').notNull(),
+  followerId: integer('follower_id').notNull().references(() => users.id),
+  followeeId: integer('followee_id').notNull().references(() => users.id),
+  createdAt: text('created_at').notNull(),
+}, t => [uniqueIndex('user_follows_unique').on(t.tenantId, t.followerId, t.followeeId)])
 
 // Puntos base: se calculan de la actividad real (posts x10, comentarios
 // x3, reacciones recibidas x2) y se suman los point_events de la Fase 5
