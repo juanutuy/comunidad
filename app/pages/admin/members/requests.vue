@@ -7,6 +7,7 @@
 // configurado en Ajustes → Ingreso de miembros.
 definePageMeta({ layout: 'admin' })
 const { user, tenant } = useAuth()
+const membersMenuItems = useMembersMenuItems()
 const api = useApi()
 const toast = useToast()
 const { fmtDate, fmtDateTime, initials } = useFormat()
@@ -51,7 +52,9 @@ async function decide(r: ReqRow, action: 'approve' | 'decline') {
     <UAlert v-if="user && user.role !== 'admin'" color="warning" variant="soft" title="Solo administradores" description="Las solicitudes de ingreso las resuelve un administrador." />
     <UAlert v-else-if="!user" color="neutral" variant="soft" title="Iniciá sesión con una cuenta administradora" />
     <template v-else>
-      <MembersSubNav />
+      <div class="flex flex-col gap-5 lg:flex-row lg:items-start">
+      <AdminSubMenu :items="membersMenuItems" />
+      <div class="min-w-0 flex-1 space-y-5">
       <UAlert
         v-if="data && !data.approval" color="neutral" variant="soft" icon="i-lucide-info"
         title="La aprobación previa está apagada"
@@ -107,6 +110,8 @@ async function decide(r: ReqRow, action: 'approve' | 'decline') {
           </li>
         </ul>
       </UCard>
+      </div>
+      </div>
     </template>
   </div>
 </template>

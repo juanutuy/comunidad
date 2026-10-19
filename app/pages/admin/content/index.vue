@@ -7,6 +7,7 @@
 // Acceso: admin y moderator — la API también lo exige.
 definePageMeta({ layout: 'admin' })
 const { user, tenant } = useAuth()
+const contentMenuItems = useContentMenuItems()
 const { fmtDateTime } = useFormat()
 const api = useApi()
 const toast = useToast()
@@ -113,7 +114,9 @@ function rowMenuItems(p: ContentPost) {
     <UAlert v-if="!user" color="neutral" variant="soft" title="Iniciá sesión con una cuenta del equipo" />
     <UAlert v-else-if="!canUse" color="warning" variant="soft" title="Sin acceso" description="Esta sección es para administradores y moderadores." />
     <template v-else>
-      <ContentSubNav />
+      <div class="flex flex-col gap-5 lg:flex-row lg:items-start">
+      <AdminSubMenu :items="contentMenuItems" />
+      <div class="min-w-0 flex-1 space-y-5">
       <div class="flex flex-wrap items-center gap-2">
         <UInput v-model="search" icon="i-lucide-search" placeholder="Buscar por título o autor…" class="w-full sm:w-72" />
         <span class="flex-1" />
@@ -190,6 +193,8 @@ function rowMenuItems(p: ContentPost) {
           </div>
         </template>
       </UModal>
+      </div>
+      </div>
     </template>
   </div>
 </template>

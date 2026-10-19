@@ -6,6 +6,7 @@
 // Acceso: solo admin (la API también lo exige).
 definePageMeta({ layout: 'admin' })
 const { user, tenant } = useAuth()
+const contentMenuItems = useContentMenuItems()
 const { fmtDateTime } = useFormat()
 const api = useApi()
 const toast = useToast()
@@ -102,7 +103,9 @@ function rowMenuItems(f: MediaFile) {
     <UAlert v-if="!user" color="neutral" variant="soft" title="Iniciá sesión con una cuenta administradora" />
     <UAlert v-else-if="!isAdmin" color="warning" variant="soft" title="Solo administradores" description="El gestor de archivos es solo para administradores." />
     <template v-else>
-      <ContentSubNav />
+      <div class="flex flex-col gap-5 lg:flex-row lg:items-start">
+      <AdminSubMenu :items="contentMenuItems" />
+      <div class="min-w-0 flex-1 space-y-5">
       <div class="flex flex-wrap items-center gap-2">
         <div class="flex flex-wrap gap-1.5">
           <UButton
@@ -222,6 +225,8 @@ function rowMenuItems(f: MediaFile) {
           </div>
         </template>
       </UModal>
+      </div>
+      </div>
     </template>
   </div>
 </template>

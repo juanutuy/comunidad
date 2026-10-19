@@ -3,7 +3,7 @@
 // puntos por acción, editables por comunidad. Los niveles se guardan
 // como lista completa (editar / agregar / eliminar en un solo guardado)
 // y el servidor valida las guardas (base en 0, umbrales crecientes).
-// Fase 11: la sección gana sub-navegación real con pestañas
+// Fase 11: la sección gana sub-navegación real
 // (?tab=niveles | ?tab=puntos), como «Badges & Levels / Activity XP»
 // de la referencia; el guardado sigue siendo uno solo para ambas
 // vistas, contra PUT /api/admin/gamification.
@@ -42,7 +42,7 @@ watchEffect(() => {
 })
 
 // Las opciones de cada compuerta salen de los niveles TAL COMO
-// QUEDARÍAN al guardar (el borrador de la pestaña de niveles): la
+// QUEDARÍAN al guardar (el borrador de la subsección de niveles): la
 // compuerta referencia el umbral, así que editar un umbral mueve la
 // referencia al nivel que tenga ese umbral en el borrador.
 const gateOptions = computed(() => [
@@ -89,7 +89,9 @@ async function save() {
     <UAlert v-if="user && user.role !== 'admin'" color="warning" variant="soft" title="Solo administradores" />
     <UAlert v-else-if="!user" color="neutral" variant="soft" title="Iniciá sesión con una cuenta administradora" />
     <template v-else>
-      <AdminSubNav :items="subItems" />
+      <div class="flex flex-col gap-5 lg:flex-row lg:items-start">
+      <AdminSubMenu :items="subItems" />
+      <div class="min-w-0 flex-1 space-y-5">
 
       <UCard v-if="tab === 'niveles'">
         <template #header>
@@ -150,7 +152,7 @@ async function save() {
         <UAlert
           class="mt-4" color="neutral" variant="soft" icon="i-lucide-info"
           title="Las compuertas siguen al umbral"
-          description="Cada compuerta guarda el umbral de puntos del nivel elegido. Si después cambiás los umbrales en «Niveles e insignias», volvé a revisar esta pestaña: la compuerta queda atada al umbral guardado."
+          description="Cada compuerta guarda el umbral de puntos del nivel elegido. Si después cambiás los umbrales en «Niveles e insignias», volvé a revisar esta subsección: la compuerta queda atada al umbral guardado."
         />
       </UCard>
 
@@ -172,6 +174,8 @@ async function save() {
 
       <div class="flex justify-end">
         <UButton label="Guardar gamificación" icon="i-lucide-save" :loading="saving" @click="save" />
+      </div>
+      </div>
       </div>
     </template>
   </div>

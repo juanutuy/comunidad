@@ -104,7 +104,7 @@ async function reviewAction(post: ReviewPostView, action: 'approve' | 'reject') 
     <UAlert v-if="user && !['admin', 'moderator'].includes(user.role || '')" color="warning" variant="soft" title="Solo moderación" description="Tu cuenta no tiene rol de administrador ni de moderador en esta comunidad." />
     <UAlert v-else-if="!user" color="neutral" variant="soft" title="Iniciá sesión con una cuenta administradora" />
     <template v-else>
-      <AdminSubNav :items="subItems" />
+      <AdminQueueTabs :items="subItems" />
 
       <!-- ============ REPORTES ============ -->
       <div v-if="tab === 'reportes'" class="space-y-4">

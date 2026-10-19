@@ -8,6 +8,7 @@
 // Acceso: admin y encargado de cursos.
 definePageMeta({ layout: 'admin' })
 const { user, tenant } = useAuth()
+const coursesMenuItems = useCoursesMenuItems()
 const api = useApi()
 const toast = useToast()
 
@@ -93,14 +94,16 @@ const previewHeading = computed(() => form.headingText
 
 <template>
   <div class="space-y-5">
-    <h1 class="text-2xl font-bold">Administración</h1>
-    <div class="flex flex-wrap gap-1 border-b border-default">
-      <NuxtLink to="/admin/courses" class="-mb-px border-b-2 border-transparent px-3 py-2 text-sm font-medium text-muted transition hover:text-highlighted">Cursos</NuxtLink>
-      <NuxtLink to="/admin/courses/blueprints" class="-mb-px border-b-2 border-primary px-3 py-2 text-sm font-medium text-highlighted">Certificados</NuxtLink>
+    <div>
+      <h1 class="text-2xl font-bold">Cursos</h1>
+      <p class="text-muted">Diseños de certificado reutilizables para los cursos de {{ tenant?.name }}.</p>
     </div>
     <UAlert v-if="!user" color="warning" variant="soft" icon="i-lucide-lock" title="Iniciá sesión" description="Necesitás una cuenta del equipo para gestionar los diseños." />
     <UAlert v-else-if="!canUse" color="error" variant="soft" icon="i-lucide-shield-alert" title="Sin acceso" description="Esta sección es para administradores y encargados de cursos." />
     <template v-else>
+      <div class="flex flex-col gap-5 lg:flex-row lg:items-start">
+      <AdminSubMenu :items="coursesMenuItems" />
+      <div class="min-w-0 flex-1 space-y-5">
       <div class="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 class="text-lg font-semibold">Diseños de certificado</h2>
@@ -217,6 +220,8 @@ const previewHeading = computed(() => form.headingText
           </div>
         </template>
       </UModal>
+      </div>
+      </div>
     </template>
   </div>
 </template>

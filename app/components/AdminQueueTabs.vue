@@ -1,9 +1,11 @@
 <script setup lang="ts">
-// Sub-navegación de una sección de la consola (Fase 11): fila de
-// pestañas con el mismo patrón visual entre secciones (Gamificación,
-// Ajustes de la comunidad). La pestaña activa sale de ?tab= en la URL;
-// sin parámetro vale la primera. Solo se usa donde la sección tiene
-// subsecciones reales — no es decoración.
+// Pestañas de VISTAS DE DATOS de una misma cola (Fase 16-D): NO es
+// navegación entre subsecciones — eso es AdminSubMenu, en columna
+// vertical. Este patrón horizontal se queda SOLO donde las
+// «pestañas» reparten una misma lista de trabajo en vistas, como
+// en la referencia: hoy lo usa únicamente Moderación (Reportes /
+// En revisión, con sus contadores). La pestaña activa sale de
+// ?tab= en la URL; sin parámetro vale la primera.
 const props = defineProps<{
   items: { value: string, label: string, icon?: string, badge?: number }[]
 }>()
@@ -15,7 +17,7 @@ const active = computed(() => {
 </script>
 
 <template>
-  <div class="flex flex-wrap gap-1 border-b border-default" role="tablist" aria-label="Subsecciones">
+  <div class="flex flex-wrap gap-1 border-b border-default" role="tablist" aria-label="Vistas de la cola">
     <NuxtLink
       v-for="item in items" :key="item.value"
       :to="{ query: { tab: item.value } }"

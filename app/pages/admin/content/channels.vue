@@ -1,11 +1,12 @@
 <script setup lang="ts">
 // Contenido → Canales (Fase 16): la tabla de canales de la consola,
-// con pestañas Activos / Archivados, «quién puede publicar» por
+// con vistas Activos / Archivados, «quién puede publicar» por
 // canal y archivar/desarchivar. La edición completa (nombre, tipo,
 // precio, grupo) sigue viviendo en la gestión de Canales: desde acá
 // se llega con «Editar». Acceso: solo admin.
 definePageMeta({ layout: 'admin' })
 const { user, tenant } = useAuth()
+const contentMenuItems = useContentMenuItems()
 const { fmtMoney } = useFormat()
 const api = useApi()
 const toast = useToast()
@@ -95,7 +96,9 @@ function rowMenuItems(ch: ContentChannel) {
     <UAlert v-if="!user" color="neutral" variant="soft" title="Iniciá sesión con una cuenta administradora" />
     <UAlert v-else-if="!isAdmin" color="warning" variant="soft" title="Solo administradores" description="La gestión de canales de la consola es solo para administradores." />
     <template v-else>
-      <ContentSubNav />
+      <div class="flex flex-col gap-5 lg:flex-row lg:items-start">
+      <AdminSubMenu :items="contentMenuItems" />
+      <div class="min-w-0 flex-1 space-y-5">
       <div class="flex flex-wrap gap-1.5">
         <UButton size="sm" :color="tab === 'active' ? 'primary' : 'neutral'" :variant="tab === 'active' ? 'soft' : 'ghost'" :label="`Activos · ${activeCount}`" @click="tab = 'active'" />
         <UButton size="sm" :color="tab === 'archived' ? 'primary' : 'neutral'" :variant="tab === 'archived' ? 'soft' : 'ghost'" :label="`Archivados · ${archivedCount}`" @click="tab = 'archived'" />
@@ -155,6 +158,8 @@ function rowMenuItems(ch: ContentChannel) {
           </div>
         </template>
       </UModal>
+      </div>
+      </div>
     </template>
   </div>
 </template>

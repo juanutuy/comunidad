@@ -10,6 +10,7 @@
 //     de usos; se puede revocar en cualquier momento.
 definePageMeta({ layout: 'admin' })
 const { user, tenant } = useAuth()
+const membersMenuItems = useMembersMenuItems()
 const api = useApi()
 const toast = useToast()
 const { fmtDate, fmtDateTime } = useFormat()
@@ -83,7 +84,9 @@ async function copyText(text: string) {
     <UAlert v-if="user && user.role !== 'admin'" color="warning" variant="soft" title="Solo administradores" description="Las invitaciones las gestiona un administrador." />
     <UAlert v-else-if="!user" color="neutral" variant="soft" title="Iniciá sesión con una cuenta administradora" />
     <template v-else>
-      <MembersSubNav />
+      <div class="flex flex-col gap-5 lg:flex-row lg:items-start">
+      <AdminSubMenu :items="membersMenuItems" />
+      <div class="min-w-0 flex-1 space-y-5">
 
       <UAlert
         v-if="data && !data.emailEnabled" color="warning" variant="soft" icon="i-lucide-mail-warning"
@@ -161,6 +164,8 @@ async function copyText(text: string) {
         </ul>
       </UCard>
       <p class="text-xs text-muted">Las fechas y horas se muestran en tu zona horaria. Última actualización al abrir la página: {{ fmtDateTime(new Date().toISOString()) }}.</p>
+      </div>
+      </div>
     </template>
   </div>
 </template>

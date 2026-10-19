@@ -4,8 +4,8 @@
 // referencia, con sub-navegación real: «General» (nombre, lema, color
 // de marca y reglas) y «Textos legales» (términos y privacidad). Es un
 // solo formulario y un solo guardado contra PUT /api/admin/settings:
-// las pestañas solo reparten los campos en las vistas.
-// Fase 12: tercera pestaña «Moderación» con la revisión previa
+// el submenú solo reparte los campos en las vistas.
+// Fase 12: subsección «Moderación» con la revisión previa
 // opcional de publicaciones (su propia subsección porque es un
 // comportamiento con explicación, no un dato de identidad).
 definePageMeta({ layout: 'admin' })
@@ -309,7 +309,9 @@ async function save() {
     <UAlert v-if="user && user.role !== 'admin'" color="warning" variant="soft" title="Solo administradores" description="Tu cuenta no tiene rol de administrador en esta comunidad." />
     <UAlert v-else-if="!user" color="neutral" variant="soft" title="Iniciá sesión con una cuenta administradora" />
     <template v-else>
-      <AdminSubNav :items="subItems" />
+      <div class="flex flex-col gap-5 lg:flex-row lg:items-start">
+      <AdminSubMenu :items="subItems" />
+      <div class="min-w-0 flex-1 space-y-5">
 
       <UCard v-if="tab === 'general'">
         <div class="space-y-4">
@@ -374,7 +376,7 @@ async function save() {
             <div class="min-w-0">
               <p class="font-semibold">Cualquiera puede registrarse</p>
               <p class="mt-1 text-sm text-muted">
-                Encendido, el registro es público (con la aprobación previa de la pestaña «Ingreso de miembros» si la activás).
+                Encendido, el registro es público (con la aprobación previa de la subsección «Ingreso de miembros» si la activás).
                 Apagado, el registro se cierra: solo entra quien tenga una invitación o a quien des de alta a mano.
               </p>
             </div>
@@ -753,6 +755,8 @@ async function save() {
 
       <div class="flex justify-end">
         <UButton label="Guardar ajustes" icon="i-lucide-save" :loading="saving" :disabled="!form.name.trim()" @click="save" />
+      </div>
+      </div>
       </div>
     </template>
   </div>

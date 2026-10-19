@@ -8,6 +8,7 @@
 // decisión de alcance, no una matriz a medio hacer.
 definePageMeta({ layout: 'admin' })
 const { user, tenant } = useAuth()
+const membersMenuItems = useMembersMenuItems()
 
 const roles = [
   {
@@ -64,7 +65,9 @@ const roles = [
     <UAlert v-if="user && user.role !== 'admin'" color="warning" variant="soft" title="Solo administradores" description="Esta explicación es para quien asigna los roles: un administrador." />
     <UAlert v-else-if="!user" color="neutral" variant="soft" title="Iniciá sesión con una cuenta administradora" />
     <template v-else>
-      <MembersSubNav />
+      <div class="flex flex-col gap-5 lg:flex-row lg:items-start">
+      <AdminSubMenu :items="membersMenuItems" />
+      <div class="min-w-0 flex-1 space-y-5">
       <p class="max-w-3xl text-sm text-muted">
         El rol se asigna desde la <NuxtLink to="/admin/members" class="text-primary hover:underline">lista de miembros</NuxtLink>,
         en el selector de cada persona. Nadie puede degradar al único administrador de la comunidad: siempre tiene que quedar alguien con control total.
@@ -93,6 +96,8 @@ const roles = [
         title="Roles fijos, sin matriz de permisos"
         description="En esta plataforma los roles son estos cuatro y sus capacidades están definidas por el sistema (las de esta página). No hay una matriz de permisos editable ni roles personalizados: es una diferencia deliberada de alcance frente a otras plataformas, para que lo que cada rol puede hacer sea siempre previsible."
       />
+      </div>
+      </div>
     </template>
   </div>
 </template>

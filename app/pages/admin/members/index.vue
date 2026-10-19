@@ -8,6 +8,7 @@
 // servidor le negaría.
 definePageMeta({ layout: 'admin' })
 const { user, tenant } = useAuth()
+const membersMenuItems = useMembersMenuItems()
 const api = useApi()
 const toast = useToast()
 const { fmtDate, initials } = useFormat()
@@ -212,7 +213,9 @@ function rowMenuItems(m: MemberRow) {
     <UAlert v-if="user && !canView" color="warning" variant="soft" title="Sin acceso" description="Esta sección es para administradores y moderadores de la comunidad." />
     <UAlert v-else-if="!user" color="neutral" variant="soft" title="Iniciá sesión con una cuenta del equipo" />
     <template v-else>
-      <MembersSubNav />
+      <div class="flex flex-col gap-5 lg:flex-row lg:items-start">
+      <AdminSubMenu :items="membersMenuItems" />
+      <div class="min-w-0 flex-1 space-y-5">
       <UAlert v-if="!isAdmin" color="neutral" variant="soft" icon="i-lucide-eye" title="Vista de solo lectura" description="Como moderador ves la lista de miembros; los roles, estados y etiquetas los gestiona un administrador." />
 
       <div class="flex flex-wrap items-center gap-2">
@@ -363,6 +366,8 @@ function rowMenuItems(m: MemberRow) {
           </div>
         </template>
       </UModal>
+      </div>
+      </div>
     </template>
   </div>
 </template>

@@ -7,7 +7,8 @@
 // arrastre, drip, inscritos y settings con autoguardado. Acá solo se
 // crea (nace en borrador y se abre el estudio), se entra y se borra.
 definePageMeta({ layout: 'admin' })
-const { user } = useAuth()
+const { user, tenant } = useAuth()
+const coursesMenuItems = useCoursesMenuItems()
 // Fase 14: el catálogo de cursos de la consola también es del
 // encargado de cursos (course_manager), no solo del administrador.
 const isAdmin = computed(() => ['admin', 'course_manager'].includes(user.value?.role || ''))
@@ -66,10 +67,9 @@ async function confirmDelete() {
 
 <template>
   <div class="space-y-5">
-    <h1 class="text-2xl font-bold">Administración</h1>
-    <div class="flex flex-wrap gap-1 border-b border-default">
-      <NuxtLink to="/admin/courses" class="-mb-px border-b-2 border-primary px-3 py-2 text-sm font-medium text-highlighted">Cursos</NuxtLink>
-      <NuxtLink to="/admin/courses/blueprints" class="-mb-px border-b-2 border-transparent px-3 py-2 text-sm font-medium text-muted transition hover:text-highlighted">Certificados</NuxtLink>
+    <div>
+      <h1 class="text-2xl font-bold">Cursos</h1>
+      <p class="text-muted">El catálogo de cursos de {{ tenant?.name }} y sus diseños de certificado.</p>
     </div>
     <UAlert v-if="!user" color="warning" variant="soft" icon="i-lucide-lock" title="Iniciá sesión" description="Necesitás una cuenta de administrador para gestionar los cursos.">
       <template #actions><UButton to="/" label="Ir al inicio" size="sm" /></template>
@@ -77,11 +77,11 @@ async function confirmDelete() {
     <UAlert v-else-if="!isAdmin" color="error" variant="soft" icon="i-lucide-shield-alert" title="Sin acceso" description="Esta sección es solo para administradores de la comunidad." />
 
     <template v-else>
+      <div class="flex flex-col gap-5 lg:flex-row lg:items-start">
+      <AdminSubMenu :items="coursesMenuItems" />
+      <div class="min-w-0 flex-1 space-y-5">
       <div class="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h2 class="text-lg font-semibold">Cursos</h2>
-          <p class="text-sm text-muted">Cada curso se edita en su estudio: currículum, drip, inscritos y ajustes, con autoguardado.</p>
-        </div>
+        <p class="text-sm text-muted">Cada curso se edita en su estudio: currículum, drip, inscritos y ajustes, con autoguardado.</p>
         <UButton label="Nuevo curso" icon="i-lucide-plus" @click="showCreate = true" />
       </div>
 
@@ -135,6 +135,8 @@ async function confirmDelete() {
           </div>
         </template>
       </UModal>
+      </div>
+      </div>
     </template>
   </div>
 </template>
