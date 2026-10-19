@@ -1735,6 +1735,93 @@ devuelto a miembro al final): su submenú de Miembros trae solo
 typecheck en cero; `test-realtime.mjs` PASS. Base local limpia
 al cerrar: 4 usuarios semilla y 7 publicaciones.
 
+## Fase 16-E (hecha) — marco fijo: solo el centro se desplaza
+
+En la referencia los lados quedan FIJOS (barra superior, lateral
+de canales y riel derecho no se mueven) y la única zona que se
+desplaza es la columna central con las publicaciones; acá el
+documento entero era el desplazador y todo se iba con la página.
+Esta fase cambia la arquitectura de scroll de los dos layouts de
+app y barre el mismo error en todo el producto:
+
+- **Layout de miembro (`default.vue`)**: la raíz pasa de
+  `min-h-screen` a `flex h-dvh flex-col overflow-hidden` — el
+  documento ya no se desplaza. El header es una fila fija superior
+  (sin `sticky`: ya no hay página que arrastrar) y debajo vive una
+  fila de alto completo con tres regiones independientes:
+  - **Lateral de canales**: fijo con scroll interno propio
+    (`overflow-y-auto` en su contenedor).
+  - **Columna central**: el desplazador principal
+    (`overflow-y-auto`); contiene la página, el pie (que bajó al
+    final de este scroll, donde sigue alcanzable) y el respiro de
+    la barra inferior móvil.
+  - **Riel derecho: fijo con scroll interno propio** — su
+    contenedor lleva el `overflow-y-auto`, con la altura de la
+    zona bajo el header. Desplazar dentro del riel no mueve la
+    columna central, y desplazar la columna central no mueve el
+    riel. Sigue existiendo solo desde `xl` y nunca en el perfil.
+  - Breakpoints intactos: 768–1279 lateral fijo sin riel ni
+    pastillas; <768 el panel deslizable (`USlideover`, con su
+    scroll interno de siempre) y la **barra inferior móvil queda
+    fija** abajo (`position: fixed`, como ya estaba).
+  - Al cambiar de página la columna central vuelve arriba
+    (vigilado por ruta en el layout: el router solo sabe mover la
+    ventana, que ya no se mueve). Un cambio de query dentro de la
+    misma página no reinicia el scroll.
+- **Consola (`admin.vue`)**: misma arquitectura — raíz `h-dvh`,
+  header fijo, **riel de secciones fijo con scroll interno**
+  (retirado el `sticky top-20`) y solo el contenido de la sección
+  se desplaza; al cambiar de sección o de subsección (`?tab=`) el
+  contenido vuelve arriba.
+- **`AdminSubMenu`** (Fase 16-D): su columna queda fija con
+  scroll interno propio — sticky DENTRO del desplazador de
+  contenido de la consola, con tope a la altura de la zona bajo
+  el header (`max-h` + `overflow-y-auto`). El panel lateral del
+  estudio de un curso (currículum) se recalculó igual contra el
+  mismo desplazador.
+- **Mapa del barrido (antes → después)**:
+  - Feed, canal, cursos, eventos, miembros, biblioteca, videos,
+    ranking, notificaciones, borradores, búsqueda, detalle de
+    post y perfil: scroll de página → columna central del marco.
+  - Chat (canal y `/messages`): el hilo `ChatThread` YA tenía su
+    propio scroll interno (`max-h` + `overflow-y-auto`) y lo
+    conserva; la lista de conversaciones se desplaza con la zona
+    central. Sin doble scroll nuevo.
+  - Modales y diálogos (compositor de crear/editar, ajustes de
+    usuario, buscador, reportes): se teletransportan fuera del
+    marco y el documento no se desplaza, así que el fondo no se
+    mueve al abrirlos; su contenido se desplaza por dentro, como
+    hasta ahora.
+  - Tablas anchas de la consola (Contenido, Medios, Canales,
+    Ingresos): su scroll horizontal ya vivía dentro de su
+    contenedor (`overflow-x-auto`) y sigue ahí, sin romper el
+    ancho del marco.
+  - Scroll infinito: NO hay en el producto (el feed y los
+    listados cargan completos; no existe `IntersectionObserver`
+    ni listener de scroll de ventana), así que no hay observador
+    que re-apuntar al nuevo desplazador.
+  - **Sin cambios a propósito**: el layout `auth` (login,
+    registro, pendiente de ingreso, invitación, enlace de
+    acceso y verificación pública de certificados) conserva su
+    scroll de página — son páginas simples, no el marco de la
+    app, igual que en la referencia. `/pricing`, términos,
+    privacidad y reglas viven en el cascarón de la comunidad (no
+    usan el layout `auth`), así que heredan el marco como ya
+    heredaban el cascarón.
+
+Verificación local por contenido (`scripts/test-fase16e.mjs`,
+**24 PASS / 0 FAIL**, contra `wrangler dev` con D1 local): el
+HTML servido del feed muestra la raíz `h-dvh`, las tres regiones
+con su overflow propio en elementos distintos y en orden
+(lateral · centro · **riel derecho con su overflow en su propio
+contenedor**), el header sin `sticky`, el pie dentro del scroll
+central y el perfil sin riel; la consola muestra riel y submenú
+fijos con scroll interno y solo el contenido desplazable;
+`/login` conserva su layout de página y la API del feed sigue
+respondiendo. Build y typecheck en cero; `test-realtime.mjs`
+PASS. Base local limpia al cerrar: 4 usuarios semilla, 7
+publicaciones y cero mensajes de prueba QA-RT.
+
 ## Pendiente a propósito (fuera de esta fase)
 
 - Migraciones versionadas con `drizzle-kit` para D1 (hoy: esquema
