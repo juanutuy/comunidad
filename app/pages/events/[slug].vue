@@ -6,7 +6,7 @@ const toast = useToast()
 const { user } = useAuth()
 const { fmtDateTime, initials } = useFormat()
 
-interface EventDetail { event: { id: number, slug: string, title: string, description: string, startsAt: string, endsAt: string, location: string, category: string, agenda: string[], host: { name: string, slug: string }, going: number, myRsvp: boolean }, attendees: { name: string, slug: string }[] }
+interface EventDetail { event: { id: number, slug: string, title: string, description: string, descriptionHtml: string, startsAt: string, endsAt: string, location: string, category: string, agenda: string[], host: { name: string, slug: string }, going: number, myRsvp: boolean }, attendees: { name: string, slug: string }[] }
 const { data, refresh } = await useAsyncData(() => `event-${slug.value}`, () => api<EventDetail>(`/api/events/${slug.value}`), { watch: [slug] })
 
 async function toggleRsvp() {
@@ -30,7 +30,9 @@ async function toggleRsvp() {
         <p class="flex items-center gap-2"><UIcon name="i-lucide-clock" /> Hasta {{ fmtDateTime(data.event.endsAt) }}</p>
         <p class="flex items-center gap-2"><UIcon name="i-lucide-map-pin" /> {{ data.event.location }}</p>
       </div>
-      <p class="mt-4 whitespace-pre-line leading-relaxed">{{ data.event.description }}</p>
+      <!-- eslint-disable-next-line vue/no-v-html -- descripción del evento: HTML sanitizado en el servidor -->
+      <div v-if="data.event.descriptionHtml" class="rich-content mt-4" v-html="data.event.descriptionHtml" />
+      <p v-else class="mt-4 whitespace-pre-line leading-relaxed">{{ data.event.description }}</p>
       <div v-if="data.event.agenda?.length" class="mt-5">
         <h2 class="mb-2 flex items-center gap-2 font-bold"><UIcon name="i-lucide-list-ordered" /> Agenda</h2>
         <ol class="space-y-1.5">

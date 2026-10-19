@@ -23,5 +23,5 @@ export default defineEventHandler(async (event) => {
         .filter(c => !blocked.has(Number(c.author_id)))
         .map(c => ({ id: c.id, body: c.body, createdAt: c.created_at, author: { name: c.author_name, slug: c.author_slug, avatarUrl: c.author_avatar || '' } }))
     : []
-  return { post: await serializePost(event, row, user?.id ?? null, access), comments }
+  return { post: await serializePost(event, row, user?.id ?? null, access, role), comments }
 })

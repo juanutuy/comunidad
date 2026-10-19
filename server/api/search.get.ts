@@ -4,6 +4,8 @@
 // nunca con el cuerpo completo.
 import { POST_SELECT, canAccessChannel, channelBySlug, currentAuth, resolveTenant, serializePost } from '../utils/community'
 import type { ChannelRow } from '../utils/community'
+import { courseListed } from '../utils/courses'
+import type { CourseRow } from '../utils/courses'
 import { dbFor } from '../utils/db'
 import { hiddenFilterSql } from '../utils/blocks'
 
@@ -22,7 +24,7 @@ export default defineEventHandler(async (event) => {
     const ch = (await channelBySlug(event, tenant.id, r.channel_slug as string))!
     const access = await canAccessChannel(event, user?.id ?? null, role, ch)
     if (ch.type === 'private' && !access) continue // privado sin acceso: ni el teaser sale del canal
-    posts.push(await serializePost(event, r, user?.id ?? null, access))
+    posts.push(await serializePost(event, r, user?.id ?? null, access, role))
   }
 
   const channelRows = await db.prepare('SELECT * FROM channels WHERE tenant_id = ? AND (name LIKE ? OR description LIKE ?) ORDER BY sort LIMIT 10').all(tenant.id, like, like) as Record<string, unknown>[]
@@ -33,8 +35,12 @@ export default defineEventHandler(async (event) => {
     channels.push({ id: c.id, slug: c.slug, name: c.name, icon: c.icon, description: c.description, type: c.type, priceCents: c.price_cents, hasAccess: access })
   }
 
+  // Fase 8: la búsqueda respeta la visibilidad como el catálogo
+  // (los secretos no existen acá; los privados solo con sesión).
   const courseRows = await db.prepare('SELECT * FROM courses WHERE tenant_id = ? AND status = \'published\' AND (title LIKE ? OR description LIKE ?) ORDER BY created_at LIMIT 10').all(tenant.id, like, like) as Record<string, unknown>[]
-  const courses = courseRows.map(c => ({ id: c.id, slug: c.slug, title: c.title, description: c.description, level: c.level, priceCents: c.price_cents }))
+  const courses = courseRows
+    .filter(c => courseListed(c as unknown as CourseRow, { loggedIn: !!user, isAdmin: role === 'admin' }))
+    .map(c => ({ id: c.id, slug: c.slug, title: c.title, description: c.description, level: c.level, priceCents: c.price_cents }))
 
   // Fase 9: quien apagó «Aparecer en búsqueda» (user_prefs
   // show_in_search = '0') no sale como miembro; sus publicaciones y

@@ -1,6 +1,7 @@
 // Detalle de evento con asistentes.
 import { currentAuth, resolveTenant } from '../../utils/community'
 import { dbFor } from '../../utils/db'
+import { sanitizeHtml } from '../../utils/sanitize'
 
 export default defineEventHandler(async (event) => {
   const tenant = await resolveTenant(event)
@@ -13,6 +14,7 @@ export default defineEventHandler(async (event) => {
   return {
     event: {
       id: row.id, slug: row.slug, title: row.title, description: row.description,
+      descriptionHtml: sanitizeHtml(String((row as Record<string, unknown>).description_html || '')),
       startsAt: row.starts_at, endsAt: row.ends_at, location: row.location, category: row.category,
       agenda: String(row.agenda || '').split('\n').map(s => s.trim()).filter(Boolean),
       host: { name: row.host_name, slug: row.host_slug },

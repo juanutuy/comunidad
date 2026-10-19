@@ -20,6 +20,7 @@ export default defineEventHandler(async (event) => {
   await db.prepare("UPDATE posts SET status = 'published', scheduled_at = '', created_at = ? WHERE id = ?").run(nowIso(), postId)
   await notifyNewPost(event, tenant.id, { id: Number(post.author_id), name: String((await db.prepare('SELECT name FROM users WHERE id = ?').get(post.author_id) as { name: string }).name) },
     { id: Number(post.channel_id), name: String(post.channel_name) },
-    { title: String(post.title), body: String(post.body), slug: String(post.slug) }, String(post.channel_slug))
+    { title: String(post.title), body: String(post.body), slug: String(post.slug) }, String(post.channel_slug),
+    { anonymous: !!post.anonymous })
   return { ok: true, slug: post.slug, channelSlug: post.channel_slug }
 })

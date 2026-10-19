@@ -12,7 +12,7 @@ export default defineEventHandler(async (event) => {
     FROM events e WHERE e.tenant_id = ? ORDER BY e.starts_at DESC`).all(tenant.id) as Record<string, unknown>[]
   return {
     events: rows.map(e => ({
-      id: e.id, slug: e.slug, title: e.title, description: e.description,
+      id: e.id, slug: e.slug, title: e.title, description: e.description, descriptionHtml: e.description_html || '',
       startsAt: e.starts_at, endsAt: e.ends_at, location: e.location, category: e.category, agenda: e.agenda || '',
       attendees: Number(e.attendees || 0),
     })),

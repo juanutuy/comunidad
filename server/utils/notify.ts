@@ -49,6 +49,9 @@ export async function notify(event: H3Event, n: NotifyInput): Promise<void> {
 // Aviso de publicación nueva: seguidores del canal + menciones. Lo
 // usan tanto la creación directa (posts.post) como la publicación de
 // un borrador/programado (posts/[id]/publish).
+// Fase 8: en un post ANÓNIMO ningún título de notificación nombra al
+// autor (la atribución interna por actor_id queda en la base, pero no
+// se muestra). Las menciones del cuerpo siguen avisando, como «Alguien».
 export async function notifyNewPost(
   event: H3Event,
   tenantId: number,
@@ -56,6 +59,7 @@ export async function notifyNewPost(
   channel: { id: number, name: string },
   post: { title: string, body: string, slug: string },
   channelSlug: string,
+  options: { anonymous?: boolean } = {},
 ): Promise<void> {
   const db = await dbFor(event)
   const link = `/p/${channelSlug}/${post.slug}`
@@ -63,10 +67,13 @@ export async function notifyNewPost(
   for (const f of followers) {
     await notify(event, {
       tenantId, userId: f.user_id, actorId: author.id, type: 'new_post',
-      title: `${author.name} publicó «${post.title}» en ${channel.name}`, link,
+      title: options.anonymous
+        ? `Nueva publicación en ${channel.name}: «${post.title}»`
+        : `${author.name} publicó «${post.title}» en ${channel.name}`,
+      link,
     })
   }
-  await notifyMentions(event, tenantId, author, `${post.title}\n${post.body}`, link)
+  await notifyMentions(event, tenantId, options.anonymous ? { id: author.id, name: 'Alguien' } : author, `${post.title}\n${post.body}`, link)
 }
 
 // Menciones simples: cualquier `@slug` de un miembro del tenant que

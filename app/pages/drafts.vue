@@ -7,6 +7,8 @@ interface DraftView {
   slug: string
   title: string
   body: string
+  bodyHtml: string
+  anonymous: boolean
   kind: string
   status: string
   scheduledAt: string
@@ -24,19 +26,37 @@ const { data, refresh } = await useAsyncData('my-drafts', () =>
   user.value ? api<{ drafts: DraftView[] }>('/api/drafts') : Promise.resolve({ drafts: [] as DraftView[] }))
 
 const editing = ref<DraftView | null>(null)
-const editForm = reactive({ title: '', body: '', scheduledAt: '' })
+const editForm = reactive({ title: '', body: '', bodyHtml: '', scheduledAt: '' })
 const saving = ref(false)
+async function uploadImageFile(file: File): Promise<string> {
+  const fd = new FormData()
+  fd.append('file', file)
+  fd.append('kind', 'image')
+  const up = await api<{ url: string }>('/api/uploads', { method: 'POST', body: fd })
+  return up.url
+}
+function editPlainText(): string {
+  if (!editForm.bodyHtml) return editForm.body.trim()
+  const d = document.createElement('div')
+  d.innerHTML = editForm.bodyHtml
+  return (d.textContent || '').trim()
+}
 function startEdit(d: DraftView) {
   editing.value = d
   editForm.title = d.title
   editForm.body = d.body
+  editForm.bodyHtml = d.bodyHtml || ''
   editForm.scheduledAt = d.scheduledAt ? d.scheduledAt.slice(0, 16) : ''
 }
 async function saveEdit() {
   if (!editing.value) return
   saving.value = true
   try {
-    const body: Record<string, unknown> = { title: editForm.title, body: editForm.body }
+    // Con cuerpo rico se manda el HTML y el servidor deriva el texto
+    // plano; una encuesta sigue editando su pregunta como texto.
+    const body: Record<string, unknown> = editing.value.kind === 'poll'
+      ? { title: editForm.title, body: editForm.body }
+      : { title: editForm.title, bodyHtml: editForm.bodyHtml }
     if (editing.value.status === 'scheduled') body.scheduledAt = new Date(editForm.scheduledAt).toISOString()
     await api(`/api/posts/${editing.value.id}`, { method: 'PUT', body })
     toast.add({ title: 'Borrador actualizado', color: 'success' })
@@ -87,6 +107,7 @@ async function deleteDraft() {
             {{ d.status === 'draft' ? 'Borrador' : 'Programado' }}
           </UBadge>
           <UBadge v-if="d.kind === 'poll'" color="primary" variant="subtle" icon="i-lucide-bar-chart-3">Encuesta</UBadge>
+          <UBadge v-if="d.anonymous" color="neutral" variant="subtle" icon="i-lucide-venetian-mask">Anónimo</UBadge>
           <span class="text-muted">en {{ d.channel.name }}</span>
           <span v-if="d.status === 'scheduled'" class="text-muted">· se publica el {{ fmtDateTime(d.scheduledAt) }}</span>
         </div>
@@ -110,8 +131,13 @@ async function deleteDraft() {
           <UFormField label="Título">
             <UInput v-model="editForm.title" class="w-full" />
           </UFormField>
-          <UFormField :label="editing?.kind === 'poll' ? 'Pregunta' : 'Contenido'">
+          <UFormField v-if="editing?.kind === 'poll'" label="Pregunta">
             <UTextarea v-model="editForm.body" :rows="5" class="w-full" />
+          </UFormField>
+          <UFormField v-else label="Contenido">
+            <ClientOnly>
+              <RichEditor v-model="editForm.bodyHtml" mode="slash" :upload-image="uploadImageFile" placeholder="Escribí «/» para insertar bloques…" />
+            </ClientOnly>
           </UFormField>
           <UFormField v-if="editing?.status === 'scheduled'" label="Fecha y hora de publicación">
             <UInput v-model="editForm.scheduledAt" type="datetime-local" />
@@ -122,7 +148,7 @@ async function deleteDraft() {
       <template #footer>
         <div class="flex justify-end gap-2">
           <UButton color="neutral" variant="ghost" label="Cancelar" @click="editing = null" />
-          <UButton label="Guardar cambios" icon="i-lucide-save" :loading="saving" :disabled="!editForm.body.trim()" @click="saveEdit" />
+          <UButton label="Guardar cambios" icon="i-lucide-save" :loading="saving" :disabled="editing?.kind === 'poll' ? !editForm.body.trim() : !editPlainText()" @click="saveEdit" />
         </div>
       </template>
     </UModal>

@@ -23,6 +23,6 @@ export default defineEventHandler(async (event) => {
       description: channel.description, type: channel.type, priceCents: channel.price_cents,
       following, hasAccess: access,
     },
-    posts: await Promise.all(rows.map(r => serializePost(event, r, user?.id ?? null, access))),
+    posts: await Promise.all(rows.map(r => serializePost(event, r, user?.id ?? null, access, role))),
   }
 })

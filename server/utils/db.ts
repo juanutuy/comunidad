@@ -159,6 +159,42 @@ const MIGRATIONS = [
   // (edited_at se completa al editar un borrador/programado).
   `ALTER TABLE posts ADD COLUMN allow_comments INTEGER NOT NULL DEFAULT 1`,
   `ALTER TABLE posts ADD COLUMN edited_at TEXT NOT NULL DEFAULT ''`,
+  // Fase 8: cuerpo con formato (body_html, sanitizado en servidor —
+  // `body` sigue siendo el texto plano derivado) y post anónimo real.
+  `ALTER TABLE posts ADD COLUMN body_html TEXT NOT NULL DEFAULT ''`,
+  `ALTER TABLE posts ADD COLUMN anonymous INTEGER NOT NULL DEFAULT 0`,
+  `ALTER TABLE posts ADD COLUMN attachment_name TEXT NOT NULL DEFAULT ''`,
+  // Fase 8: lecciones con tipo (kind) y campos por tipo. is_free ya
+  // existía y oficia de «vista previa gratuita». unlock_offset_days
+  // queda NULL cuando la lección no tiene drip por inscripción.
+  `ALTER TABLE lessons ADD COLUMN kind TEXT NOT NULL DEFAULT 'text'`,
+  `ALTER TABLE lessons ADD COLUMN content_html TEXT NOT NULL DEFAULT ''`,
+  `ALTER TABLE lessons ADD COLUMN file_url TEXT NOT NULL DEFAULT ''`,
+  `ALTER TABLE lessons ADD COLUMN file_name TEXT NOT NULL DEFAULT ''`,
+  `ALTER TABLE lessons ADD COLUMN embed_url TEXT NOT NULL DEFAULT ''`,
+  `ALTER TABLE lessons ADD COLUMN allow_download INTEGER NOT NULL DEFAULT 0`,
+  `ALTER TABLE lessons ADD COLUMN prerequisite INTEGER NOT NULL DEFAULT 0`,
+  `ALTER TABLE lessons ADD COLUMN resource_url TEXT NOT NULL DEFAULT ''`,
+  `ALTER TABLE lessons ADD COLUMN resource_name TEXT NOT NULL DEFAULT ''`,
+  `ALTER TABLE lessons ADD COLUMN unlock_offset_days INTEGER`,
+  `ALTER TABLE lessons ADD COLUMN unlock_at TEXT NOT NULL DEFAULT ''`,
+  // Fase 8: estado de la lección — las nuevas nacen en borrador desde
+  // el estudio y no se ven en el curso hasta publicarlas (las
+  // anteriores a la fase quedan 'published', su comportamiento).
+  `ALTER TABLE lessons ADD COLUMN status TEXT NOT NULL DEFAULT 'published'`,
+  // Fase 8: cursos con descripción corta y rica, banner, visibilidad
+  // (public|private|secret), límite de inscritos, drip y certificado
+  // por curso (encendido por defecto: las bases anteriores ya emitían
+  // certificado al 100% y no cambia su comportamiento).
+  `ALTER TABLE courses ADD COLUMN short_description TEXT NOT NULL DEFAULT ''`,
+  `ALTER TABLE courses ADD COLUMN description_html TEXT NOT NULL DEFAULT ''`,
+  `ALTER TABLE courses ADD COLUMN banner_url TEXT NOT NULL DEFAULT ''`,
+  `ALTER TABLE courses ADD COLUMN visibility TEXT NOT NULL DEFAULT 'public'`,
+  `ALTER TABLE courses ADD COLUMN enroll_limit INTEGER NOT NULL DEFAULT 0`,
+  `ALTER TABLE courses ADD COLUMN drip_mode TEXT NOT NULL DEFAULT 'none'`,
+  `ALTER TABLE courses ADD COLUMN certificate_enabled INTEGER NOT NULL DEFAULT 1`,
+  // Fase 8: descripción de eventos con el editor clásico.
+  `ALTER TABLE events ADD COLUMN description_html TEXT NOT NULL DEFAULT ''`,
 ]
 
 async function runMigrations(db: AsyncDb): Promise<void> {
@@ -176,6 +212,13 @@ async function initDb(db: AsyncDb): Promise<void> {
   // CREATE TABLE/INDEX IF NOT EXISTS: idempotente en SQLite y en D1.
   for (const stmt of splitSql(CREATE_SQL)) await db.prepare(stmt).run()
   await runMigrations(db)
+  // Fase 8: backfill de tipos de lección — las lecciones anteriores a
+  // la fase nacieron con kind='text'; las que SOLO traían video (sin
+  // contenido de texto) quedan como lecciones de video. La condición
+  // sobre el contenido vacío hace que nunca reclasifique una lección
+  // de texto real en arranques posteriores.
+  try { await db.prepare("UPDATE lessons SET kind = 'video' WHERE kind = 'text' AND video_url != '' AND content = '' AND content_html = ''").run() }
+  catch { /* bases sin la columna todavía */ }
   const { seedIfEmpty, backfillLessonContent, backfillPlans } = await import('./seed')
   await seedIfEmpty(db)
   await backfillLessonContent(db)

@@ -7,19 +7,34 @@ const { fmtDateTime } = useFormat()
 const api = useApi()
 const toast = useToast()
 
-interface EventRow { id: number, slug: string, title: string, description: string, startsAt: string, endsAt: string, location: string, category: string, agenda: string, attendees: number }
+interface EventRow { id: number, slug: string, title: string, description: string, descriptionHtml: string, startsAt: string, endsAt: string, location: string, category: string, agenda: string, attendees: number }
 const { data, refresh } = await useAsyncData('admin-events', () =>
   user.value?.role === 'admin' ? api<{ events: EventRow[] }>('/api/admin/events') : Promise.resolve({ events: [] as EventRow[] }))
 
-const form = reactive({ title: '', description: '', startsAt: '', endsAt: '', location: 'En línea', category: 'General', agenda: '' })
+// Fase 8 (Parte D): la descripción se edita con el editor clásico
+// (barra fija) y viaja como HTML; el servidor sanitiza y deriva el
+// texto plano. Sin HTML previo, el editor arranca con la descripción
+// plana anterior convertida en párrafos.
+const form = reactive({ title: '', descriptionHtml: '', startsAt: '', endsAt: '', location: 'En línea', category: 'General', agenda: '' })
 const editing = ref<EventRow | null>(null)
 const saving = ref(false)
 
+function plainToHtml(text: string) {
+  const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  return text.split(/\n{2,}/).map(p => `<p>${esc(p).replace(/\n/g, '<br>')}</p>`).join('')
+}
+async function uploadImageFile(file: File): Promise<string> {
+  const fd = new FormData()
+  fd.append('file', file)
+  fd.append('kind', 'image')
+  const up = await api<{ url: string }>('/api/uploads', { method: 'POST', body: fd })
+  return up.url
+}
 function localInput(iso: string) { return iso ? iso.slice(0, 16) : '' }
 function startEdit(e: EventRow) {
   editing.value = e
   form.title = e.title
-  form.description = e.description
+  form.descriptionHtml = e.descriptionHtml || (e.description ? plainToHtml(e.description) : '')
   form.startsAt = localInput(e.startsAt)
   form.endsAt = localInput(e.endsAt)
   form.location = e.location
@@ -28,13 +43,13 @@ function startEdit(e: EventRow) {
 }
 function resetForm() {
   editing.value = null
-  form.title = ''; form.description = ''; form.startsAt = ''; form.endsAt = ''; form.location = 'En línea'; form.category = 'General'; form.agenda = ''
+  form.title = ''; form.descriptionHtml = ''; form.startsAt = ''; form.endsAt = ''; form.location = 'En línea'; form.category = 'General'; form.agenda = ''
 }
 async function save() {
   saving.value = true
   try {
     const body = {
-      title: form.title, description: form.description, location: form.location, category: form.category, agenda: form.agenda,
+      title: form.title, descriptionHtml: form.descriptionHtml, location: form.location, category: form.category, agenda: form.agenda,
       startsAt: form.startsAt ? new Date(form.startsAt).toISOString() : '',
       endsAt: form.endsAt ? new Date(form.endsAt).toISOString() : '',
     }
@@ -87,7 +102,9 @@ async function confirmDelete() {
             <UInput v-model="form.title" class="w-full" placeholder="Nombre del evento" />
           </UFormField>
           <UFormField label="Descripción">
-            <UTextarea v-model="form.description" :rows="3" class="w-full" />
+            <ClientOnly>
+              <RichEditor :key="editing?.id || 'new'" v-model="form.descriptionHtml" mode="classic" :upload-image="uploadImageFile" placeholder="Contá de qué trata el evento…" />
+            </ClientOnly>
           </UFormField>
           <UFormField label="Agenda por sesiones" description="Una sesión por línea, en formato libre. Ej.: «10:00 — Bienvenida y presentación», «10:20 — Charla: primeros pasos». Se muestra como lista en el detalle del evento.">
             <UTextarea v-model="form.agenda" :rows="4" class="w-full" placeholder="10:00 — Bienvenida&#10;10:20 — Sesión principal&#10;11:15 — Preguntas y cierre" />

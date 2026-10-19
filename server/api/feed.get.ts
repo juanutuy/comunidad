@@ -25,7 +25,7 @@ export default defineEventHandler(async (event) => {
     const channel = (await channelBySlug(event, tenant.id, r.channel_slug as string))!
     const access = await canAccessChannel(event, user?.id ?? null, role, channel)
     if (channel.type !== 'free' && !followed.has(channel.id) && !access) continue
-    posts.push(await serializePost(event, r, user?.id ?? null, access))
+    posts.push(await serializePost(event, r, user?.id ?? null, access, role))
   }
   return { posts }
 })

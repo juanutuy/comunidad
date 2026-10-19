@@ -2,12 +2,13 @@
 // Las publicaciones ya publicadas no se editan por esta vía.
 import { requireUser, resolveTenant } from '../../utils/community'
 import { dbFor, nowIso } from '../../utils/db'
+import { htmlToText, sanitizeHtml } from '../../utils/sanitize'
 
 export default defineEventHandler(async (event) => {
   const tenant = await resolveTenant(event)
   const user = await requireUser(event, tenant.id)
   const postId = Number(getRouterParam(event, 'id'))
-  const body = await readBody<{ title?: string, body?: string, scheduledAt?: string }>(event)
+  const body = await readBody<{ title?: string, body?: string, bodyHtml?: string, scheduledAt?: string }>(event)
   const db = await dbFor(event)
   const post = await db.prepare('SELECT author_id, status, kind FROM posts WHERE id = ? AND tenant_id = ?').get(postId, tenant.id) as { author_id: number, status: string, kind: string } | undefined
   if (!post) throw createError({ statusCode: 404, message: 'Publicación no encontrada.' })
@@ -16,7 +17,15 @@ export default defineEventHandler(async (event) => {
   if (post.status === 'published')
     throw createError({ statusCode: 400, message: 'Una publicación ya publicada no se edita desde borradores.' })
   let title = (body.title || '').trim()
-  const text = (body.body || '').trim()
+  // Fase 8: si el editor manda cuerpo rico, se sanitiza y el texto
+  // plano se deriva (igual que al crear). El anónimo NO se toca acá:
+  // se fija solo al crear la publicación.
+  let bodyHtml: string | null = null
+  let text = (body.body || '').trim()
+  if (typeof body.bodyHtml === 'string') {
+    bodyHtml = sanitizeHtml(body.bodyHtml)
+    text = htmlToText(bodyHtml)
+  }
   if (post.kind === 'poll' && !title && text) title = text.slice(0, 80)
   if (!title || !text) throw createError({ statusCode: 400, message: 'El borrador necesita título y contenido.' })
   let scheduledAt: string | null = null
@@ -29,8 +38,8 @@ export default defineEventHandler(async (event) => {
   // Fase 7: toda edición deja marca (edited_at) para el «Editado»
   // de la tarjeta cuando la publicación salga.
   if (scheduledAt)
-    await db.prepare('UPDATE posts SET title = ?, body = ?, teaser = ?, scheduled_at = ?, edited_at = ? WHERE id = ?').run(title, text, text.slice(0, 160), scheduledAt, nowIso(), postId)
+    await db.prepare('UPDATE posts SET title = ?, body = ?, body_html = ?, teaser = ?, scheduled_at = ?, edited_at = ? WHERE id = ?').run(title, text, bodyHtml ?? '', text.slice(0, 160), scheduledAt, nowIso(), postId)
   else
-    await db.prepare('UPDATE posts SET title = ?, body = ?, teaser = ?, edited_at = ? WHERE id = ?').run(title, text, text.slice(0, 160), nowIso(), postId)
+    await db.prepare('UPDATE posts SET title = ?, body = ?, body_html = ?, teaser = ?, edited_at = ? WHERE id = ?').run(title, text, bodyHtml ?? '', text.slice(0, 160), nowIso(), postId)
   return { ok: true }
 })

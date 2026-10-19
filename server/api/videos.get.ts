@@ -11,7 +11,7 @@ export default defineEventHandler(async (event) => {
   const rows = await db.prepare(`${POST_SELECT} WHERE p.tenant_id = ? AND p.media_type = 'video' AND p.status = 'published'${hf.sql} ORDER BY p.created_at DESC`).all(tenant.id, ...hf.params) as Record<string, unknown>[]
   const posts = await Promise.all(rows.map(async (r) => {
     const ch = (await channelBySlug(event, tenant.id, r.channel_slug as string))!
-    return serializePost(event, r, user?.id ?? null, await canAccessChannel(event, user?.id ?? null, role, ch))
+    return serializePost(event, r, user?.id ?? null, await canAccessChannel(event, user?.id ?? null, role, ch), role)
   }))
   return { posts }
 })

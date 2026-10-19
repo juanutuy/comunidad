@@ -9,13 +9,19 @@
 import { canAccessChannel, channelBySlug, currentAuth, requireUser, resolveTenant } from '../utils/community'
 import { nowIso, dbFor, slugify } from '../utils/db'
 import { notifyNewPost } from '../utils/notify'
+import { htmlToText, sanitizeHtml } from '../utils/sanitize'
 
 interface CreateBody {
   channelSlug?: string
   title?: string
   body?: string
+  // Fase 8: cuerpo con formato del editor rico. Si viene, se sanitiza
+  // en el servidor y el texto plano (`body`) se DERIVA de él: es la
+  // única fuente para teasers, búsqueda y notificaciones.
+  bodyHtml?: string
   mediaType?: string
   mediaUrl?: string
+  attachmentName?: string
   kind?: string
   options?: string[]
   status?: string
@@ -24,6 +30,8 @@ interface CreateBody {
   // «Publicar como anuncio» (solo admin: nace fijado).
   allowComments?: boolean
   pin?: boolean
+  // Fase 8: post anónimo (solo se fija al crear; no se convierte después).
+  anonymous?: boolean
 }
 
 export default defineEventHandler(async (event) => {
@@ -38,7 +46,15 @@ export default defineEventHandler(async (event) => {
 
   const kind = body.kind === 'poll' ? 'poll' : 'post'
   let title = (body.title || '').trim()
-  const text = (body.body || '').trim()
+  // Fase 8: con cuerpo rico, el HTML se sanitiza SIEMPRE en el servidor
+  // y el texto plano se deriva de él. Sin cuerpo rico vale el `body`
+  // plano de siempre (compatibilidad con clientes anteriores).
+  let bodyHtml = ''
+  let text = (body.body || '').trim()
+  if (typeof body.bodyHtml === 'string' && body.bodyHtml.trim()) {
+    bodyHtml = sanitizeHtml(body.bodyHtml)
+    text = htmlToText(bodyHtml)
+  }
   // En una encuesta la pregunta vive en el cuerpo; si no hay título, se
   // deriva de la pregunta (recortada) para el slug y el encabezado.
   if (kind === 'poll' && !title && text) title = text.slice(0, 80)
@@ -62,22 +78,24 @@ export default defineEventHandler(async (event) => {
     scheduledAt = when.toISOString()
   }
 
-  const mediaType = kind === 'poll' ? 'none' : ['image', 'video'].includes(body.mediaType || '') ? body.mediaType! : 'none'
+  // 'file' (Fase 8): archivo adjunto descargable bajo el cuerpo.
+  const mediaType = kind === 'poll' ? 'none' : ['image', 'video', 'file'].includes(body.mediaType || '') ? body.mediaType! : 'none'
   const allowComments = body.allowComments === false ? 0 : 1
   // «Publicar como anuncio» solo tiene efecto para el admin: un miembro
   // no puede fijar su propio post mandando pin=true.
   const pinned = body.pin === true && role === 'admin' ? 1 : 0
+  const anonymous = body.anonymous === true ? 1 : 0
   const db = await dbFor(event)
   let slug = slugify(title)
   if (await db.prepare('SELECT id FROM posts WHERE channel_id = ? AND slug = ?').get(channel.id, slug))
     slug = `${slug}-${Math.floor(Math.random() * 9000 + 1000)}`
-  const id = Number((await db.prepare('INSERT INTO posts (tenant_id, channel_id, author_id, slug, title, body, teaser, media_type, media_url, pinned, created_at, status, scheduled_at, kind, allow_comments) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
-    .run(tenant.id, channel.id, user.id, slug, title, text, text.slice(0, 160), mediaType, kind === 'poll' ? '' : (body.mediaUrl || '').trim(), pinned, nowIso(), status, scheduledAt, kind, allowComments)).lastInsertRowId)
+  const id = Number((await db.prepare('INSERT INTO posts (tenant_id, channel_id, author_id, slug, title, body, body_html, teaser, media_type, media_url, attachment_name, pinned, created_at, status, scheduled_at, kind, allow_comments, anonymous) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+    .run(tenant.id, channel.id, user.id, slug, title, text, bodyHtml, text.slice(0, 160), mediaType, kind === 'poll' ? '' : (body.mediaUrl || '').trim(), mediaType === 'file' ? String(body.attachmentName || '').slice(0, 120) : '', pinned, nowIso(), status, scheduledAt, kind, allowComments, anonymous)).lastInsertRowId)
   for (let i = 0; i < options.length; i++) {
     await db.prepare('INSERT INTO poll_options (tenant_id, post_id, label, sort) VALUES (?, ?, ?, ?)')
       .run(tenant.id, id, options[i], i + 1)
   }
   if (status === 'published')
-    await notifyNewPost(event, tenant.id, user, channel, { title, body: text, slug }, channel.slug)
+    await notifyNewPost(event, tenant.id, user, channel, { title, body: text, slug }, channel.slug, { anonymous: !!anonymous })
   return { id, slug, channelSlug: channel.slug, status }
 })

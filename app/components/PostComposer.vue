@@ -1,11 +1,13 @@
 <script setup lang="ts">
-// Compositor compacto + editor en modal (Fase 7, estilo referencia):
-// una barra con avatar, campo «Escribí algo…» y atajos (Foto / Video /
-// Encuesta / Publicar) que abre el editor completo en un modal. Toda
-// la lógica de publicación es la de las fases anteriores: post común o
-// encuesta, foto subida o por URL, video de YouTube, publicar ahora,
-// guardar borrador o programar — sumando los toggles «Permitir
-// comentarios» y «Publicar como anuncio» (admin, nace fijado).
+// Compositor del feed (Fases 7/8/10): barra compacta que abre el
+// editor en modal, y variante «bare» (solo el modal) para la barra
+// inferior móvil. Desde la Fase 8 el modal es un editor rico estilo
+// la referencia: título como placeholder grande dentro del área,
+// toggles-icono arriba a la derecha (anuncio, anónimo, comentarios),
+// barra inferior de solo iconos y botón Publicar con chevron
+// (Programar / Guardar borrador). El cuerpo se edita con RichEditor
+// en modo «slash» y se envía como HTML: el servidor lo sanitiza y
+// deriva el texto plano (ver server/utils/sanitize.ts).
 const props = withDefaults(defineProps<{ channelSlug?: string, variant?: 'bar' | 'bare' }>(), { variant: 'bar' })
 const emit = defineEmits<{ published: [] }>()
 
@@ -18,57 +20,150 @@ const { data: channelData } = await useAsyncData('composer-channels', () =>
   api<{ groups: { channels: { slug: string, name: string, type: string, hasAccess: boolean }[] }[] }>('/api/channels'))
 const publishable = computed(() =>
   (channelData.value?.groups || []).flatMap(g => g.channels).filter(c => c.type === 'free' || c.hasAccess))
-const channelOptions = computed(() => publishable.value.map(c => ({ label: c.name, value: c.slug })))
 
 const open = ref(false)
-// Fase 10: en teléfono el editor abre a pantalla completa (UModal
-// fullscreen); en pantallas medianas y grandes sigue siendo un modal.
 const isPhone = useIsPhone()
-const form = reactive({ channelSlug: '', title: '', body: '', mediaType: 'none', mediaUrl: '' })
+const maximized = ref(false)
+const channelSlug = ref('')
+const title = ref('')
+const bodyHtml = ref('')
 const kind = ref<'post' | 'poll'>('post')
 const pollOptions = ref<string[]>(['', ''])
 const allowComments = ref(true)
 const asAnnouncement = ref(false)
+const anonymous = ref(false)
 const scheduleMode = ref(false)
 const scheduledAt = ref('')
 const publishing = ref(false)
-const imageFile = ref<File | null>(null)
+const attachedFile = ref<{ url: string, name: string } | null>(null)
+const videoUrl = ref('')
+const gifUrl = ref('')
+const videoPopOpen = ref(false)
+const gifPopOpen = ref(false)
+const emojiPopOpen = ref(false)
+const confirmDiscard = ref(false)
+const openedSnapshot = ref('')
+const editorRef = ref<{ focus: () => void, pickImage: () => void, insertImage: (u: string) => void, insertAudio: (u: string) => void, insertVideo: (u: string) => boolean, insertText: (t: string) => void, insertCodeBlock: () => void, insertSlash: () => void } | null>(null)
 
-function onFileChange(e: Event) {
-  imageFile.value = (e.target as HTMLInputElement).files?.[0] ?? null
+const EMOJIS = ['😀', '😁', '😂', '🤣', '😊', '😍', '😘', '😎', '🤔', '😅', '😉', '🙂', '🙃', '😴', '😮', '😢', '😭', '😡', '🥳', '🤯', '👍', '👎', '👏', '🙌', '🙏', '💪', '🔥', '❤️', '💡', '🎉', '🎂', '🎁', '⚽', '🎵', '📚', '💻', '☕', '🍕', '🌮', '🐶', '🐱', '🌎', '⭐', '✅', '❌', '❓', '💯']
+
+const currentChannel = computed(() => publishable.value.find(c => c.slug === channelSlug.value))
+const channelMenuItems = computed(() => [publishable.value.map(c => ({
+  label: `# ${c.name}`,
+  onSelect: () => { channelSlug.value = c.slug },
+}))])
+
+function htmlText(html: string): string {
+  if (import.meta.server || !html) return ''
+  const d = document.createElement('div')
+  d.innerHTML = html
+  return (d.textContent || '').trim()
 }
+const bodyText = computed(() => htmlText(bodyHtml.value))
+const validOptions = computed(() => pollOptions.value.map(o => o.trim()).filter(Boolean))
+const canSubmit = computed(() => {
+  if (!bodyText.value) return false
+  if (kind.value === 'poll') return validOptions.value.length >= 2
+  return !!title.value.trim()
+})
+const snapshot = computed(() => JSON.stringify({
+  t: title.value, h: bodyHtml.value, k: kind.value, o: pollOptions.value,
+  a: anonymous.value, c: allowComments.value, f: attachedFile.value?.url || '',
+}))
+const isDirty = computed(() => open.value && snapshot.value !== openedSnapshot.value)
+
 function addPollOption() { if (pollOptions.value.length < 4) pollOptions.value.push('') }
 function removePollOption(i: number) { if (pollOptions.value.length > 2) pollOptions.value.splice(i, 1) }
 
-const validOptions = computed(() => pollOptions.value.map(o => o.trim()).filter(Boolean))
-const canSubmit = computed(() => {
-  if (!form.body.trim()) return false
-  if (kind.value === 'poll') return validOptions.value.length >= 2
-  return !!form.title.trim()
-})
+async function upload(kind: 'image' | 'audio' | 'file', file: File): Promise<{ url: string, name: string }> {
+  const fd = new FormData()
+  fd.append('file', file)
+  fd.append('kind', kind)
+  return await api<{ url: string, name: string }>('/api/uploads', { method: 'POST', body: fd })
+}
+async function uploadImage(file: File): Promise<string> {
+  return (await upload('image', file)).url
+}
 
+function onInlineImage(e: Event) {
+  const file = (e.target as HTMLInputElement).files?.[0]
+  ;(e.target as HTMLInputElement).value = ''
+  if (!file) return
+  upload('image', file).then(({ url }) => editorRef.value?.insertImage(url))
+    .catch(err => toast.add({ title: 'No se pudo subir la imagen', description: (err as { data?: { message?: string } }).data?.message || '', color: 'error' }))
+}
+function onAudio(e: Event) {
+  const file = (e.target as HTMLInputElement).files?.[0]
+  ;(e.target as HTMLInputElement).value = ''
+  if (!file) return
+  upload('audio', file).then(({ url }) => editorRef.value?.insertAudio(url))
+    .catch(err => toast.add({ title: 'No se pudo subir el audio', description: (err as { data?: { message?: string } }).data?.message || '', color: 'error' }))
+}
+function onAttachFile(e: Event) {
+  const file = (e.target as HTMLInputElement).files?.[0]
+  ;(e.target as HTMLInputElement).value = ''
+  if (!file) return
+  upload('file', file).then(({ url, name }) => { attachedFile.value = { url, name } })
+    .catch(err => toast.add({ title: 'No se pudo subir el archivo', description: (err as { data?: { message?: string } }).data?.message || '', color: 'error' }))
+}
+function insertVideo() {
+  if (!videoUrl.value.trim()) return
+  if (editorRef.value?.insertVideo(videoUrl.value)) { videoUrl.value = ''; videoPopOpen.value = false }
+  else toast.add({ title: 'Enlace de video no reconocido', description: 'Pegá un enlace de YouTube o Vimeo.', color: 'warning' })
+}
+function insertGif() {
+  if (!gifUrl.value.trim()) return
+  editorRef.value?.insertImage(gifUrl.value.trim())
+  gifUrl.value = ''
+  gifPopOpen.value = false
+}
+function insertEmoji(e: string) {
+  editorRef.value?.insertText(e)
+  emojiPopOpen.value = false
+}
+
+const pendingPreset = ref<'photo' | 'video' | 'poll' | null>(null)
 function openModal(preset?: 'photo' | 'video' | 'poll') {
   if (!user.value) { toast.add({ title: 'Iniciá sesión para publicar', color: 'warning' }); return }
-  if (!form.channelSlug) {
-    form.channelSlug = props.channelSlug && publishable.value.some(c => c.slug === props.channelSlug)
+  if (!channelSlug.value || !publishable.value.some(c => c.slug === channelSlug.value)) {
+    channelSlug.value = props.channelSlug && publishable.value.some(c => c.slug === props.channelSlug)
       ? props.channelSlug
-      : (channelOptions.value[0]?.value || '')
+      : (publishable.value[0]?.slug || '')
   }
   kind.value = preset === 'poll' ? 'poll' : 'post'
-  if (preset === 'photo') form.mediaType = 'upload'
-  if (preset === 'video') form.mediaType = 'video'
+  pendingPreset.value = preset || null
   open.value = true
+  openedSnapshot.value = snapshot.value
+  setTimeout(() => {
+    editorRef.value?.focus()
+    if (pendingPreset.value === 'photo') editorRef.value?.pickImage()
+    if (pendingPreset.value === 'video') videoPopOpen.value = true
+  }, 400)
 }
 
 function resetForm() {
-  form.title = ''; form.body = ''; form.mediaUrl = ''; form.mediaType = 'none'
-  imageFile.value = null
+  title.value = ''; bodyHtml.value = ''
   pollOptions.value = ['', '']
   kind.value = 'post'
   allowComments.value = true
   asAnnouncement.value = false
+  anonymous.value = false
   scheduleMode.value = false
   scheduledAt.value = ''
+  attachedFile.value = null
+  maximized.value = false
+}
+
+function requestClose() {
+  if (publishing.value) return
+  if (isDirty.value) { confirmDiscard.value = true; return }
+  open.value = false
+  resetForm()
+}
+function discard() {
+  confirmDiscard.value = false
+  open.value = false
+  resetForm()
 }
 
 async function submit(mode: 'now' | 'draft' | 'schedule') {
@@ -77,37 +172,38 @@ async function submit(mode: 'now' | 'draft' | 'schedule') {
     return
   }
   if (mode !== 'draft' && !canSubmit.value) return
-  if (mode === 'draft' && !form.body.trim() && !form.title.trim()) {
+  if (mode === 'draft' && !bodyText.value && !title.value.trim()) {
     toast.add({ title: 'Escribí algo antes de guardar el borrador', color: 'warning' })
     return
   }
   publishing.value = true
   try {
     const payload: Record<string, unknown> = {
-      ...form,
+      channelSlug: channelSlug.value,
+      title: title.value,
+      bodyHtml: bodyHtml.value,
       kind: kind.value,
       status: mode === 'draft' ? 'draft' : mode === 'schedule' ? 'scheduled' : 'published',
       allowComments: allowComments.value,
       pin: asAnnouncement.value,
+      anonymous: anonymous.value,
     }
     if (kind.value === 'poll') payload.options = validOptions.value
     if (mode === 'schedule') payload.scheduledAt = new Date(scheduledAt.value).toISOString()
-    if (kind.value !== 'poll' && form.mediaType === 'upload') {
-      if (!imageFile.value) throw new Error('Elegí una imagen para subir.')
-      const fd = new FormData()
-      fd.append('file', imageFile.value)
-      fd.append('kind', 'image')
-      const up = await api<{ url: string }>('/api/uploads', { method: 'POST', body: fd })
-      payload.mediaType = 'image'
-      payload.mediaUrl = up.url
+    if (attachedFile.value) {
+      payload.mediaType = 'file'
+      payload.mediaUrl = attachedFile.value.url
+      payload.attachmentName = attachedFile.value.name
     }
     await api('/api/posts', { method: 'POST', body: payload })
     if (mode === 'draft') toast.add({ title: 'Borrador guardado', description: 'Lo encontrás en «Mis borradores».', color: 'success' })
     else if (mode === 'schedule') toast.add({ title: 'Publicación programada', description: `Se publica el ${new Date(scheduledAt.value).toLocaleString('es', { dateStyle: 'medium', timeStyle: 'short' })}.`, color: 'success' })
     else toast.add({ title: 'Publicación creada', color: 'success' })
-    resetForm()
+    confirmDiscard.value = false
     open.value = false
+    resetForm()
     emit('published')
+    if (props.variant === 'bare') await refreshNuxtData()
   }
   catch (e) {
     toast.add({ title: 'No se pudo guardar', description: (e as { data?: { message?: string } }).data?.message || (e as Error).message || 'Intentá de nuevo.', color: 'error' })
@@ -151,74 +247,80 @@ const chevronItems = computed(() => [
       </div>
     </UCard>
 
-    <!-- Editor en modal (pantalla completa en teléfono, Fase 10) -->
-    <UModal v-model:open="open" title="Crear publicación" :fullscreen="isPhone" :ui="{ content: 'sm:max-w-2xl' }">
-      <template #body>
-        <div class="space-y-4">
-          <div class="flex flex-wrap items-center gap-3">
-            <UAvatar :src="user.avatarUrl || undefined" :text="initials(user.name)" size="md" />
-            <div class="min-w-0">
-              <p class="truncate font-semibold">{{ user.name }}</p>
-              <p class="text-xs text-muted">Publicando en</p>
+    <!-- Editor en modal: pantalla completa en teléfono o al maximizar -->
+    <UModal
+      v-model:open="open" :close="false" :dismissible="false" :fullscreen="maximized || isPhone"
+      :ui="{ content: maximized || isPhone ? '' : 'sm:max-w-3xl' }"
+    >
+      <template #header>
+        <div class="flex w-full items-start gap-3">
+          <UAvatar v-if="anonymous" icon="i-lucide-venetian-mask" size="lg" :ui="{ root: 'bg-elevated' }" />
+          <UAvatar v-else :src="user.avatarUrl || undefined" :text="initials(user.name)" size="lg" />
+          <div class="min-w-0 flex-1">
+            <p class="truncate font-semibold">{{ anonymous ? 'Anónimo' : user.name }}</p>
+            <div class="flex items-center gap-1 text-sm text-muted">
+              <span>Publicando en</span>
+              <UDropdownMenu :items="channelMenuItems">
+                <UButton color="neutral" variant="link" size="sm" class="px-1 font-semibold text-primary" :label="`# ${currentChannel?.name || '…'}`" trailing-icon="i-lucide-chevron-down" />
+              </UDropdownMenu>
             </div>
-            <USelect v-model="form.channelSlug" :items="channelOptions" class="ml-auto w-52" />
+          </div>
+          <!-- Toggles-icono como en la referencia -->
+          <div class="flex shrink-0 items-center gap-1">
+            <UButton
+              v-if="user.role === 'admin'" size="sm" :color="asAnnouncement ? 'primary' : 'neutral'"
+              :variant="asAnnouncement ? 'soft' : 'ghost'" icon="i-lucide-megaphone"
+              title="Publicar como anuncio (queda fijado en el canal)" @click="asAnnouncement = !asAnnouncement"
+            />
+            <UButton
+              size="sm" :color="anonymous ? 'primary' : 'neutral'" :variant="anonymous ? 'soft' : 'ghost'"
+              icon="i-lucide-venetian-mask" title="Publicar como anónimo: nadie ve tu nombre ni tu perfil"
+              @click="anonymous = !anonymous"
+            />
+            <UButton
+              size="sm" :color="allowComments ? 'primary' : 'neutral'" :variant="allowComments ? 'soft' : 'ghost'"
+              :icon="allowComments ? 'i-lucide-message-circle' : 'i-lucide-message-circle-off'"
+              :title="allowComments ? 'Comentarios permitidos' : 'Comentarios desactivados'" @click="allowComments = !allowComments"
+            />
+            <UButton
+              v-if="!isPhone" size="sm" color="neutral" variant="ghost"
+              :icon="maximized ? 'i-lucide-minimize-2' : 'i-lucide-maximize-2'"
+              :title="maximized ? 'Reducir' : 'Maximizar'" @click="maximized = !maximized"
+            />
+            <UButton size="sm" color="neutral" variant="ghost" icon="i-lucide-x" title="Cerrar" @click="requestClose" />
+          </div>
+        </div>
+      </template>
+      <template #body>
+        <div class="space-y-3">
+          <input
+            v-model="title" type="text" maxlength="160"
+            :placeholder="kind === 'poll' ? 'Título (opcional)' : 'Escribí un título'"
+            class="w-full bg-transparent text-xl font-bold outline-none placeholder:text-dimmed"
+          >
+          <ClientOnly>
+            <RichEditor
+              ref="editorRef" v-model="bodyHtml" mode="slash" :upload-image="uploadImage"
+              :placeholder="kind === 'poll' ? '¿Cuál es tu pregunta?' : '¿Qué tenés en mente? Escribí «/» para insertar bloques…'"
+            />
+          </ClientOnly>
+
+          <!-- Panel de encuesta integrado al editor -->
+          <div v-if="kind === 'poll'" class="space-y-2 rounded-lg border border-default p-3">
+            <p class="flex items-center gap-2 text-sm font-semibold"><UIcon name="i-lucide-bar-chart-3" /> Opciones de la encuesta</p>
+            <div v-for="(_, i) in pollOptions" :key="i" class="flex items-center gap-2">
+              <UInput v-model="pollOptions[i]" :placeholder="`Opción ${i + 1}`" class="flex-1" maxlength="80" />
+              <UButton v-if="pollOptions.length > 2" size="sm" color="neutral" variant="ghost" icon="i-lucide-x" @click="removePollOption(i)" />
+            </div>
+            <UButton v-if="pollOptions.length < 4" size="sm" color="neutral" variant="soft" icon="i-lucide-plus" label="Agregar opción" @click="addPollOption" />
+            <p class="text-xs text-muted">Los miembros pueden votar y cambiar su voto. La pregunta es el texto del editor.</p>
           </div>
 
-          <div class="flex flex-wrap items-center gap-x-5 gap-y-2 border-y border-default py-2.5">
-            <USwitch v-model="allowComments" label="Permitir comentarios" />
-            <USwitch v-if="user.role === 'admin'" v-model="asAnnouncement" label="Publicar como anuncio" />
-            <span class="text-xs text-muted">{{ asAnnouncement && user.role === 'admin' ? 'Queda fijado arriba del canal.' : '' }}</span>
+          <div v-if="attachedFile" class="flex items-center gap-2 rounded-lg border border-default px-3 py-2 text-sm">
+            <UIcon name="i-lucide-paperclip" class="text-muted" />
+            <span class="min-w-0 flex-1 truncate font-medium">{{ attachedFile.name }}</span>
+            <UButton size="xs" color="neutral" variant="ghost" icon="i-lucide-x" title="Quitar adjunto" @click="attachedFile = null" />
           </div>
-
-          <UTabs
-            :model-value="kind" :items="[
-              { label: 'Publicación', value: 'post', icon: 'i-lucide-pen-square' },
-              { label: 'Encuesta', value: 'poll', icon: 'i-lucide-bar-chart-3' },
-            ]" :content="false" size="sm" class="w-64" @update:model-value="(v: string | number) => kind = v as 'post' | 'poll'"
-          />
-
-          <template v-if="kind === 'post'">
-            <UFormField label="Título">
-              <UInput v-model="form.title" placeholder="¿Qué querés compartir?" class="w-full" />
-            </UFormField>
-            <UFormField label="Contenido">
-              <UTextarea v-model="form.body" :rows="5" placeholder="Escribí tu publicación…" class="w-full" />
-            </UFormField>
-            <UFormField label="Adjunto">
-              <USelect
-                v-model="form.mediaType" :items="[
-                  { label: 'Sin adjunto', value: 'none' },
-                  { label: 'Foto (subir archivo)', value: 'upload' },
-                  { label: 'Video (enlace de YouTube)', value: 'video' },
-                  { label: 'Imagen (URL)', value: 'image' },
-                ]" class="w-full"
-              />
-            </UFormField>
-            <UFormField v-if="form.mediaType === 'video' || form.mediaType === 'image'" label="URL del adjunto">
-              <UInput v-model="form.mediaUrl" placeholder="https://…" class="w-full" />
-            </UFormField>
-            <UFormField v-else-if="form.mediaType === 'upload'" label="Imagen (PNG, JPG, WebP o GIF · máx. 5 MB)">
-              <input type="file" accept="image/png,image/jpeg,image/webp,image/gif" class="block w-full text-sm file:mr-3 file:rounded-md file:border-0 file:bg-elevated file:px-3 file:py-2 file:text-sm file:font-medium" @change="onFileChange">
-              <p v-if="imageFile" class="mt-1 text-xs text-muted">{{ imageFile.name }} · {{ (imageFile.size / 1024).toFixed(0) }} KB</p>
-            </UFormField>
-          </template>
-          <template v-else>
-            <UFormField label="Pregunta" description="La pregunta es el cuerpo de la encuesta; el título es opcional.">
-              <UTextarea v-model="form.body" :rows="2" placeholder="¿Qué preferís para el próximo taller?" class="w-full" />
-            </UFormField>
-            <UFormField label="Título (opcional)">
-              <UInput v-model="form.title" placeholder="Se genera desde la pregunta si lo dejás vacío" class="w-full" />
-            </UFormField>
-            <UFormField label="Opciones (2 a 4)">
-              <div class="space-y-2">
-                <div v-for="(_, i) in pollOptions" :key="i" class="flex items-center gap-2">
-                  <UInput v-model="pollOptions[i]" :placeholder="`Opción ${i + 1}`" class="flex-1" maxlength="80" />
-                  <UButton v-if="pollOptions.length > 2" size="sm" color="neutral" variant="ghost" icon="i-lucide-x" @click="removePollOption(i)" />
-                </div>
-                <UButton v-if="pollOptions.length < 4" size="sm" color="neutral" variant="soft" icon="i-lucide-plus" label="Agregar opción" @click="addPollOption" />
-              </div>
-            </UFormField>
-          </template>
 
           <div v-if="scheduleMode" class="flex flex-wrap items-center gap-2 rounded-lg bg-elevated p-3">
             <UIcon name="i-lucide-calendar-clock" />
@@ -231,8 +333,54 @@ const chevronItems = computed(() => [
         </div>
       </template>
       <template #footer>
-        <div class="flex w-full items-center justify-end gap-2">
-          <UButton color="neutral" variant="ghost" label="Cancelar" @click="open = false" />
+        <!-- Barra inferior de solo iconos, como la referencia -->
+        <div class="flex w-full items-center gap-0.5">
+          <UButton size="sm" color="neutral" variant="ghost" icon="i-lucide-plus" title="Insertar bloque (o escribí «/» en el texto)" @click="editorRef?.insertSlash()" />
+          <label class="inline-flex cursor-pointer rounded-md p-2 text-muted transition hover:bg-elevated hover:text-default" title="Insertar imagen">
+            <UIcon name="i-lucide-image" class="text-lg" />
+            <input type="file" accept="image/png,image/jpeg,image/webp,image/gif" class="hidden" @change="onInlineImage">
+          </label>
+          <UPopover v-model:open="videoPopOpen">
+            <UButton size="sm" color="neutral" variant="ghost" icon="i-lucide-video" title="Incrustar video (YouTube o Vimeo)" />
+            <template #content>
+              <div class="flex w-80 items-center gap-2 p-3">
+                <UInput v-model="videoUrl" placeholder="Enlace de YouTube o Vimeo…" class="flex-1" size="sm" @keyup.enter="insertVideo" />
+                <UButton size="sm" label="Insertar" @click="insertVideo" />
+              </div>
+            </template>
+          </UPopover>
+          <label class="inline-flex cursor-pointer rounded-md p-2 text-muted transition hover:bg-elevated hover:text-default" title="Insertar audio (MP3, M4A, OGG, WAV)">
+            <UIcon name="i-lucide-music" class="text-lg" />
+            <input type="file" accept="audio/*" class="hidden" @change="onAudio">
+          </label>
+          <UPopover v-model:open="gifPopOpen">
+            <UButton size="sm" color="neutral" variant="ghost" icon="i-lucide-image-play" title="Insertar GIF por enlace" />
+            <template #content>
+              <div class="flex w-80 items-center gap-2 p-3">
+                <UInput v-model="gifUrl" placeholder="Enlace del GIF (https://…)" class="flex-1" size="sm" @keyup.enter="insertGif" />
+                <UButton size="sm" label="Insertar" @click="insertGif" />
+              </div>
+            </template>
+          </UPopover>
+          <UPopover v-model:open="emojiPopOpen">
+            <UButton size="sm" color="neutral" variant="ghost" icon="i-lucide-smile" title="Insertar emoji" />
+            <template #content>
+              <div class="grid w-72 grid-cols-8 gap-0.5 p-2">
+                <button v-for="e in EMOJIS" :key="e" type="button" class="rounded-md p-1.5 text-xl leading-none transition hover:bg-elevated" @click="insertEmoji(e)">{{ e }}</button>
+              </div>
+            </template>
+          </UPopover>
+          <UButton
+            size="sm" :color="kind === 'poll' ? 'primary' : 'neutral'" :variant="kind === 'poll' ? 'soft' : 'ghost'"
+            icon="i-lucide-bar-chart-3" title="Encuesta" @click="kind = kind === 'poll' ? 'post' : 'poll'"
+          />
+          <label class="inline-flex cursor-pointer rounded-md p-2 text-muted transition hover:bg-elevated hover:text-default" title="Adjuntar un archivo descargable">
+            <UIcon name="i-lucide-paperclip" class="text-lg" />
+            <input type="file" class="hidden" @change="onAttachFile">
+          </label>
+          <UButton size="sm" color="neutral" variant="ghost" icon="i-lucide-code-xml" title="Bloque de código" @click="editorRef?.insertCodeBlock()" />
+          <span class="flex-1" />
+          <UButton color="neutral" variant="ghost" label="Cancelar" @click="requestClose" />
           <div class="flex">
             <UButton
               :label="scheduleMode ? 'Programar' : 'Publicar'"
@@ -244,6 +392,17 @@ const chevronItems = computed(() => [
               <UButton icon="i-lucide-chevron-up" :loading="publishing" class="rounded-l-none border-l border-white/25" title="Más opciones de publicación" />
             </UDropdownMenu>
           </div>
+        </div>
+      </template>
+    </UModal>
+
+    <!-- Confirmación al cerrar con cambios sin publicar -->
+    <UModal v-model:open="confirmDiscard" title="¿Descartar publicación?" description="Tenés contenido sin publicar en el editor.">
+      <template #footer>
+        <div class="flex w-full flex-wrap justify-end gap-2">
+          <UButton color="neutral" variant="ghost" label="Seguir editando" @click="confirmDiscard = false" />
+          <UButton color="neutral" variant="soft" label="Guardar borrador" icon="i-lucide-save" :loading="publishing" @click="submit('draft')" />
+          <UButton color="error" label="Descartar" icon="i-lucide-trash-2" @click="discard" />
         </div>
       </template>
     </UModal>

@@ -7,16 +7,18 @@ export interface PostView {
   slug: string
   title: string
   body: string
+  bodyHtml?: string
   teaser: string
   locked: boolean
   mediaType: string
   mediaUrl: string
+  attachmentName?: string
   pinned: boolean
   kind?: string
   allowComments?: boolean
   edited?: boolean
   createdAt: string
-  author: { name: string, slug: string, avatarUrl?: string, role?: string, online?: boolean }
+  author: { name: string, slug: string, avatarUrl?: string, role?: string, online?: boolean, anonymous?: boolean, mine?: boolean, realAuthor?: { name: string, slug: string, avatarUrl?: string }, realRole?: string }
   channel: { name: string, slug: string, type: string }
   reactions: Record<string, number>
   myReactions: string[]
@@ -115,7 +117,9 @@ async function hidePost() {
 // (ocultar para mí, fijar si soy admin, eliminar si corresponde).
 const postMenuItems = computed(() => {
   const items: { label: string, icon: string, onSelect: () => void }[] = []
-  if (user.value && user.value.slug !== props.post.author.slug)
+  // En un post anónimo el slug viene vacío: «es mío» lo dice la marca
+  // `mine` del serializador, no la comparación de slugs.
+  if (user.value && !props.post.author.mine && user.value.slug !== props.post.author.slug)
     items.push({ label: 'Ocultar publicación', icon: 'i-lucide-eye-off', onSelect: hidePost })
   if (user.value?.role === 'admin')
     items.push({ label: props.post.pinned ? 'Desfijar' : 'Fijar (anuncio)', icon: 'i-lucide-pin', onSelect: togglePin })
@@ -124,7 +128,7 @@ const postMenuItems = computed(() => {
   return [items]
 })
 
-const canDelete = computed(() => !!user.value && (user.value.role === 'admin' || user.value.slug === props.post.author.slug))
+const canDelete = computed(() => !!user.value && (user.value.role === 'admin' || !!props.post.author.mine || user.value.slug === props.post.author.slug))
 const confirmDelete = ref(false)
 const deleting = ref(false)
 async function deletePost() {
@@ -145,16 +149,26 @@ async function deletePost() {
   <UCard v-if="!locallyHidden">
     <div class="flex items-start gap-3">
       <span class="relative shrink-0">
-        <UAvatar :src="post.author.avatarUrl || undefined" :text="initials(post.author.name)" size="md" />
+        <UAvatar v-if="post.author.anonymous && !post.author.mine" icon="i-lucide-venetian-mask" size="md" :ui="{ root: 'bg-elevated' }" />
+        <UAvatar v-else :src="post.author.avatarUrl || undefined" :text="initials(post.author.name)" size="md" />
         <span v-if="post.author.online" class="absolute -right-0.5 -bottom-0.5 h-3 w-3 rounded-full bg-green-500 ring-2 ring-white dark:ring-neutral-900" title="En línea" />
       </span>
       <div class="min-w-0 flex-1">
         <div class="flex items-start gap-2">
           <div class="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1 text-sm">
-            <NuxtLink :to="`/profile/${post.author.slug}`" class="font-semibold hover:underline">
+            <!-- Post anónimo (Fase 8): sin enlace al perfil. El admin
+                 ve además la autoría real, entre paréntesis. -->
+            <span v-if="post.author.anonymous && !post.author.mine" class="font-semibold">Anónimo</span>
+            <NuxtLink v-else :to="`/profile/${post.author.slug}`" class="font-semibold hover:underline">
               {{ post.author.name }}
             </NuxtLink>
-            <UBadge v-if="post.author.role === 'admin'" color="primary" variant="solid" size="sm">
+            <UBadge v-if="post.author.anonymous" color="neutral" variant="subtle" size="sm" icon="i-lucide-venetian-mask">
+              Anónimo
+            </UBadge>
+            <span v-if="post.author.realAuthor" class="text-xs text-muted">
+              (autor: <NuxtLink :to="`/profile/${post.author.realAuthor.slug}`" class="hover:underline">{{ post.author.realAuthor.name }}</NuxtLink>)
+            </span>
+            <UBadge v-if="post.author.role === 'admin' || post.author.realRole === 'admin'" color="primary" variant="solid" size="sm">
               Admin
             </UBadge>
             <span class="text-muted"># en</span>
@@ -205,7 +219,11 @@ async function deletePost() {
           </div>
         </div>
         <div v-else>
-          <p class="mt-2 whitespace-pre-line text-[15px] leading-relaxed">
+          <!-- Fase 8: con cuerpo rico se muestra el HTML (sanitizado
+               en el servidor al guardar y al servir); sin él, el
+               texto plano de siempre. -->
+          <div v-if="post.bodyHtml" class="rich-content mt-2 text-[15px] leading-relaxed" v-html="post.bodyHtml" />
+          <p v-else class="mt-2 whitespace-pre-line text-[15px] leading-relaxed">
             {{ post.body }}
           </p>
           <div v-if="post.mediaType === 'video' && youtubeEmbed" class="mt-3 aspect-video overflow-hidden rounded-lg">
@@ -217,6 +235,14 @@ async function deletePost() {
           <div v-else-if="post.mediaType === 'video' && post.mediaUrl" class="mt-3 text-sm">
             <a :href="post.mediaUrl" target="_blank" rel="noopener" class="text-primary hover:underline">Ver video</a>
           </div>
+          <a
+            v-else-if="post.mediaType === 'file' && post.mediaUrl" :href="post.mediaUrl" download
+            class="mt-3 flex items-center gap-3 rounded-lg border border-default p-3 text-sm transition hover:bg-elevated"
+          >
+            <UIcon name="i-lucide-paperclip" class="shrink-0 text-lg text-muted" />
+            <span class="min-w-0 flex-1 truncate font-medium">{{ post.attachmentName || 'Archivo adjunto' }}</span>
+            <span class="flex shrink-0 items-center gap-1 text-primary"><UIcon name="i-lucide-download" /> Descargar</span>
+          </a>
 
           <div v-if="localPoll" class="mt-4 space-y-2">
             <button

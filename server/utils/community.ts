@@ -6,6 +6,7 @@ import type { H3Event } from 'h3'
 import { readSession } from './auth'
 import { isOnline } from './chat'
 import { dbFor } from './db'
+import { sanitizeHtml } from './sanitize'
 
 export interface TenantRow { id: number, slug: string, name: string, tagline: string, brand_color: string, guidelines: string }
 export interface UserRow { id: number, name: string, slug: string, email: string, bio: string, location: string, avatar_url: string, created_at: string, cover_url?: string, website?: string, last_seen_at?: string }
@@ -109,7 +110,7 @@ export interface PollView {
   myOptionId: number | null
 }
 
-export async function serializePost(event: H3Event, row: Record<string, unknown>, userId: number | null, fullAccess: boolean) {
+export async function serializePost(event: H3Event, row: Record<string, unknown>, userId: number | null, fullAccess: boolean, viewerRole: string | null = null) {
   const db = await dbFor(event)
   const postId = row.id as number
   const reactionRows = await db.prepare('SELECT type, COUNT(*) AS n FROM reactions WHERE post_id = ? GROUP BY type').all(postId) as { type: string, n: number }[]
@@ -144,15 +145,41 @@ export async function serializePost(event: H3Event, row: Record<string, unknown>
       myOptionId: myVote ? Number(myVote.option_id) : null,
     }
   }
+  // Fase 8: post anónimo REAL. Para cualquier lector que no sea el
+  // propio autor ni un admin, el autor se reemplaza por «Anónimo» sin
+  // slug, sin avatar y sin presencia: ningún campo de la respuesta
+  // pública puede llevar a su perfil. El admin ve la marca «Anónimo»
+  // con la autoría real aparte (realAuthor); el autor se sigue viendo
+  // a sí mismo (con la marca de anónimo) para poder gestionar su post.
+  const isAnonymous = !!row.anonymous
+  const isAuthor = userId !== null && Number(row.author_id) === userId
+  const realAuthor = {
+    name: row.author_name as string, slug: row.author_slug as string, avatarUrl: (row.author_avatar as string) || '',
+    role: (row.author_role as string) || 'member',
+    online: isOnline(row.author_last_seen as string),
+  }
+  const authorView = !isAnonymous
+    ? { ...realAuthor, anonymous: false, mine: isAuthor }
+    : isAuthor
+      ? { ...realAuthor, anonymous: true, mine: true }
+      : viewerRole === 'admin'
+        ? { name: 'Anónimo', slug: '', avatarUrl: '', role: 'member', online: false, anonymous: true, mine: false, realAuthor: { name: realAuthor.name, slug: realAuthor.slug, avatarUrl: realAuthor.avatarUrl }, realRole: realAuthor.role }
+        : { name: 'Anónimo', slug: '', avatarUrl: '', role: 'member', online: false, anonymous: true, mine: false }
   return {
     id: postId,
     slug: row.slug,
     title: row.title,
     body: fullAccess ? row.body : '',
+    // Fase 8: cuerpo con formato, re-sanitizado al servir (ya viene
+    // sanitizado de la escritura; esto cubre datos viejos o editados
+    // por otras vías). El texto plano (`body`) sigue mandando en
+    // teasers, búsqueda y notificaciones.
+    bodyHtml: fullAccess ? sanitizeHtml(String(row.body_html || '')) : '',
     teaser: row.teaser || String(row.body || '').slice(0, 160),
     locked: !fullAccess,
     mediaType: row.media_type,
     mediaUrl: row.media_url,
+    attachmentName: (row.attachment_name as string) || '',
     pinned: !!row.pinned,
     kind: (row.kind as string) || 'post',
     status: (row.status as string) || 'published',
@@ -160,11 +187,7 @@ export async function serializePost(event: H3Event, row: Record<string, unknown>
     allowComments: row.allow_comments === undefined || row.allow_comments === null ? true : !!row.allow_comments,
     edited: !!row.edited_at,
     createdAt: row.created_at,
-    author: {
-      name: row.author_name, slug: row.author_slug, avatarUrl: row.author_avatar || '',
-      role: (row.author_role as string) || 'member',
-      online: isOnline(row.author_last_seen as string),
-    },
+    author: authorView,
     channel: { name: row.channel_name, slug: row.channel_slug, type: row.channel_type },
     reactions, myReactions, commentCount, bookmarked, poll,
   }

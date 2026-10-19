@@ -4,3 +4,43 @@
 @theme static {
   --font-sans: 'Public Sans', ui-sans-serif, system-ui, sans-serif;
 }
+
+/* Fase 8 — contenido rico: el mismo CSS da formato al área editable
+   de TipTap (.rich-area, la clase ProseMirror del editor) y al HTML
+   ya sanitizado que se muestra en posts, cursos y eventos
+   (.rich-content). Tailwind reinicia listas y títulos, así que acá
+   se redeclara lo esencial, con nuestros propios estilos. */
+.rich-area, .rich-content { overflow-wrap: break-word; }
+.rich-area { outline: none; min-height: 6rem; }
+.rich-area p, .rich-content p { margin: 0.45em 0; }
+.rich-area > :first-child, .rich-content > :first-child { margin-top: 0; }
+.rich-area > :last-child, .rich-content > :last-child { margin-bottom: 0; }
+.rich-area h1, .rich-content h1 { font-size: 1.55em; font-weight: 800; line-height: 1.25; margin: 0.7em 0 0.35em; }
+.rich-area h2, .rich-content h2 { font-size: 1.3em; font-weight: 700; line-height: 1.3; margin: 0.7em 0 0.35em; }
+.rich-area h3, .rich-content h3 { font-size: 1.12em; font-weight: 700; line-height: 1.35; margin: 0.6em 0 0.3em; }
+.rich-area ul, .rich-content ul { list-style: disc; padding-left: 1.4em; margin: 0.45em 0; }
+.rich-area ol, .rich-content ol { list-style: decimal; padding-left: 1.4em; margin: 0.45em 0; }
+.rich-area li, .rich-content li { margin: 0.2em 0; }
+.rich-area ul[data-type="taskList"], .rich-content ul[data-type="taskList"] { list-style: none; padding-left: 0.2em; }
+.rich-area ul[data-type="taskList"] li, .rich-content ul[data-type="taskList"] li { display: flex; gap: 0.5em; align-items: flex-start; }
+.rich-area ul[data-type="taskList"] li > label, .rich-content ul[data-type="taskList"] li > label { margin-top: 0.25em; }
+.rich-area ul[data-type="taskList"] li > div, .rich-content ul[data-type="taskList"] li > div { flex: 1; }
+.rich-area blockquote, .rich-content blockquote { border-left: 3px solid var(--ui-border-accented); padding-left: 0.9em; margin: 0.6em 0; color: var(--ui-text-muted); }
+.rich-area pre, .rich-content pre { background: #171717; color: #f5f5f5; border-radius: 0.6rem; padding: 0.8rem 1rem; overflow-x: auto; margin: 0.6em 0; font-size: 0.86em; line-height: 1.55; }
+.rich-area pre code, .rich-content pre code { background: transparent; padding: 0; color: inherit; }
+.rich-area code, .rich-content code { background: var(--ui-bg-elevated); border-radius: 0.3rem; padding: 0.1em 0.32em; font-size: 0.88em; }
+.rich-area a, .rich-content a { color: var(--ui-primary); text-decoration: underline; text-underline-offset: 2px; }
+.rich-area img, .rich-content img { max-width: 100%; height: auto; border-radius: 0.6rem; margin: 0.5em 0; }
+.rich-area audio, .rich-content audio { width: 100%; margin: 0.5em 0; }
+.rich-area hr, .rich-content hr { border: none; border-top: 1px solid var(--ui-border); margin: 1em 0; }
+.rich-video { position: relative; aspect-ratio: 16 / 9; margin: 0.6em 0; border-radius: 0.6rem; overflow: hidden; background: #000; }
+.rich-video iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+.rich-content iframe:not(.rich-video iframe) { max-width: 100%; }
+/* Placeholder del editor vacío (TipTap marca el nodo vacío) */
+.rich-area .is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  pointer-events: none;
+  color: var(--ui-text-dimmed);
+}

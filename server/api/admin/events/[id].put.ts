@@ -11,7 +11,7 @@ export default defineEventHandler(async (event) => {
   const db = await dbFor(event)
   const row = await db.prepare('SELECT id FROM events WHERE id = ? AND tenant_id = ?').get(eventId, tenant.id)
   if (!row) throw createError({ statusCode: 404, message: 'Evento no encontrado.' })
-  await db.prepare('UPDATE events SET title = ?, description = ?, starts_at = ?, ends_at = ?, location = ?, category = ?, agenda = ? WHERE id = ?')
-    .run(input.title, input.description, input.startsAt, input.endsAt, input.location, input.category, input.agenda, eventId)
+  await db.prepare('UPDATE events SET title = ?, description = ?, description_html = ?, starts_at = ?, ends_at = ?, location = ?, category = ?, agenda = ? WHERE id = ?')
+    .run(input.title, input.description, input.descriptionHtml, input.startsAt, input.endsAt, input.location, input.category, input.agenda, eventId)
   return { ok: true }
 })
