@@ -88,7 +88,7 @@ CREATE TABLE IF NOT EXISTS plans (id INTEGER PRIMARY KEY AUTOINCREMENT, tenant_i
 CREATE TABLE IF NOT EXISTS member_subscriptions (id INTEGER PRIMARY KEY AUTOINCREMENT, tenant_id INTEGER NOT NULL, user_id INTEGER NOT NULL, plan_id INTEGER NOT NULL, status TEXT NOT NULL DEFAULT 'active', source TEXT NOT NULL DEFAULT 'stripe', stripe_subscription_id TEXT NOT NULL DEFAULT '', stripe_customer_id TEXT NOT NULL DEFAULT '', current_period_end TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
 CREATE UNIQUE INDEX IF NOT EXISTS member_subscriptions_unique ON member_subscriptions (tenant_id, user_id, plan_id);
 CREATE TABLE IF NOT EXISTS payments (id INTEGER PRIMARY KEY AUTOINCREMENT, tenant_id INTEGER NOT NULL, user_id INTEGER NOT NULL, kind TEXT NOT NULL, item_id INTEGER NOT NULL DEFAULT 0, plan_id INTEGER NOT NULL DEFAULT 0, amount_cents INTEGER NOT NULL DEFAULT 0, currency TEXT NOT NULL DEFAULT 'usd', status TEXT NOT NULL DEFAULT 'pending', stripe_session_id TEXT NOT NULL DEFAULT '', stripe_payment_intent TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
-CREATE UNIQUE INDEX IF NOT EXISTS payments_session_unique ON payments (stripe_session_id);
+CREATE UNIQUE INDEX IF NOT EXISTS payments_session_unique ON payments (stripe_session_id) WHERE stripe_session_id <> '';
 CREATE TABLE IF NOT EXISTS manual_payment_methods (id INTEGER PRIMARY KEY AUTOINCREMENT, tenant_id INTEGER NOT NULL, type TEXT NOT NULL DEFAULT 'transferencia', title TEXT NOT NULL, details TEXT NOT NULL DEFAULT '', active INTEGER NOT NULL DEFAULT 1, sort INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS stripe_events (id TEXT PRIMARY KEY, type TEXT NOT NULL, processed_at TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS email_log (id INTEGER PRIMARY KEY AUTOINCREMENT, tenant_id INTEGER NOT NULL, user_id INTEGER, to_email TEXT NOT NULL, kind TEXT NOT NULL, subject TEXT NOT NULL, status TEXT NOT NULL, detail TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL);
@@ -295,6 +295,14 @@ const MIGRATIONS = [
   `ALTER TABLE payments ADD COLUMN decided_at TEXT NOT NULL DEFAULT ''`,
   `ALTER TABLE plans ADD COLUMN display_order INTEGER NOT NULL DEFAULT 0`,
   `ALTER TABLE plans ADD COLUMN featured INTEGER NOT NULL DEFAULT 0`,
+  // Fase 17 (corrección): el índice único de stripe_session_id pasa
+  // a PARCIAL. La unicidad protege la idempotencia de Stripe (una
+  // sesión = un pago); los pagos manuales no tienen sesión (''), y
+  // con el índice pleno el SEGUNDO pago manual de la base violaba
+  // la unicidad y devolvía 500. DROP + CREATE en cada init es
+  // idempotente y no toca datos.
+  `DROP INDEX IF EXISTS payments_session_unique`,
+  `CREATE UNIQUE INDEX payments_session_unique ON payments (stripe_session_id) WHERE stripe_session_id <> ''`,
 ]
 
 async function runMigrations(db: AsyncDb): Promise<void> {
