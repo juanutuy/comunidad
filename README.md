@@ -1657,6 +1657,84 @@ canal y de nivel son datos, como en la referencia).
   en español, conteos de usuarios y posts intactos). Build y
   typecheck en cero; `test-realtime.mjs` PASS.
 
+## Fase 16-D (hecha) — submenús de consola en columna, sin pestañas
+
+La paridad también es CÓMO se navega: en la referencia, Settings (y
+cada sección con subsecciones) abre una **columna de submenú
+vertical** junto al riel de la consola, con el contenido a la
+derecha; la nuestra repartía las subsecciones en **pestañas
+horizontales**, y encima de forma inconsistente (cada sección con
+su propio markup, y Cursos con una fila de pestañas escrita a
+mano). Esta fase unifica el patrón:
+
+- **Un solo componente, `AdminSubMenu`**: columna vertical en
+  escritorio (riel de secciones → submenú → contenido, la columna
+  queda fija al hacer scroll) y fila horizontal compacta
+  desplazable SOLO en pantallas chicas. Dos modos según la forma
+  de los ítems: `{ value }` para subsecciones de una misma página
+  (el enlace escribe `?tab=` y la activa sale de la URL, como
+  siempre: los enlaces que apuntan a `?tab=pagos` y demás siguen
+  aterrizando en su subsección) y `{ to }` para subsecciones que
+  son rutas propias (la activa sale del path).
+- **Mapa final de navegación de la consola**:
+  - **Ajustes de la comunidad** (`/admin/settings`, modo `?tab=`):
+    General · Privacidad · Barra lateral del feed · Menú de
+    navegación · Contacto · Pagos · Textos legales · Moderación ·
+    Ingreso de miembros. Sigue siendo un solo formulario con un
+    solo guardado; el selector de idioma de la Fase 18 y la
+    moneda/métodos de la Fase 17 quedaron intactos.
+  - **Gamificación** (modo `?tab=`): Niveles e insignias · Puntos
+    por acción · Compuertas por nivel. Un solo guardado, como
+    siempre.
+  - **Miembros** (rutas): Miembros · Solicitudes de ingreso ·
+    Invitaciones · Roles. «Solicitudes» se ofrece siempre al
+    admin: la página avisa si la aprobación previa está apagada y
+    muestra el historial. El moderador solo ve «Miembros».
+  - **Contenido** (rutas): Publicaciones · Archivos (solo admin)
+    · Canales.
+  - **Cursos** (rutas): Cursos · Certificados. Las dos páginas
+    decían «Administración» como título y traían su propia fila
+    de pestañas escrita a mano: ahora titulan «Cursos» y usan el
+    submenú común.
+  - Las listas de ítems por rol viven en
+    `composables/useAdminMenus.ts`: a nadie se le ofrece una
+    subsección que el servidor le negaría, y la consola sigue
+    filtrada por rol de punta a punta.
+- **Lo que NO es navegación entre subsecciones y se queda** (la
+  distinción importa): las **pestañas de cola de Moderación**
+  (Reportes / En revisión, componente `AdminQueueTabs`) reparten
+  UNA misma lista de trabajo en vistas — es el patrón de la
+  referencia para esa pantalla, no subsecciones —; los **filtros
+  de datos** de Contenido (estados de publicaciones, tipo de
+  archivo en Medios, Activos/Archivados en Canales) filtran la
+  lista que se está viendo; y las **pestañas del estudio de un
+  curso** (Curriculum / Drip / Enrollments / Settings) son los
+  paneles de trabajo de UN editor enfocado en un solo curso, no
+  navegación de la consola. Los tres componentes horizontales
+  viejos (`AdminSubNav`, `MembersSubNav`, `ContentSubNav`) se
+  retiraron del código: no quedan dos implementaciones del mismo
+  submenú.
+- **Responsive**: por debajo de `lg` el submenú se pliega a la
+  fila compacta; el contenido nunca queda tapado ni exige scroll
+  horizontal de página.
+
+Verificación local por contenido (`scripts/test-fase16d.mjs`,
+**49 PASS / 0 FAIL**, contra `wrangler dev` con D1 local): el
+HTML servido de `/admin/settings` muestra la columna con las 9
+subsecciones y ninguna fila de pestañas; `?tab=pagos` aterriza en
+Pagos con la moneda y los métodos de la Fase 17 y la subsección
+marcada activa; `?tab=privacidad` muestra el teaser granular de
+la Fase 15; General conserva el selector de idioma de la Fase 18;
+guardar el correo de soporte desde Contacto persiste y se
+restauró. Miembros, Contenido y Cursos muestran su submenú con la
+subsección activa marcada en cada ruta; Moderación conserva su
+`tablist` de cola y no tiene submenú; los filtros de datos de
+Contenido siguen presentes. Con Diego promovido a moderador (y
+devuelto a miembro al final): su submenú de Miembros trae solo
+«Miembros» y el de Contenido no ofrece Archivos. Build y
+typecheck en cero; `test-realtime.mjs` PASS. Base local limpia
+al cerrar: 4 usuarios semilla y 7 publicaciones.
+
 ## Pendiente a propósito (fuera de esta fase)
 
 - Migraciones versionadas con `drizzle-kit` para D1 (hoy: esquema
