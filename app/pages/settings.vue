@@ -6,10 +6,11 @@
 // vuelve a la comunidad. La lógica de ajustes vive en
 // app/components/UserSettingsModal.vue contra /api/settings*.
 const { user } = useAuth()
+const { t } = useI18n()
 const { openSettings } = useUserSettings()
 const route = useRoute()
 
-const validSections = ['perfil', 'notificaciones', 'privacidad', 'bloqueos', 'seguridad'] as const
+const validSections = ['perfil', 'notificaciones', 'privacidad', 'bloqueos', 'idioma', 'seguridad'] as const
 type Section = typeof validSections[number]
 
 onMounted(() => {
@@ -23,15 +24,15 @@ onMounted(() => {
 <template>
   <div class="space-y-5">
     <UAlert
-      v-if="!user" color="neutral" variant="soft" title="Iniciá sesión para ver tus ajustes"
-      description="Los ajustes de tu cuenta se abren en una ventana sobre la comunidad."
+      v-if="!user" color="neutral" variant="soft" :title="t('settingsPage.loginTitle')"
+      :description="t('settingsPage.loginText')"
     >
       <template #actions>
-        <UButton to="/login" label="Iniciar sesión" size="sm" />
+        <UButton to="/login" :label="t('nav.login')" size="sm" />
       </template>
     </UAlert>
     <p v-else class="flex items-center gap-2 text-sm text-muted">
-      <UIcon name="i-lucide-loader-circle" class="animate-spin" /> Abriendo tus ajustes…
+      <UIcon name="i-lucide-loader-circle" class="animate-spin" /> {{ t('settingsPage.opening') }}
     </p>
   </div>
 </template>

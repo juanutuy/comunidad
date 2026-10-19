@@ -5,6 +5,7 @@
 const route = useRoute()
 const api = useApi()
 const { user } = useAuth()
+const { t } = useI18n()
 const canceled = computed(() => String(route.query.estado || '') === 'cancelado')
 
 const { data, refresh } = await useAsyncData('billing-return', () =>
@@ -29,16 +30,16 @@ watch(() => latest.value?.status, (s) => { if (s === 'paid' && timer) clearInter
       <UIcon v-else-if="latest?.status === 'paid'" name="i-lucide-check-circle-2" class="text-4xl text-green-500" />
       <UIcon v-else name="i-lucide-loader-circle" class="animate-spin text-4xl text-primary" />
       <h1 class="mt-3 text-2xl font-bold">
-        {{ canceled ? 'Pago cancelado' : latest?.status === 'paid' ? '¡Pago confirmado!' : 'Confirmando tu pago…' }}
+        {{ canceled ? t('billingReturn.canceledTitle') : latest?.status === 'paid' ? t('billingReturn.confirmedTitle') : t('billingReturn.confirmingTitle') }}
       </h1>
       <p class="mt-2 text-muted">
-        <template v-if="canceled">No se hizo ningún cargo y no se activó ningún acceso. Podés reintentarlo cuando quieras desde la página de precios.</template>
-        <template v-else-if="latest?.status === 'paid'">Tu compra de «{{ latest.itemName }}» ya está activa. El acceso se concedió al confirmarse el pago.</template>
-        <template v-else>Estamos esperando la confirmación del sistema de pagos. Esta página se actualiza sola; tu acceso se activa apenas el pago queda confirmado, sin que tengas que hacer nada más.</template>
+        <template v-if="canceled">{{ t('billingReturn.canceledText') }}</template>
+        <template v-else-if="latest?.status === 'paid'">{{ t('billingReturn.confirmedText', { name: latest.itemName }) }}</template>
+        <template v-else>{{ t('billingReturn.confirmingText') }}</template>
       </p>
       <div class="mt-5 flex flex-wrap justify-center gap-2">
-        <UButton to="/pricing" label="Ver precios y mis compras" icon="i-lucide-tag" />
-        <UButton to="/feeds" color="neutral" variant="soft" label="Ir al feed" />
+        <UButton to="/pricing" :label="t('billingReturn.viewPricing')" icon="i-lucide-tag" />
+        <UButton to="/feeds" color="neutral" variant="soft" :label="t('billingReturn.goFeed')" />
       </div>
     </UCard>
   </div>

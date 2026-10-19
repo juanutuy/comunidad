@@ -56,6 +56,12 @@ export function useAuth() {
   const status = useState<string | null>('auth-status', () => null)
   const gates = useState<MyGates | null>('auth-gates', () => null)
   const api = useApi()
+  // Fase 18: el composable de idioma se captura ACÁ, en la creación
+  // (síncrona, con contexto de Nuxt activo). Llamarlo dentro de
+  // fetchMe DESPUÉS del await rompía el SSR: sin contexto, useState
+  // lanzaba, el catch anulaba el usuario y el idioma nunca se
+  // aplicaba (el HTML nacía sin sesión y en español).
+  const i18n = useI18n()
 
   async function fetchMe() {
     try {
@@ -67,7 +73,7 @@ export function useAuth() {
       // Fase 18: el idioma resuelto que calculó el servidor manda —
       // en SSR esto corre antes del primer render (app.vue espera
       // fetchMe), así la página nace en el idioma correcto.
-      useI18n().applyResolved(data.locale, data.user?.locale ?? null, data.tenant?.defaultLocale)
+      i18n.applyResolved(data.locale, data.user?.locale ?? null, data.tenant?.defaultLocale)
     }
     catch {
       user.value = null

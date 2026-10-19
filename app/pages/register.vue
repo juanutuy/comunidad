@@ -7,6 +7,7 @@
 // preguntan respuestas.
 definePageMeta({ layout: 'auth' })
 const { register, tenant } = useAuth()
+const { t } = useI18n()
 const api = useApi()
 const route = useRoute()
 const router = useRouter()
@@ -37,11 +38,11 @@ async function submit() {
       router.push('/pending')
       return
     }
-    toast.add({ title: '¡Cuenta creada! Bienvenido a la comunidad', color: 'success' })
+    toast.add({ title: t('auth.welcomeToast'), color: 'success' })
     router.push('/feeds')
   }
   catch (e) {
-    error.value = (e as { data?: { message?: string } }).data?.message || 'No se pudo crear la cuenta.'
+    error.value = (e as { data?: { message?: string } }).data?.message || t('auth.registerFailed')
   }
   finally { loading.value = false }
 }
@@ -49,40 +50,40 @@ async function submit() {
 
 <template>
   <UCard>
-    <h1 class="text-2xl font-bold">Creá tu cuenta</h1>
-    <p class="mt-1 text-sm text-muted">Es gratis y toma menos de un minuto.</p>
+    <h1 class="text-2xl font-bold">{{ t('auth.createAccountTitle') }}</h1>
+    <p class="mt-1 text-sm text-muted">{{ t('auth.registerSubtitle') }}</p>
     <UAlert
       v-if="registrationClosed" class="mt-4" color="warning" variant="soft" icon="i-lucide-lock"
-      title="El registro público está cerrado"
-      description="Esta comunidad crece por invitación. Si un administrador te compartió un enlace de invitación, abrilo para crear tu cuenta; si no, pedile uno a quien te contó de la comunidad."
+      :title="t('auth.closedTitle')"
+      :description="t('auth.closedText')"
     />
     <UAlert v-if="error" class="mt-4" color="error" variant="soft" :title="error" />
     <UAlert
       v-if="joinInfo?.approval && !inviteToken" class="mt-4" color="warning" variant="soft" icon="i-lucide-hourglass"
-      title="Esta comunidad revisa los ingresos"
-      description="Al crear tu cuenta, un administrador revisa tu solicitud antes de darte acceso. Te avisamos cuando esté aprobada."
+      :title="t('auth.approvalTitle')"
+      :description="t('auth.approvalText')"
     />
     <form v-if="!registrationClosed" class="mt-5 space-y-4" @submit.prevent="submit">
-      <UFormField label="Nombre">
-        <UInput v-model="form.name" required placeholder="Tu nombre" class="w-full" />
+      <UFormField :label="t('auth.nameLabel')">
+        <UInput v-model="form.name" required :placeholder="t('auth.namePlaceholder')" class="w-full" />
       </UFormField>
-      <UFormField label="Correo electrónico">
-        <UInput v-model="form.email" type="email" required placeholder="vos@correo.com" class="w-full" />
+      <UFormField :label="t('auth.email')">
+        <UInput v-model="form.email" type="email" required :placeholder="t('auth.emailPlaceholder')" class="w-full" />
       </UFormField>
-      <UFormField label="Contraseña" hint="Mínimo 8 caracteres">
-        <UInput v-model="form.password" type="password" required minlength="8" placeholder="Creá una contraseña" class="w-full" />
+      <UFormField :label="t('auth.password')" :hint="t('auth.passwordHint')">
+        <UInput v-model="form.password" type="password" required minlength="8" :placeholder="t('auth.newPasswordPlaceholder')" class="w-full" />
       </UFormField>
       <template v-if="questions.length">
-        <p class="border-t border-default pt-4 text-sm font-semibold">Contale a la comunidad</p>
+        <p class="border-t border-default pt-4 text-sm font-semibold">{{ t('auth.tellCommunity') }}</p>
         <UFormField v-for="(q, i) in questions" :key="i" :label="q">
-          <UTextarea v-model="answers[i]" :rows="2" class="w-full" placeholder="Tu respuesta" />
+          <UTextarea v-model="answers[i]" :rows="2" class="w-full" :placeholder="t('auth.yourAnswer')" />
         </UFormField>
       </template>
-      <UButton type="submit" block :label="joinInfo?.approval && !inviteToken ? 'Crear cuenta y enviar solicitud' : 'Crear cuenta'" :loading="loading" />
+      <UButton type="submit" block :label="joinInfo?.approval && !inviteToken ? t('auth.submitApproval') : t('auth.createAccountButton')" :loading="loading" />
     </form>
     <p class="mt-4 text-center text-sm text-muted">
-      ¿Ya tenés cuenta? <NuxtLink to="/login" class="font-medium text-primary hover:underline">Iniciá sesión</NuxtLink>
+      {{ t('auth.haveAccount') }} <NuxtLink to="/login" class="font-medium text-primary hover:underline">{{ t('nav.login') }}</NuxtLink>
     </p>
-    <p v-if="tenant" class="mt-2 text-center text-xs text-muted">Estás creando tu cuenta en {{ tenant.name }}.</p>
+    <p v-if="tenant" class="mt-2 text-center text-xs text-muted">{{ t('auth.creatingIn', { name: tenant.name }) }}</p>
   </UCard>
 </template>

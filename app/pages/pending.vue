@@ -6,6 +6,7 @@
 // cuenta suspendida. Con la membresía activa redirige al feed.
 definePageMeta({ layout: 'auth' })
 const { user, status, tenant, logout, fetchMe } = useAuth()
+const { t } = useI18n()
 const router = useRouter()
 
 await fetchMe()
@@ -18,22 +19,22 @@ const view = computed(() => {
       return {
         icon: 'i-lucide-user-x',
         color: 'error' as const,
-        title: 'Tu solicitud no fue aprobada',
-        text: `Un administrador revisó tu solicitud de ingreso a ${tenant.value?.name || 'la comunidad'} y esta vez no fue aprobada. Cuando pase el tiempo de espera que definió la comunidad, vas a poder volver a solicitar el ingreso registrándote de nuevo con el mismo correo.`,
+        title: t('pending.declinedTitle'),
+        text: t('pending.declinedText', { name: tenant.value?.name || t('pricing.theCommunity') }),
       }
     case 'suspended':
       return {
         icon: 'i-lucide-ban',
         color: 'error' as const,
-        title: 'Tu cuenta está suspendida',
-        text: `Tu acceso a ${tenant.value?.name || 'la comunidad'} está suspendido por un administrador. Si creés que es un error, escribile a un administrador de la comunidad.`,
+        title: t('pending.suspendedTitle'),
+        text: t('pending.suspendedText', { name: tenant.value?.name || t('pricing.theCommunity') }),
       }
     default:
       return {
         icon: 'i-lucide-hourglass',
         color: 'warning' as const,
-        title: 'Tu solicitud está en revisión',
-        text: `${tenant.value?.name || 'La comunidad'} revisa cada ingreso antes de dar acceso. Un administrador está viendo tu solicitud: cuando la apruebe, vas a poder entrar con tu correo y tu contraseña. No tenés que hacer nada más.`,
+        title: t('pending.pendingTitle'),
+        text: t('pending.pendingText', { name: tenant.value?.name || t('pending.defaultCommunity') }),
       }
   }
 })
@@ -52,8 +53,8 @@ async function doLogout() {
       </span>
       <h1 class="mt-4 text-2xl font-bold">{{ view.title }}</h1>
       <p class="mt-2 max-w-md text-sm text-muted">{{ view.text }}</p>
-      <UAlert v-if="status === 'pending'" class="mt-4 text-left" color="neutral" variant="soft" icon="i-lucide-info" title="¿Ya te aprobaron?" description="Volvé a iniciar sesión: si tu solicitud ya fue aprobada, entrás directo a la comunidad." />
-      <UButton class="mt-6" color="neutral" variant="soft" icon="i-lucide-log-out" label="Cerrar sesión" @click="doLogout" />
+      <UAlert v-if="status === 'pending'" class="mt-4 text-left" color="neutral" variant="soft" icon="i-lucide-info" :title="t('pending.approvedNoteTitle')" :description="t('pending.approvedNoteText')" />
+      <UButton class="mt-6" color="neutral" variant="soft" icon="i-lucide-log-out" :label="t('nav.logout')" @click="doLogout" />
     </div>
   </UCard>
 </template>

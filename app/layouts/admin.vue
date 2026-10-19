@@ -18,26 +18,30 @@
 // solo Cursos — y solo se pinta para el staff; sin rol de staff se
 // ve la barra y el aviso de la página, nunca datos.
 const { user, tenant, logout } = useAuth()
+const { t } = useI18n()
 const { initials } = useFormat()
 const router = useRouter()
 const route = useRoute()
 
-const sections = [
-  { label: 'Panel', icon: 'i-lucide-layout-dashboard', to: '/admin', exact: true, roles: ['admin'] },
-  { label: 'Miembros', icon: 'i-lucide-users', to: '/admin/members', roles: ['admin', 'moderator'] },
-  { label: 'Canales', icon: 'i-lucide-hash', to: '/admin/channels', roles: ['admin'] },
-  { label: 'Contenido', icon: 'i-lucide-folder-open', to: '/admin/content', roles: ['admin', 'moderator'] },
-  { label: 'Cursos', icon: 'i-lucide-graduation-cap', to: '/admin/courses', roles: ['admin', 'course_manager'] },
-  { label: 'Eventos', icon: 'i-lucide-calendar-days', to: '/admin/events', roles: ['admin'] },
-  { label: 'Moderación', icon: 'i-lucide-shield-alert', to: '/admin/moderation', roles: ['admin', 'moderator'] },
-  { label: 'Gamificación', icon: 'i-lucide-trophy', to: '/admin/gamification', roles: ['admin'] },
-  { label: 'Planes', icon: 'i-lucide-credit-card', to: '/admin/plans', roles: ['admin'] },
-  { label: 'Ingresos', icon: 'i-lucide-chart-line', to: '/admin/earnings', roles: ['admin', 'moderator'] },
-  { label: 'Dominios', icon: 'i-lucide-globe', to: '/admin/domains', roles: ['admin'] },
-  { label: 'Correos', icon: 'i-lucide-mail', to: '/admin/emails', roles: ['admin'] },
-  { label: 'Ajustes de la comunidad', icon: 'i-lucide-settings', to: '/admin/settings', roles: ['admin'] },
-]
-const visibleSections = computed(() => sections.filter(s => !!user.value?.role && s.roles.includes(user.value.role)))
+// Fase 18: los rótulos del cascarón de la consola sí se traducen; los
+// cuerpos de las páginas /admin/** quedan en español en esta fase
+// (declarado en el README).
+const sections = computed(() => [
+  { label: t('adminShell.sectionPanel'), icon: 'i-lucide-layout-dashboard', to: '/admin', exact: true, roles: ['admin'] },
+  { label: t('adminShell.sectionMembers'), icon: 'i-lucide-users', to: '/admin/members', roles: ['admin', 'moderator'] },
+  { label: t('adminShell.sectionChannels'), icon: 'i-lucide-hash', to: '/admin/channels', roles: ['admin'] },
+  { label: t('adminShell.sectionContent'), icon: 'i-lucide-folder-open', to: '/admin/content', roles: ['admin', 'moderator'] },
+  { label: t('adminShell.sectionCourses'), icon: 'i-lucide-graduation-cap', to: '/admin/courses', roles: ['admin', 'course_manager'] },
+  { label: t('adminShell.sectionEvents'), icon: 'i-lucide-calendar-days', to: '/admin/events', roles: ['admin'] },
+  { label: t('adminShell.sectionModeration'), icon: 'i-lucide-shield-alert', to: '/admin/moderation', roles: ['admin', 'moderator'] },
+  { label: t('adminShell.sectionGamification'), icon: 'i-lucide-trophy', to: '/admin/gamification', roles: ['admin'] },
+  { label: t('adminShell.sectionPlans'), icon: 'i-lucide-credit-card', to: '/admin/plans', roles: ['admin'] },
+  { label: t('adminShell.sectionEarnings'), icon: 'i-lucide-chart-line', to: '/admin/earnings', roles: ['admin', 'moderator'] },
+  { label: t('adminShell.sectionDomains'), icon: 'i-lucide-globe', to: '/admin/domains', roles: ['admin'] },
+  { label: t('adminShell.sectionEmails'), icon: 'i-lucide-mail', to: '/admin/emails', roles: ['admin'] },
+  { label: t('adminShell.sectionSettings'), icon: 'i-lucide-settings', to: '/admin/settings', roles: ['admin'] },
+])
+const visibleSections = computed(() => sections.value.filter(s => !!user.value?.role && s.roles.includes(user.value.role)))
 const isStaff = computed(() => visibleSections.value.length > 0)
 function isActive(item: { to: string, exact?: boolean }) {
   if (item.exact) return route.path === item.to
@@ -56,11 +60,11 @@ async function doLogout() {
 
 const userMenuItems = computed(() => [
   [
-    { label: 'Mi perfil', icon: 'i-lucide-user', to: `/profile/${user.value?.slug}` },
-    { label: 'Ajustes de cuenta', icon: 'i-lucide-settings-2', onSelect: () => openUserSettings() },
-    { label: 'Volver a la comunidad', icon: 'i-lucide-arrow-left', to: '/feeds' },
+    { label: t('nav.myProfile'), icon: 'i-lucide-user', to: `/profile/${user.value?.slug}` },
+    { label: t('nav.accountSettings'), icon: 'i-lucide-settings-2', onSelect: () => openUserSettings() },
+    { label: t('adminShell.backToCommunity'), icon: 'i-lucide-arrow-left', to: '/feeds' },
   ],
-  [{ label: 'Cerrar sesión', icon: 'i-lucide-log-out', onSelect: doLogout }],
+  [{ label: t('nav.logout'), icon: 'i-lucide-log-out', onSelect: doLogout }],
 ])
 </script>
 
@@ -70,19 +74,19 @@ const userMenuItems = computed(() => [
       <div class="flex h-14 items-center gap-3 px-4">
         <UButton
           v-if="isStaff" class="md:hidden" color="neutral" variant="ghost"
-          icon="i-lucide-menu" aria-label="Abrir el menú de la consola" @click="railOpen = true"
+          icon="i-lucide-menu" :aria-label="t('adminShell.consoleMenu')" @click="railOpen = true"
         />
-        <UButton to="/feeds" color="neutral" variant="ghost" icon="i-lucide-arrow-left" label="Volver a la comunidad" class="-ml-2 shrink-0" />
+        <UButton to="/feeds" color="neutral" variant="ghost" icon="i-lucide-arrow-left" :label="t('adminShell.backToCommunity')" class="-ml-2 shrink-0" />
         <span class="hidden h-6 w-px bg-neutral-200 sm:block dark:bg-neutral-800" />
         <span class="flex min-w-0 items-center gap-2">
           <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg font-bold text-white" :style="{ backgroundColor: tenant?.brandColor || '#2563eb' }">
             {{ (tenant?.name || 'C').charAt(0) }}
           </span>
           <span class="hidden truncate font-bold sm:block">{{ tenant?.name || 'Comunidad' }}</span>
-          <UBadge color="primary" variant="subtle" class="shrink-0">Administración</UBadge>
+          <UBadge color="primary" variant="subtle" class="shrink-0">{{ t('adminShell.administration') }}</UBadge>
         </span>
         <span class="flex-1" />
-        <UButton to="/feeds" color="neutral" variant="ghost" icon="i-lucide-eye" label="Ver la comunidad" class="hidden md:inline-flex" />
+        <UButton to="/feeds" color="neutral" variant="ghost" icon="i-lucide-eye" :label="t('adminShell.viewCommunity')" class="hidden md:inline-flex" />
         <UColorModeButton class="hidden md:inline-flex" />
         <template v-if="user">
           <UDropdownMenu :items="userMenuItems">
@@ -92,14 +96,14 @@ const userMenuItems = computed(() => [
             </UButton>
           </UDropdownMenu>
         </template>
-        <UButton v-else to="/login" color="neutral" variant="ghost" label="Iniciar sesión" />
+        <UButton v-else to="/login" color="neutral" variant="ghost" :label="t('nav.login')" />
       </div>
     </header>
 
     <div class="mx-auto flex max-w-[1400px] items-start gap-6 px-4 py-6">
       <!-- Riel de secciones: solo iconos en md, completo desde lg. -->
       <aside v-if="isStaff" class="sticky top-20 hidden w-14 shrink-0 md:block lg:w-56">
-        <nav aria-label="Secciones de administración">
+        <nav :aria-label="t('adminShell.consoleNavLabel')">
           <ul class="space-y-0.5">
             <li v-for="item in visibleSections" :key="item.to">
               <NuxtLink
@@ -121,9 +125,9 @@ const userMenuItems = computed(() => [
     </div>
 
     <!-- Riel como panel deslizable en teléfono. -->
-    <USlideover v-model:open="railOpen" side="left" title="Administración" description="Secciones de la consola de administración.">
+    <USlideover v-model:open="railOpen" side="left" :title="t('adminShell.administration')" :description="t('adminShell.slideoverText')">
       <template #body>
-        <nav aria-label="Secciones de administración">
+        <nav :aria-label="t('adminShell.consoleNavLabel')">
           <ul class="space-y-0.5">
             <li v-for="item in visibleSections" :key="item.to">
               <NuxtLink

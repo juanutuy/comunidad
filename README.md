@@ -1584,6 +1584,79 @@ accesos, inscripciones ni usuarios de prueba (verificado por SQL).
   ni exportar, igual que la referencia; la moneda no convierte
   montos ya cargados (queda documentado en la propia UI).
 
+## Fase 18 (hecha) — multilenguaje español/inglés reales
+
+La interfaz habla español e inglés de verdad, con la resolución de
+la referencia: **elección del usuario** (modal de Ajustes → sección
+«Idioma», con «Predeterminado de la comunidad», «Español» y
+«English») **> cookie de idioma** (visitantes; la fijan el login y
+el cambio de idioma) **> idioma por defecto de la comunidad**
+(Ajustes de la comunidad → General → «Idioma por defecto») **>
+español**, el idioma base del producto. Sin dependencias nuevas:
+catálogo propio y tipado en `app/i18n/es.ts` / `app/i18n/en.ts`
+(916 claves, las mismas en ambos — un chequeo automático lo exige)
+con un composable `useI18n` y `t(clave)`; la arquitectura admite
+sumar idiomas agregando un diccionario. El contenido de los
+miembros NO se traduce (publicaciones, cursos, eventos, nombres de
+canal y de nivel son datos, como en la referencia).
+
+- **Cobertura traducida (es/en)**: el marco completo de la app
+  (barra superior, navegación, lateral, panel y barra móvil, menú
+  del avatar), el feed con sus ordenamientos, el compositor
+  (compacto y modal, crear y editar), el editor rico (barra, slash,
+  formularios), la tarjeta de publicación con todos sus menús, el
+  detalle de publicación y los comentarios, las páginas de canal,
+  cursos (listado, detalle, lecciones, progreso y certificado),
+  eventos, miembros y directorio, ranking, biblioteca, videos,
+  mensajes y chat (lista, salas y conversación), notificaciones,
+  búsqueda, borradores, perfil completo, el modal de Ajustes del
+  usuario entero (incluida la sección nueva «Idioma»), y las
+  páginas públicas: login, registro, precios, pendiente, invitación,
+  acceso, verificar certificado, vuelta de pago, reglas/términos/
+  privacidad (solo los títulos: el cuerpo es texto del tenant) y la
+  página de error.
+- **Servidor localizado**: los mensajes de error/validación de
+  auth (login, registro, invitaciones, estados de membresía),
+  posts y comentarios, y el checkout (manual y en línea) responden
+  en el idioma resuelto del solicitante (`server/utils/i18n.ts`).
+  Las guardas comunes (sesión, escritura restringida) también.
+- **Fechas y dinero**: `Intl` según el idioma activo («hace 5 min» /
+  «5 min ago», calendarios, fechas completas) y `formatMoney`
+  respeta idioma (es-419 / en-US) además de la moneda del tenant.
+- **SSR correcto**: el idioma resuelto viaja en `/api/tenant` y el
+  HTML nace en ese idioma, con `<html lang>` acorde, sin parpadeo.
+  (Al construirlo salió a la luz un detalle real: el `fetchMe` de
+  `app.vue` no puede llamar composables después de su `await` — el
+  contexto de Nuxt se pierde en SSR —; el composable de idioma se
+  captura antes, en la creación de `useAuth`.)
+- **Quedó SOLO en español, declarado** (lista cerrada): los
+  **cuerpos de las páginas de la consola de administración**
+  `/admin/**` — del cascarón de la consola SÍ se tradujeron los
+  rótulos del riel y la cabecera —; los **títulos de las
+  notificaciones ya generadas** (se escriben en la base al crearse,
+  con los nombres y contenidos de los miembros: el marco de la
+  pantalla de notificaciones sí se traduce); los **nombres de
+  producto que el servidor guarda en los pagos** («Acceso al canal
+  …», como cualquier dato guardado); los mensajes del endpoint de
+  **enlaces de acceso** de un solo uso (la página sí está
+  traducida; el aviso genérico de respaldo también); el **correo de
+  bienvenida** del registro (la capa de correo sigue en oscuro); y
+  dos validaciones de borde al guardar el idioma (textos de 400 en
+  los endpoints de ajustes de idioma).
+- **Verificación**: `scripts/test-fase18.mjs` (29 chequeos, todo
+  PASS local): paridad de diccionarios importando ambos catálogos;
+  visitante en /login y /pricing por defecto y por cookie; un
+  usuario elige English y su feed SSR sale en inglés mientras el de
+  otra usuaria sigue en español, sin claves crudas en el HTML;
+  defecto de la comunidad en inglés → la usuaria sin elección lo ve
+  en inglés al volver a entrar y quien eligió Español explícito se
+  queda en español; mensajes de servidor en ambos idiomas (login
+  inválido, encuesta sin pregunta, checkout manual deshabilitado);
+  persistencia de la elección tras cerrar sesión y volver a entrar;
+  y limpieza final (locales de usuarios en NULL, defecto del tenant
+  en español, conteos de usuarios y posts intactos). Build y
+  typecheck en cero; `test-realtime.mjs` PASS.
+
 ## Pendiente a propósito (fuera de esta fase)
 
 - Migraciones versionadas con `drizzle-kit` para D1 (hoy: esquema

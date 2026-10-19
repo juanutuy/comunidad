@@ -14,7 +14,7 @@ const { t } = useI18n()
 // compositor se reemplaza por el aviso hasta alcanzar el nivel.
 const dmGate = computed(() => gates.value?.dm?.blocked ? gates.value.dm : null)
 const dmBlockedMessage = computed(() => dmGate.value
-  ? t('messages.dmGateText', { level: dmGate.value.levelName, mine: dmGate.value.myPoints, needed: dmGate.value.neededPoints })
+  ? t('messages.dmGateText', { level: dmGate.value.levelName ?? '', mine: dmGate.value.myPoints ?? 0, needed: dmGate.value.neededPoints ?? 0 })
   : undefined)
 const { timeAgo, initials } = useFormat()
 

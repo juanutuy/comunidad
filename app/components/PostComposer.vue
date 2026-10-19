@@ -188,8 +188,8 @@ function openModal(preset?: 'photo' | 'video' | 'poll') {
   // de barra además pinta la alerta fija en el lugar del compositor).
   if (createGate.value) {
     toast.add({
-      title: t('composer.gateToastTitle', { level: createGate.value.levelName }),
-      description: t('composer.gateToastText', { mine: createGate.value.myPoints, needed: createGate.value.neededPoints }),
+      title: t('composer.gateToastTitle', { level: createGate.value.levelName ?? '' }),
+      description: t('composer.gateToastText', { mine: createGate.value.myPoints ?? 0, needed: createGate.value.neededPoints ?? 0 }),
       color: 'warning',
     })
     return
@@ -401,8 +401,8 @@ const chevronItems = computed(() => [
        un toast: no se pinta una alerta dentro de la barra fija. -->
   <UAlert
     v-if="user && createGate && variant === 'bar'" color="warning" variant="soft" icon="i-lucide-lock"
-    :title="t('composer.gateTitle', { level: createGate.levelName })"
-    :description="t('composer.gateText', { mine: createGate.myPoints, needed: createGate.neededPoints })"
+    :title="t('composer.gateTitle', { level: createGate.levelName ?? '' })"
+    :description="t('composer.gateText', { mine: createGate.myPoints ?? 0, needed: createGate.neededPoints ?? 0 })"
   />
   <!-- Fase 16: canal de «solo el equipo» — el compositor se
        reemplaza por el aviso para los miembros sin permiso. -->

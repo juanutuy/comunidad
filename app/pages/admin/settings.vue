@@ -31,6 +31,8 @@ interface SettingsData {
     supportEmail?: string, websiteUrl?: string, socialLinks?: SocialLinkForm[]
     // Fase 17: pagos.
     currency?: string, manualPaymentsEnabled?: boolean
+    // Fase 18: idioma por defecto de la comunidad.
+    defaultLocale?: string
   }
   channels: { id: number, name: string, slug: string, type: string }[]
 }
@@ -53,6 +55,9 @@ const form = reactive({
   supportEmail: '', websiteUrl: '', socialLinks: [] as SocialLinkForm[],
   // Fase 17: pagos.
   currency: 'USD', manualPaymentsEnabled: false,
+  // Fase 18: idioma por defecto (cada miembro puede elegir el suyo
+  // en su modal de Ajustes > Idioma; su elección manda sobre esta).
+  defaultLocale: 'es',
 })
 watchEffect(() => {
   if (data.value?.settings) {
@@ -89,6 +94,7 @@ watchEffect(() => {
     form.socialLinks = (data.value.settings.socialLinks || []).map(s => ({ ...s }))
     form.currency = data.value.settings.currency || 'USD'
     form.manualPaymentsEnabled = !!data.value.settings.manualPaymentsEnabled
+    form.defaultLocale = data.value.settings.defaultLocale === 'en' ? 'en' : 'es'
   }
 })
 
@@ -279,6 +285,8 @@ async function save() {
         // Fase 17: pagos.
         currency: form.currency,
         manualPaymentsEnabled: form.manualPaymentsEnabled,
+        // Fase 18: idioma por defecto de la comunidad.
+        defaultLocale: form.defaultLocale,
       },
     })
     toast.add({ title: 'Ajustes guardados', color: 'success' })
@@ -317,6 +325,15 @@ async function save() {
               <UInput v-model="form.brandColor" class="w-32" />
               <span class="flex h-8 w-8 items-center justify-center rounded-lg font-bold text-white" :style="{ backgroundColor: form.brandColor }">{{ (form.name || 'C').charAt(0) }}</span>
             </div>
+          </UFormField>
+          <UFormField
+            label="Idioma por defecto de la comunidad" class="max-w-sm"
+            description="El idioma de la interfaz para visitantes y para los miembros que no eligieron uno propio en sus ajustes. Lo que escriben los miembros (publicaciones, cursos, eventos) no se traduce: solo cambia la interfaz."
+          >
+            <USelect
+              v-model="form.defaultLocale" class="w-full"
+              :items="[{ label: 'Español', value: 'es' }, { label: 'English', value: 'en' }]"
+            />
           </UFormField>
           <UFormField label="Reglas de la comunidad" description="Una regla por línea. Se muestran en la página de Reglas.">
             <UTextarea v-model="form.guidelinesText" :rows="8" class="w-full" />
