@@ -293,8 +293,100 @@ real verificado en `wrangler dev` con `scripts/test-realtime.mjs`
 (presencia, chat, DM, notificación y rechazo de visitantes: todo PASS).
 Arquitectura y pasos de migración en «Tiempo real (Fase 3)».
 
-## Fases siguientes (pendiente, a propósito)
+## Fase 4 (hecha) — activación pendiente de credenciales
 
-- **Stripe real** para canales pagos y cursos pagos (webhook que concede `channel_access` / inscripción con `source='stripe'`).
-- **Correos** transaccionales (bienvenida, digest semanal) vía Amazon SES.
-- Migraciones versionadas con `drizzle-kit` para D1 y dominios personalizados por tenant (Cloudflare for Platforms).
+### Stripe: completo y EN OSCURO
+El código de pagos está completo (sin SDK: fetch form-encoded a la API
+de Stripe) pero **sin claves no cobra y la UI lo dice** («Pagos en línea
+próximamente»). Piezas:
+
+- Config por secretos del Worker: `NUXT_STRIPE_SECRET_KEY`,
+  `NUXT_STRIPE_WEBHOOK_SECRET` y la pública
+  `NUXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`. `GET /api/billing/status`
+  devuelve `{ enabled }` (true solo con las dos claves secretas).
+- Tablas `plans` / `member_subscriptions` / `payments` / `stripe_events`.
+  Los planes del tenant incluyen acceso a **todos** sus canales pagos;
+  el admin los gestiona en `/admin/plans` y se venden en la página
+  pública `/pricing` junto a canales y cursos pagos individuales.
+- Compra: `POST /api/billing/checkout` (canal / curso / plan) crea la
+  sesión de Stripe Checkout y la fila `payments` en `pending`. Sin
+  claves responde **409** y ningún flujo existente se rompe (el «Acceso
+  demo» sigue disponible y etiquetado).
+- Webhook `POST /api/stripe/webhook` con **verificación de firma real**
+  (HMAC-SHA256 sobre `t.payload`, tolerancia 5 min) e **idempotente**
+  (`stripe_events`): al `checkout.session.completed` marca el pago como
+  `paid` y concede `channel_access` con `source='stripe'` / la
+  inscripción al curso / la suscripción activa. La página
+  `/billing/return` **nunca** concede nada: solo muestra el estado real
+  que dejó el webhook en la base.
+- Los cursos pagos ya no se inscriben directo: el endpoint de
+  inscripción responde 402 sin un pago confirmado.
+- Prueba local (sin Stripe CLI): payload firmado a mano — firma válida
+  concede acceso en la base y el reenvío del mismo evento no duplica;
+  firma inválida → 400.
+
+**Para encenderlo (Juan):**
+```bash
+npx wrangler secret put NUXT_STRIPE_SECRET_KEY        # clave secreta de Stripe
+npx wrangler secret put NUXT_STRIPE_WEBHOOK_SECRET   # secreto del webhook
+# (la publishable va como variable pública NUXT_PUBLIC_STRIPE_PUBLISHABLE_KEY)
+```
+Y en el panel de Stripe: crear un endpoint de webhook hacia
+`https://<tu-worker>/api/stripe/webhook` con el evento
+`checkout.session.completed` (y opcionalmente `checkout.session.expired`
+y `customer.subscription.deleted`, también manejados).
+
+### Correos: capa propia, honesta, EN OSCURO
+`server/utils/email.ts` con **proveedor HTTP genérico**: si existe
+`NUXT_EMAIL_PROVIDER_URL`, hace `POST { from, to, subject, text }` con
+`Authorization: Bearer <NUXT_EMAIL_PROVIDER_TOKEN>` (si está). Sirve
+para un relay de Amazon SES o un servicio tipo Resend sin cambiar
+código. Remitente: `NUXT_EMAIL_FROM`.
+
+- Sin proveedor: el correo **no se envía** y queda registrado en
+  `email_log` con estado `skipped_no_provider`. Con proveedor: `sent` o
+  `failed`. El admin lo ve todo en `/admin/emails`.
+- Bienvenida automática al registrarse.
+- **Digest semanal**: `POST /api/cron/digest` protegido por
+  `NUXT_CRON_SECRET` (header `x-cron-secret` o Bearer; sin el secreto =
+  503, con secreto incorrecto = 401). Genera el resumen de cada tenant
+  (posts de la semana + próximos eventos) y lo despacha a sus miembros
+  con la capa de correo. Agendado: un Cron Trigger de Cloudflare que
+  llame a esta URL, o cualquier programador externo (cron/n8n).
+  ```bash
+  npx wrangler secret put NUXT_CRON_SECRET
+  npx wrangler secret put NUXT_EMAIL_PROVIDER_URL    # relay SES/Resend
+  npx wrangler secret put NUXT_EMAIL_PROVIDER_TOKEN  # token del relay (si aplica)
+  ```
+
+### Dominios personalizados por tenant
+- Tabla `tenant_domains`; `resolveTenant` busca **primero** coincidencia
+  exacta del host contra esa tabla, antes del subdominio y del fallback.
+- Admin: `/admin/domains` para agregar/quitar el dominio, con los pasos
+  de DNS (CNAME) explicados en la propia pantalla.
+- **Paso de cuenta aparte (no lo hace la app):** activar el dominio en
+  **Cloudflare for Platforms** (custom hostnames) y emitir el
+  certificado; recién ahí el tráfico del dominio llega al Worker. La UI
+  lo dice tal cual, sin prometer activación automática.
+- En local se prueba con `curl -H "Host: tudominio.example.com"` (el
+  dev server de Vite acepta cualquier host por `vite.server.allowedHosts`,
+  solo-dev; verificado resolviendo un segundo tenant por su dominio).
+
+### PWA instalable
+- `public/manifest.webmanifest` (nombre, `display: standalone`,
+  `start_url: /feeds`, colores) + iconos 192/512 y maskable generados
+  con `scripts/gen-icons.mjs` (PNG sin dependencias).
+- `public/sw.js` **prudente**: cache-first SOLO de assets versionados
+  (`/_nuxt/`, `/icons/`); nunca cachea `/api/` ni HTML autenticado. Se
+  registra solo en producción desde `app/app.vue`.
+- Verificado: manifest e iconos servidos con 200 y content-type
+  correcto en `npm run dev` y en `wrangler dev`, link al manifest en el
+  HTML, SW accesible.
+
+## Pendiente a propósito (fuera de esta fase)
+
+- Migraciones versionadas con `drizzle-kit` para D1 (hoy: esquema
+  aditivo idempotente al primer request, suficiente para este alcance).
+- La activación en vivo de Stripe, del proveedor de correo y de los
+  dominios: es cargar los secretos/pasos de cuenta de arriba, sin tocar
+  código.

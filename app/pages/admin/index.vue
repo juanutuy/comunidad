@@ -53,11 +53,7 @@ async function save() {
     <UAlert v-if="user && user.role !== 'admin'" color="warning" variant="soft" title="Solo administradores" description="Tu cuenta no tiene rol de administrador en esta comunidad." />
     <UAlert v-else-if="!user" color="neutral" variant="soft" title="Iniciá sesión con una cuenta administradora" />
     <template v-else>
-      <div class="flex flex-wrap gap-2">
-        <UButton to="/admin" color="primary" label="Ajustes" icon="i-lucide-settings" size="sm" />
-        <UButton to="/admin/members" color="neutral" variant="soft" label="Miembros" icon="i-lucide-users" size="sm" />
-        <UButton to="/admin/channels" color="neutral" variant="soft" label="Canales" icon="i-lucide-hash" size="sm" />
-      </div>
+      <AdminNav />
       <UCard>
         <div class="space-y-4">
           <UFormField label="Nombre de la comunidad">

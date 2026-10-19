@@ -2,6 +2,7 @@
 import { hashPassword, setSession } from '../../utils/auth'
 import { ensureMembership, publicUser, resolveTenant } from '../../utils/community'
 import { nowIso, dbFor, slugify } from '../../utils/db'
+import { sendEmail } from '../../utils/email'
 
 export default defineEventHandler(async (event) => {
   const body = await readBody<{ name?: string, email?: string, password?: string }>(event)
@@ -19,6 +20,14 @@ export default defineEventHandler(async (event) => {
     .run(name, slug, email, hashPassword(password), nowIso())).lastInsertRowId)
   const tenant = await resolveTenant(event)
   await ensureMembership(event, tenant.id, id, 'member')
+  // Correo de bienvenida (Fase 4): sin proveedor configurado queda
+  // registrado en email_log como 'skipped_no_provider'; nunca rompe el
+  // registro ni finge un envío.
+  await sendEmail(event, {
+    tenantId: tenant.id, userId: id, to: email, kind: 'welcome',
+    subject: `¡Te damos la bienvenida a ${tenant.name}!`,
+    text: `Hola, ${name}:\n\nTu cuenta en ${tenant.name} ya está creada. Entrá a la comunidad para presentarte, seguir tus canales favoritos y participar.\n\n¡Nos vemos adentro!`,
+  }).catch(() => {})
   setSession(event, id)
   const user = await db.prepare('SELECT * FROM users WHERE id = ?').get(id) as import('../../utils/community').UserRow
   return { user: { ...publicUser(user), role: 'member' } }

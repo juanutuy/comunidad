@@ -18,6 +18,7 @@ const navItems = [
   { label: 'Videos', icon: 'i-lucide-play-square', to: '/videos' },
   { label: 'Biblioteca', icon: 'i-lucide-library', to: '/library' },
   { label: 'Ranking', icon: 'i-lucide-trophy', to: '/leaderboard' },
+  { label: 'Precios', icon: 'i-lucide-tag', to: '/pricing' },
   { label: 'Reglas', icon: 'i-lucide-scroll-text', to: '/guidelines' },
 ]
 
@@ -36,6 +37,9 @@ const userMenuItems = computed(() => [
           { label: 'Ajustes de la comunidad', icon: 'i-lucide-settings', to: '/admin' },
           { label: 'Miembros', icon: 'i-lucide-users', to: '/admin/members' },
           { label: 'Administrar canales', icon: 'i-lucide-hash', to: '/admin/channels' },
+          { label: 'Planes y precios', icon: 'i-lucide-credit-card', to: '/admin/plans' },
+          { label: 'Dominio personalizado', icon: 'i-lucide-globe', to: '/admin/domains' },
+          { label: 'Correos', icon: 'i-lucide-mail', to: '/admin/emails' },
         ]
       : []),
   ],

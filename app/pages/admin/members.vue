@@ -56,9 +56,7 @@ async function removeMember() {
     <UAlert v-else-if="!user" color="neutral" variant="soft" title="Iniciá sesión con una cuenta administradora" />
     <template v-else>
       <div class="flex flex-wrap gap-2">
-        <UButton to="/admin" color="neutral" variant="soft" label="Ajustes" icon="i-lucide-settings" size="sm" />
-        <UButton to="/admin/members" color="primary" label="Miembros" icon="i-lucide-users" size="sm" />
-        <UButton to="/admin/channels" color="neutral" variant="soft" label="Canales" icon="i-lucide-hash" size="sm" />
+        <AdminNav />
       </div>
       <UCard :ui="{ body: 'p-0 sm:p-0' }">
         <ul class="divide-y divide-default">

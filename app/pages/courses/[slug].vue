@@ -14,9 +14,29 @@ const { data, refresh } = await useAsyncData(() => `course-${slug.value}`, () =>
 const open = ref<string[]>(['0'])
 async function enroll() {
   if (!user.value) { toast.add({ title: 'Iniciá sesión para inscribirte', color: 'warning' }); return }
-  await api(`/api/courses/${slug.value}/enroll`, { method: 'POST' })
-  toast.add({ title: '¡Inscripción confirmada!', color: 'success' })
-  await refresh()
+  try {
+    await api(`/api/courses/${slug.value}/enroll`, { method: 'POST' })
+    toast.add({ title: '¡Inscripción confirmada!', color: 'success' })
+    await refresh()
+  }
+  catch (e) {
+    toast.add({ title: 'Este curso es pago', description: (e as { data?: { message?: string } }).data?.message || 'Completá la compra para inscribirte.', color: 'warning' })
+  }
+}
+
+const { data: billing } = await useAsyncData('billing-status-course', () => api<{ enabled: boolean }>('/api/billing/status'))
+const buying = ref(false)
+async function buyCourse() {
+  if (!user.value) { toast.add({ title: 'Iniciá sesión para comprar', color: 'warning' }); return }
+  buying.value = true
+  try {
+    const res = await api<{ url: string }>('/api/billing/checkout', { method: 'POST', body: { kind: 'course', slug: slug.value } })
+    window.location.href = res.url
+  }
+  catch (e) {
+    toast.add({ title: 'No se pudo iniciar el pago', description: (e as { data?: { message?: string } }).data?.message || '', color: 'error' })
+  }
+  finally { buying.value = false }
 }
 </script>
 
@@ -30,7 +50,17 @@ async function enroll() {
       </div>
       <h1 class="mt-3 text-2xl font-bold">{{ data.course.title }}</h1>
       <p class="mt-2 whitespace-pre-line text-muted">{{ data.course.description }}</p>
-      <UButton v-if="!data.course.enrolled" class="mt-4" label="Inscribirme" icon="i-lucide-graduation-cap" @click="enroll" />
+      <div v-if="!data.course.enrolled" class="mt-4 flex flex-wrap items-center gap-2">
+        <UButton v-if="!(data.course.priceCents > 0)" label="Inscribirme" icon="i-lucide-graduation-cap" @click="enroll" />
+        <template v-else-if="billing?.enabled">
+          <UButton :label="`Comprar curso · ${fmtMoney(data.course.priceCents)}`" icon="i-lucide-credit-card" :loading="buying" @click="buyCourse" />
+          <span class="text-sm text-muted">La inscripción se activa automáticamente al confirmarse el pago.</span>
+        </template>
+        <template v-else>
+          <UButton label="Comprar curso" icon="i-lucide-credit-card" disabled />
+          <span class="text-sm text-muted">Pagos en línea próximamente: esta comunidad todavía no activó los pagos con tarjeta.</span>
+        </template>
+      </div>
       <template v-else>
         <div class="mt-4 flex flex-wrap items-center gap-3">
           <UBadge color="success" variant="soft" icon="i-lucide-check" size="lg">Ya estás inscrito</UBadge>

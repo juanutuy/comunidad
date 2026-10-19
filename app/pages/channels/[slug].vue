@@ -33,6 +33,20 @@ async function demoAccess() {
   }
   catch { toast.add({ title: 'No se pudo activar el acceso', color: 'error' }) }
 }
+
+const { data: billing } = await useAsyncData('billing-status-channel', () => api<{ enabled: boolean }>('/api/billing/status'))
+const buying = ref(false)
+async function buyAccess() {
+  buying.value = true
+  try {
+    const res = await api<{ url: string }>('/api/billing/checkout', { method: 'POST', body: { kind: 'channel', slug: slug.value } })
+    window.location.href = res.url
+  }
+  catch (e) {
+    toast.add({ title: 'No se pudo iniciar el pago', description: (e as { data?: { message?: string } }).data?.message || '', color: 'error' })
+  }
+  finally { buying.value = false }
+}
 </script>
 
 <template>
@@ -65,9 +79,11 @@ async function demoAccess() {
           @click="toggleFollow"
         />
       </div>
-      <UAlert v-if="data.channel.type === 'paid' && !data.channel.hasAccess" class="mt-4" color="warning" variant="soft" icon="i-lucide-lock" title="Este es un canal pago" description="Con acceso ves todas las publicaciones completas y participás en la conversación. El pago real con tarjeta llega en la próxima fase; por ahora podés activar el acceso de demostración.">
+      <UAlert v-if="data.channel.type === 'paid' && !data.channel.hasAccess" class="mt-4" color="warning" variant="soft" icon="i-lucide-lock" title="Este es un canal pago" :description="billing?.enabled ? 'Con acceso ves todas las publicaciones completas y participás en la conversación. El pago se procesa con Stripe y el acceso se activa al confirmarse.' : 'Con acceso ves todas las publicaciones completas y participás en la conversación. Los pagos en línea todavía no están activados en esta comunidad (próximamente); mientras tanto podés activar el acceso de demostración.'">
         <template #actions>
-          <UButton v-if="user" size="sm" color="warning" label="Acceso demo" icon="i-lucide-key-round" @click="demoAccess" />
+          <UButton v-if="user && billing?.enabled" size="sm" color="warning" :label="`Comprar acceso · ${fmtMoney(data.channel.priceCents)}`" icon="i-lucide-credit-card" :loading="buying" @click="buyAccess" />
+          <UButton v-if="user" size="sm" color="warning" variant="soft" label="Acceso demo" icon="i-lucide-key-round" @click="demoAccess" />
+          <UButton v-if="user" size="sm" to="/pricing" color="neutral" variant="soft" label="Ver planes" />
           <UButton v-else size="sm" to="/login" label="Iniciar sesión" />
         </template>
       </UAlert>

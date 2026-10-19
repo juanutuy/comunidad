@@ -12,7 +12,16 @@ export interface ChannelRow { id: number, tenant_id: number, group_id: number | 
 
 export async function resolveTenant(event: H3Event): Promise<TenantRow> {
   const db = await dbFor(event)
-  const host = (getRequestHost(event) || '').split(':')[0]!
+  const host = (getRequestHost(event) || '').split(':')[0]!.toLowerCase()
+  // Fase 4: dominio personalizado — coincidencia EXACTA del host contra
+  // tenant_domains, antes que cualquier otra regla.
+  if (host) {
+    try {
+      const byDomain = await db.prepare('SELECT t.* FROM tenant_domains d JOIN tenants t ON t.id = d.tenant_id WHERE d.domain = ?').get(host) as TenantRow | undefined
+      if (byDomain) return byDomain
+    }
+    catch { /* bases anteriores sin la tabla: seguir con subdominio */ }
+  }
   const sub = host.split('.')[0]!
   if (sub && !['localhost', 'www', '127'].includes(sub)) {
     const bySlug = await db.prepare('SELECT * FROM tenants WHERE slug = ?').get(sub) as TenantRow | undefined
@@ -61,11 +70,18 @@ export async function canAccessChannel(event: H3Event, userId: number | null, ro
   if (!userId) return false
   if (role === 'admin') return true
   if (channel.type === 'private') return !!role // miembro del tenant
-  // paid
+  // paid: acceso directo (demo/stripe) o membresía activa del tenant
+  // (los planes incluyen acceso a los canales pagos — Fase 4).
   const db = await dbFor(event)
   const row = await db.prepare('SELECT id FROM channel_access WHERE tenant_id = ? AND user_id = ? AND channel_id = ?')
     .get(channel.tenant_id, userId, channel.id)
-  return !!row
+  if (row) return true
+  try {
+    const sub = await db.prepare("SELECT id FROM member_subscriptions WHERE tenant_id = ? AND user_id = ? AND status = 'active'")
+      .get(channel.tenant_id, userId)
+    return !!sub
+  }
+  catch { return false }
 }
 
 export async function serializePost(event: H3Event, row: Record<string, unknown>, userId: number | null, fullAccess: boolean) {

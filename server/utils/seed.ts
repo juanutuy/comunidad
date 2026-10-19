@@ -26,6 +26,26 @@ export async function backfillLessonContent(db: AsyncDb) {
   }
 }
 
+// Backfill idempotente (Fase 4): las bases sembradas antes de la Fase 4
+// no tienen planes (la tabla es nueva). Si un tenant quedó con cero
+// planes, se le cargan los dos planes demo estándar. No toca tenants
+// que ya tengan planes propios.
+export async function backfillPlans(db: AsyncDb) {
+  try {
+    const tenants = await db.prepare('SELECT id FROM tenants ORDER BY id').all() as { id: number }[]
+    for (const t of tenants) {
+      const n = (await db.prepare('SELECT COUNT(*) AS n FROM plans WHERE tenant_id = ?').get(t.id) as { n: number }).n
+      if (n > 0) continue
+      const now = new Date().toISOString()
+      await db.prepare('INSERT INTO plans (tenant_id, name, description, price_cents, interval, active, sort, created_at) VALUES (?, ?, ?, ?, ?, 1, ?, ?)')
+        .run(t.id, 'Membresía Premium mensual', 'Acceso a todos los canales pagos de la comunidad, recursos exclusivos y sesiones de revisión.', 900, 'month', 1, now)
+      await db.prepare('INSERT INTO plans (tenant_id, name, description, price_cents, interval, active, sort, created_at) VALUES (?, ?, ?, ?, ?, 1, ?, ?)')
+        .run(t.id, 'Membresía Premium anual', 'Todo lo de la mensual, con dos meses de regalo por pagar el año completo.', 9000, 'year', 2, now)
+    }
+  }
+  catch { /* bases sin la tabla planes todavia: el CREATE corre antes y la crea */ }
+}
+
 export async function seedIfEmpty(db: AsyncDb) {
   const count = await db.prepare('SELECT COUNT(*) AS n FROM tenants').get() as { n: number }
   if (count.n > 0) return
@@ -168,6 +188,13 @@ export async function seedIfEmpty(db: AsyncDb) {
   await run('INSERT OR IGNORE INTO rsvps (tenant_id, event_id, user_id) VALUES (?, ?, ?)', tenantId, e1, lucia)
   await run('INSERT OR IGNORE INTO rsvps (tenant_id, event_id, user_id) VALUES (?, ?, ?)', tenantId, e2, diego)
   await run('INSERT OR IGNORE INTO rsvps (tenant_id, event_id, user_id) VALUES (?, ?, ?)', tenantId, e2, member)
+
+  // Planes de membresía (Fase 4): incluyen acceso a los canales pagos.
+  const mkPlan = async (name: string, description: string, price: number, interval: string, sort: number) =>
+    run('INSERT INTO plans (tenant_id, name, description, price_cents, interval, active, sort, created_at) VALUES (?, ?, ?, ?, ?, 1, ?, ?)',
+      tenantId, name, description, price, interval, sort, iso(now))
+  await mkPlan('Membresía Premium mensual', 'Acceso a todos los canales pagos de la comunidad, recursos exclusivos y sesiones de revisión.', 900, 'month', 1)
+  await mkPlan('Membresía Premium anual', 'Todo lo de la mensual, con dos meses de regalo por pagar el año completo.', 9000, 'year', 2)
 
   // Biblioteca
   const mkItem = async (title: string, kind: string, category: string, size: string, downloads: number, locked: number, ago: number) =>
