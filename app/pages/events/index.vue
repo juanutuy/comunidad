@@ -2,6 +2,7 @@
 // Eventos con dos vistas (Fase 2): Lista (próximos/pasados) y Calendario
 // mensual con navegación y eventos posicionados por día.
 const api = useApi()
+const { user } = useAuth()
 const { fmtDateTime } = useFormat()
 interface EventCard { id: number, slug: string, title: string, description: string, startsAt: string, endsAt: string, location: string, category: string, host: { name: string }, going: number, myRsvp: boolean, past: boolean }
 const { data } = await useAsyncData('events', () => api<{ events: EventCard[] }>('/api/events'))
@@ -60,12 +61,15 @@ const weekDays = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom']
         <h1 class="text-2xl font-bold">Eventos</h1>
         <p class="text-muted">Encuentros de la comunidad · las horas se muestran en tu zona local.</p>
       </div>
-      <div class="flex overflow-hidden rounded-lg border border-default">
-        <UButton
-          v-for="v in viewOptions" :key="v.value" :icon="v.icon" :label="v.label" size="sm"
-          :color="view === v.value ? 'primary' : 'neutral'" :variant="view === v.value ? 'solid' : 'ghost'"
-          class="rounded-none" @click="view = v.value"
-        />
+      <div class="flex flex-wrap items-center gap-2">
+        <UButton v-if="user?.role === 'admin'" to="/admin/events" label="Crear evento" icon="i-lucide-plus" color="primary" size="sm" />
+        <div class="flex overflow-hidden rounded-lg border border-default">
+          <UButton
+            v-for="v in viewOptions" :key="v.value" :icon="v.icon" :label="v.label" size="sm"
+            :color="view === v.value ? 'primary' : 'neutral'" :variant="view === v.value ? 'solid' : 'ghost'"
+            class="rounded-none" @click="view = v.value"
+          />
+        </div>
       </div>
     </div>
 
