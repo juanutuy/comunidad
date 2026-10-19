@@ -3,6 +3,7 @@
 import { currentAuth, resolveTenant } from '../utils/community'
 import { isOnline } from '../utils/chat'
 import { levelFor } from '../utils/levels'
+import { getGamification } from '../utils/gamification'
 import { dbFor } from '../utils/db'
 import { hiddenFilterSql } from '../utils/blocks'
 
@@ -14,7 +15,9 @@ export default defineEventHandler(async (event) => {
   const events = await db.prepare(`SELECT e.slug, e.title, e.starts_at, u.name AS host_name FROM events e LEFT JOIN users u ON u.id = e.host_id WHERE e.tenant_id = ? AND e.starts_at >= datetime('now') ORDER BY e.starts_at LIMIT 3`).all(tenant.id)
   const hf = hiddenFilterSql(user?.id ?? null)
   const recent = await db.prepare(`SELECT p.slug, p.title, c.slug AS channel_slug FROM posts p JOIN channels c ON c.id = p.channel_id WHERE p.tenant_id = ? AND c.type = 'free' AND p.status = 'published'${hf.sql} ORDER BY p.pinned DESC, p.created_at DESC LIMIT 5`).all(tenant.id, ...hf.params)
-  // Top líderes: misma fórmula del ranking (actividad + point_events).
+  // Top líderes: misma fórmula del ranking (actividad + point_events),
+  // con los valores de la configuración de gamificación (Fase 9).
+  const gam = await getGamification(event, tenant.id)
   const leaderRows = await db.prepare(`
     SELECT u.id, u.name, u.slug, u.avatar_url,
       (SELECT COUNT(*) FROM posts p WHERE p.author_id = u.id AND p.tenant_id = ? AND p.status = 'published') AS post_count,
@@ -24,9 +27,9 @@ export default defineEventHandler(async (event) => {
     FROM users u JOIN memberships m ON m.user_id = u.id AND m.tenant_id = ?`).all(tenant.id, tenant.id, tenant.id, tenant.id, tenant.id) as Record<string, number | string>[]
   const leaders = leaderRows.map(r => ({
     id: r.id, name: r.name, slug: r.slug, avatarUrl: (r.avatar_url as string) || '',
-    points: (r.post_count as number) * 10 + (r.comment_count as number) * 3 + (r.reactions_received as number) * 2 + (r.extra_points as number),
+    points: (r.post_count as number) * gam.points.post + (r.comment_count as number) * gam.points.comment + (r.reactions_received as number) * gam.points.reaction_received + (r.extra_points as number),
   })).sort((a, b) => b.points - a.points).slice(0, 5)
-    .map(l => ({ ...l, level: levelFor(l.points).name }))
+    .map(l => ({ ...l, level: levelFor(l.points, gam.levels).name }))
   // En línea: última conexión WebSocket hace menos de 2 minutos.
   const memberRows = await db.prepare(`SELECT u.id, u.name, u.slug, u.avatar_url, u.last_seen_at FROM users u JOIN memberships m ON m.user_id = u.id AND m.tenant_id = ? ORDER BY u.name`).all(tenant.id) as Record<string, unknown>[]
   const online = memberRows

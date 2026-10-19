@@ -5,6 +5,7 @@
 // últimos SOLO se devuelven cuando el perfil es el del propio usuario.
 import { POST_SELECT, canAccessChannel, channelBySlug, currentAuth, resolveTenant, serializePost } from '../../utils/community'
 import { badgesFor, levelFor, memberStats } from '../../utils/levels'
+import { getGamification, levelBadgesFor } from '../../utils/gamification'
 import { isOnline } from '../../utils/chat'
 import { dbFor } from '../../utils/db'
 import { blockedByMe } from '../../utils/blocks'
@@ -34,6 +35,9 @@ export default defineEventHandler(async (event) => {
     WHERE c.author_id = ? AND c.tenant_id = ? AND p.status = 'published' ORDER BY c.created_at DESC LIMIT 20`).all(user.id, tenant.id)
   const channels = await db.prepare(`SELECT c.name, c.slug FROM follows f JOIN channels c ON c.id = f.channel_id WHERE f.tenant_id = ? AND f.user_id = ?`).all(tenant.id, user.id)
   const stats = await memberStats(event, tenant.id, user.id as number)
+  // Fase 9: nivel e insignias de nivel según la configuración de
+  // gamificación del tenant (la tarjeta «Insignias ganadas» del perfil).
+  const gam = await getGamification(event, tenant.id)
   // Fase 6: seguidores / siguiendo (relaciones entre miembros del tenant).
   const followers = (await db.prepare('SELECT COUNT(*) AS n FROM user_follows WHERE tenant_id = ? AND followee_id = ?').get(tenant.id, user.id) as { n: number }).n
   const following = (await db.prepare('SELECT COUNT(*) AS n FROM user_follows WHERE tenant_id = ? AND follower_id = ?').get(tenant.id, user.id) as { n: number }).n
@@ -65,7 +69,7 @@ export default defineEventHandler(async (event) => {
       avatarUrl: user.avatar_url || '', coverUrl: user.cover_url || '', website: user.website || '',
       memberSince: user.created_at,
       lastSeenAt: user.last_seen_at || '', online: isOnline(user.last_seen_at as string),
-      points: stats.points, level: levelFor(stats.points), badges: badgesFor(stats),
+      points: stats.points, level: levelFor(stats.points, gam.levels), levels: levelBadgesFor(gam.levels, stats.points), badges: badgesFor(stats),
       stats: { ...stats, followers, following },
       followedByMe,
       blockedByMe: iBlockedThem,

@@ -57,6 +57,9 @@ const userMenuItems = computed(() => [
           { label: 'Ajustes de la comunidad', icon: 'i-lucide-settings', to: '/admin' },
           { label: 'Miembros', icon: 'i-lucide-users', to: '/admin/members' },
           { label: 'Administrar canales', icon: 'i-lucide-hash', to: '/admin/channels' },
+          { label: 'Cursos', icon: 'i-lucide-graduation-cap', to: '/admin/courses' },
+          { label: 'Eventos', icon: 'i-lucide-calendar-days', to: '/admin/events' },
+          { label: 'Gamificación', icon: 'i-lucide-trophy', to: '/admin/gamification' },
           { label: 'Planes y precios', icon: 'i-lucide-credit-card', to: '/admin/plans' },
           { label: 'Dominio personalizado', icon: 'i-lucide-globe', to: '/admin/domains' },
           { label: 'Correos', icon: 'i-lucide-mail', to: '/admin/emails' },
@@ -71,6 +74,10 @@ function doSearch() {
   const q = searchQuery.value.trim()
   if (q.length >= 2) router.push({ path: '/search', query: { q } })
 }
+
+// Fase 9: el perfil usa todo el ancho con sus tres zonas propias (como
+// la referencia): en /profile/* no se renderiza el riel derecho global.
+const isProfilePage = computed(() => route.path.startsWith('/profile/'))
 </script>
 
 <template>
@@ -124,7 +131,10 @@ function doSearch() {
       </nav>
     </header>
 
-    <div class="mx-auto grid max-w-[1400px] gap-6 px-4 py-6 lg:grid-cols-[240px_minmax(0,1fr)] xl:grid-cols-[240px_minmax(0,1fr)_290px]">
+    <div
+      class="mx-auto grid max-w-[1400px] gap-6 px-4 py-6 lg:grid-cols-[240px_minmax(0,1fr)]"
+      :class="isProfilePage ? '' : 'xl:grid-cols-[240px_minmax(0,1fr)_290px]'"
+    >
       <aside :class="showChannels ? 'block' : 'hidden lg:block'" class="space-y-5">
         <div>
           <ul class="space-y-0.5">
@@ -203,7 +213,7 @@ function doSearch() {
         <slot />
       </main>
 
-      <aside class="hidden xl:block">
+      <aside v-if="!isProfilePage" class="hidden xl:block">
         <RightRail />
       </aside>
     </div>

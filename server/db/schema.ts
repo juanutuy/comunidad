@@ -332,6 +332,27 @@ export const userFollows = sqliteTable('user_follows', {
   createdAt: text('created_at').notNull(),
 }, t => [uniqueIndex('user_follows_unique').on(t.tenantId, t.followerId, t.followeeId)])
 
+// Fase 9: gamificación administrable por tenant. Los niveles y los
+// valores de puntos por acción dejan de estar fijos en el código: se
+// guardan acá (con los valores históricos como semilla) y se editan
+// desde /admin/gamification. Ver server/utils/gamification.ts.
+export const gamificationLevels = sqliteTable('gamification_levels', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  tenantId: integer('tenant_id').notNull(),
+  name: text('name').notNull(),
+  minPoints: integer('min_points').notNull().default(0),
+  icon: text('icon').notNull().default('i-lucide-award'), // nombre de icono lucide
+  position: integer('position').notNull().default(0),
+}, t => [uniqueIndex('gamification_levels_tenant_min').on(t.tenantId, t.minPoints)])
+
+export const gamificationPoints = sqliteTable('gamification_points', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  tenantId: integer('tenant_id').notNull(),
+  action: text('action').notNull(), // 'post' | 'comment' | 'reaction_received' | 'course_enroll' | 'course_complete' | 'event_rsvp'
+  points: integer('points').notNull().default(0),
+}, t => [uniqueIndex('gamification_points_tenant_action').on(t.tenantId, t.action)])
+
 // Puntos base: se calculan de la actividad real (posts x10, comentarios
 // x3, reacciones recibidas x2) y se suman los point_events de la Fase 5
 // (inscripción a curso +5, curso completo +50, RSVP a evento +10).
+// Desde la Fase 9 los multiplicadores salen de gamification_points.

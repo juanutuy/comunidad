@@ -1,10 +1,12 @@
 // Guardar preferencias de cuenta (Fase 5): qué notificaciones recibir
 // por tipo (respetadas por utils/notify.ts) y si aparecer en el
 // directorio de miembros (respetado por /api/members/directory).
+// Fase 9: show_in_search — aparecer en los resultados de búsqueda
+// (respetado por /api/search, que deja de devolver el perfil).
 import { requireUser, resolveTenant } from '../../utils/community'
 import { dbFor } from '../../utils/db'
 
-const ALLOWED = ['notify_reaction', 'notify_comment', 'notify_mention', 'notify_new_post', 'notify_dm', 'notify_follow', 'directory_visible']
+const ALLOWED = ['notify_reaction', 'notify_comment', 'notify_mention', 'notify_new_post', 'notify_dm', 'notify_follow', 'directory_visible', 'show_in_search']
 
 export default defineEventHandler(async (event) => {
   const tenant = await resolveTenant(event)

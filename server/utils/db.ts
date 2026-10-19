@@ -115,6 +115,10 @@ CREATE UNIQUE INDEX IF NOT EXISTS user_hidden_posts_unique ON user_hidden_posts 
 CREATE TABLE IF NOT EXISTS user_follows (id INTEGER PRIMARY KEY AUTOINCREMENT, tenant_id INTEGER NOT NULL, follower_id INTEGER NOT NULL, followee_id INTEGER NOT NULL, created_at TEXT NOT NULL);
 CREATE UNIQUE INDEX IF NOT EXISTS user_follows_unique ON user_follows (tenant_id, follower_id, followee_id);
 CREATE INDEX IF NOT EXISTS user_follows_followee ON user_follows (tenant_id, followee_id);
+CREATE TABLE IF NOT EXISTS gamification_levels (id INTEGER PRIMARY KEY AUTOINCREMENT, tenant_id INTEGER NOT NULL, name TEXT NOT NULL, min_points INTEGER NOT NULL DEFAULT 0, icon TEXT NOT NULL DEFAULT 'i-lucide-award', position INTEGER NOT NULL DEFAULT 0);
+CREATE UNIQUE INDEX IF NOT EXISTS gamification_levels_tenant_min ON gamification_levels (tenant_id, min_points);
+CREATE TABLE IF NOT EXISTS gamification_points (id INTEGER PRIMARY KEY AUTOINCREMENT, tenant_id INTEGER NOT NULL, action TEXT NOT NULL, points INTEGER NOT NULL DEFAULT 0);
+CREATE UNIQUE INDEX IF NOT EXISTS gamification_points_tenant_action ON gamification_points (tenant_id, action);
 `
 
 // Migraciones aditivas (Fase 2) para bases creadas en la Fase 1 — ya hay

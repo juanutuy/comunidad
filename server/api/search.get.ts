@@ -36,7 +36,13 @@ export default defineEventHandler(async (event) => {
   const courseRows = await db.prepare('SELECT * FROM courses WHERE tenant_id = ? AND status = \'published\' AND (title LIKE ? OR description LIKE ?) ORDER BY created_at LIMIT 10').all(tenant.id, like, like) as Record<string, unknown>[]
   const courses = courseRows.map(c => ({ id: c.id, slug: c.slug, title: c.title, description: c.description, level: c.level, priceCents: c.price_cents }))
 
-  const memberRows = await db.prepare(`SELECT u.id, u.name, u.slug, u.bio, u.avatar_url FROM users u JOIN memberships m ON m.user_id = u.id AND m.tenant_id = ? WHERE u.name LIKE ? LIMIT 10`).all(tenant.id, like) as Record<string, unknown>[]
+  // Fase 9: quien apagó «Aparecer en búsqueda» (user_prefs
+  // show_in_search = '0') no sale como miembro; sus publicaciones y
+  // comentarios de arriba siguen apareciendo igual.
+  const memberRows = await db.prepare(`SELECT u.id, u.name, u.slug, u.bio, u.avatar_url FROM users u JOIN memberships m ON m.user_id = u.id AND m.tenant_id = ?
+    WHERE u.name LIKE ?
+    AND NOT EXISTS (SELECT 1 FROM user_prefs up WHERE up.tenant_id = ? AND up.user_id = u.id AND up.key = 'show_in_search' AND up.value = '0')
+    LIMIT 10`).all(tenant.id, like, tenant.id) as Record<string, unknown>[]
   const members = memberRows.map(m => ({ id: m.id, name: m.name, slug: m.slug, bio: m.bio, avatarUrl: m.avatar_url || '' }))
 
   return { posts, channels, courses, members }

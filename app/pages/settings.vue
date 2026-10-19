@@ -15,7 +15,7 @@ const { data, refresh } = await useAsyncData('account-settings', () =>
 const profile = reactive({ name: '', bio: '', location: '', website: '' })
 const prefs = reactive<Record<string, boolean>>({
   notify_reaction: true, notify_comment: true, notify_mention: true, notify_new_post: true, notify_dm: true, notify_follow: true,
-  directory_visible: true,
+  directory_visible: true, show_in_search: true,
 })
 watchEffect(() => {
   if (data.value) {
@@ -232,6 +232,11 @@ const notifyItems = [
           <UIcon name="i-lucide-users" class="text-muted" />
           <span class="flex-1 text-sm">Aparecer en el directorio de miembros <span class="block text-xs text-muted">Si lo apagás, tu perfil sigue existiendo pero no salís en la lista de Miembros.</span></span>
           <USwitch v-model="prefs.directory_visible" />
+        </div>
+        <div class="mt-4 flex items-center gap-3">
+          <UIcon name="i-lucide-search" class="text-muted" />
+          <span class="flex-1 text-sm">Aparecer en los resultados de búsqueda <span class="block text-xs text-muted">Si lo apagás, tu perfil no sale cuando alguien busca tu nombre. Tus publicaciones y comentarios siguen apareciendo.</span></span>
+          <USwitch v-model="prefs.show_in_search" />
         </div>
         <div class="mt-3 flex justify-end">
           <UButton label="Guardar privacidad" icon="i-lucide-save" :loading="savingPrefs" @click="savePrefs" />

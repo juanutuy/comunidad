@@ -1,18 +1,19 @@
 // Niveles e insignias (Fase 2), derivados de los puntos de actividad que
-// ya calcula el ranking: publicación = 10, comentario = 3, reacción
-// recibida = 2. Todo se calcula al vuelo, sin tablas de estado.
+// ya calcula el ranking. Todo se calcula al vuelo, sin tablas de estado.
 //
-// Umbrales de nivel (puntos acumulados):
-//   Inicial       0 – 24
-//   Activo       25 – 59
-//   Colaborador  60 – 119
-//   Referente   120 – 249
-//   Leyenda     250+
+// Fase 9: los umbrales de nivel y los valores de puntos base
+// (publicación, comentario, reacción recibida) ya NO viven acá: se leen
+// de la configuración de gamificación del tenant
+// (server/utils/gamification.ts, editable en /admin/gamification).
+// LEVELS y levelFor quedan como red de seguridad con los valores
+// históricos, por si algún consumidor no tiene la configuración a mano.
 import type { H3Event } from 'h3'
 import { dbFor } from './db'
 import { extraPoints } from './points'
+import { getGamification, levelForConfig } from './gamification'
+import type { GamLevel } from './gamification'
 
-export interface Level { name: string, min: number, nextAt: number | null, nextName: string | null }
+export interface Level { name: string, min: number, icon: string, nextAt: number | null, nextName: string | null, nextIcon: string | null }
 
 export const LEVELS: { name: string, min: number }[] = [
   { name: 'Leyenda', min: 250 },
@@ -22,11 +23,14 @@ export const LEVELS: { name: string, min: number }[] = [
   { name: 'Inicial', min: 0 },
 ]
 
-export function levelFor(points: number): Level {
+// Sin `levels` usa los valores históricos fijos; con la configuración
+// del tenant, el cálculo sale de gamification_levels.
+export function levelFor(points: number, levels?: GamLevel[]): Level {
+  if (levels && levels.length) return levelForConfig(levels, points)
   const idx = LEVELS.findIndex(l => points >= l.min)
   const current = LEVELS[idx]!
   const next = idx > 0 ? LEVELS[idx - 1]! : null
-  return { name: current.name, min: current.min, nextAt: next ? next.min : null, nextName: next ? next.name : null }
+  return { name: current.name, min: current.min, icon: 'i-lucide-award', nextAt: next ? next.min : null, nextName: next ? next.name : null, nextIcon: null }
 }
 
 export interface MemberStats {
@@ -56,8 +60,10 @@ export async function memberStats(event: H3Event, tenantId: number, userId: numb
            WHERE ch2.course_id = c.id AND lp.user_id = ? AND lp.tenant_id = ?)`,
   tenantId, userId, tenantId)
   // Fase 5: se suman los hitos de point_events (cursos y eventos).
+  // Fase 9: los valores base salen de la configuración del tenant.
   const extra = await extraPoints(event, tenantId, userId).catch(() => 0)
-  return { posts, comments, reactionsReceived, coursesCompleted, bookmarks, points: posts * 10 + comments * 3 + reactionsReceived * 2 + extra }
+  const { points: values } = await getGamification(event, tenantId)
+  return { posts, comments, reactionsReceived, coursesCompleted, bookmarks, points: posts * values.post + comments * values.comment + reactionsReceived * values.reaction_received + extra }
 }
 
 export interface Badge { id: string, name: string, description: string, icon: string, earned: boolean }

@@ -605,6 +605,76 @@ selector y la barra del compositor. Suite
 /events /members /leaderboard /messages /admin /channels/general
 /p/:canal/:post` en 200. Build y typecheck en 0 errores.
 
+## Fase 9 (hecha) — perfil estilo Ezy, personalización y gamificación administrable
+
+- **Perfil en 3 zonas propias, sin el riel global**: en `/profile/*`
+  el layout ya no renderiza el `RightRail` de la app (la página usa
+  todo el ancho). Cabecera sobria con portada, avatar grande con punto
+  de presencia, nombre + `@slug`, línea «Miembro desde · ubicación ·
+  Activo ahora/Última vez…» y la fila de estadísticas discreta. Debajo,
+  tres columnas: **izquierda** — tarjeta de **navegación vertical** con
+  etiquetas completas (Publicaciones / Comentarios / Canales /
+  Eventos / Guardados, este último solo en el perfil propio) con la
+  activa en pastilla de marca, y tarjeta **«Insignias ganadas — X de
+  Y»** con la grilla de insignias **de nivel** (icono, orden, umbral;
+  ganadas a color, bloqueadas atenuadas) más la fila secundaria de
+  insignias de actividad de la Fase 6; **centro** — el contenido de la
+  sección con **estados vacíos estilo referencia** (icono grande en
+  círculo, título y subtítulo, componente `EmptyState.vue`);
+  **derecha** — tarjeta de **nivel** (icono grande, «Sin insignia
+  aún» si no alcanzó el primer nivel con puntos, «Progreso a
+  {siguiente} — X / Y», barra y «Te faltan N pts») y **«Acerca de»**
+  con la sección **«Activo en»** (los canales del miembro).
+- **Modales de personalización** (perfil propio): «Editar perfil»
+  abre un **modal** con nombre, bio, ubicación y sitio web, y cambio
+  de **avatar y portada** desde el mismo modal (subir / vista previa /
+  quitar portada), reusando `PUT /api/settings/profile` y
+  `/api/uploads` (`kind` avatar/cover). La portada (o su botón) abre
+  el **modal de portada** dedicado. `/settings` conserva seguridad,
+  notificaciones, privacidad y bloqueos.
+- **Gamificación administrable por tenant**: tablas nuevas
+  `gamification_levels` (nombre, umbral, icono lucide, orden) y
+  `gamification_points` (acción → puntos; tabla propia en vez de JSON
+  en el tenant, por encajar con el resto del esquema). Se siembran con
+  los valores históricos la primera vez que se leen (niveles Inicial
+  0 / Activo 25 / Colaborador 60 / Referente 120 / Leyenda 250; puntos
+  post 10, comentario 3, reacción recibida 2, inscribirse 5, curso
+  completo 50, RSVP 10). `levelFor`, `memberStats`, el ranking, el
+  riel y los hitos de `point_events` leen esta configuración
+  (cacheada solo dentro del request: los cambios se ven de
+  inmediato). Página **`/admin/gamification`** (en el AdminNav y en el
+  menú de admin de la barra superior): editar nombre/icono/umbral,
+  agregar y eliminar niveles — con guardas en el servidor (siempre un
+  nivel base en 0, umbrales estrictamente crecientes sin duplicar,
+  nombres únicos) — y editar los puntos por acción (enteros ≥ 0).
+  Los puntos base se recalculan con el valor vigente; los hitos
+  (cursos/eventos) quedan registrados con el valor del momento.
+- **«Aparecer en búsqueda»**: preferencia `show_in_search` (def.
+  visible) en Ajustes → Privacidad; `/api/search` deja de devolver el
+  **perfil** de quien la apaga (sus publicaciones y comentarios siguen
+  apareciendo, como en la referencia). El opt-out del directorio no
+  cambia. El par «Everyone / Members Only» de la referencia no se
+  incluye: todo el producto exige cuenta, así que no hay superficie
+  pública donde aplicarlo (sin interruptores decorativos).
+
+Verificado en local con `wrangler dev` en estado fresco (suite de 61
+comprobaciones): rutas `/profile/marco-solis` (propio y ajeno),
+`/settings`, `/admin/gamification`, `/feeds` y `/leaderboard` en 200;
+el HTML del perfil trae la navegación vertical completa, «Insignias
+ganadas — 1 de 5» y «22 / 25» en la tarjeta de nivel, y NO trae el
+riel global (que sí sigue en el feed); la bio editada por la API del
+modal se refleja; seguir/dejar de seguir intacto; con
+`show_in_search` apagado la búsqueda no devuelve el perfil pero sí un
+post del miembro, y al reactivar vuelve; como admin, cambiar el
+umbral de Activo (25 → 20) y el valor del comentario (3 → 4) mueve el
+nivel y los puntos en perfil y ranking, un comentario nuevo otorga
+con el valor nuevo, el hito de RSVP se registra con el valor vigente
+(15), un nivel temporal agregado aparece como sexta insignia y al
+eliminarlo todo vuelve a la semilla restaurada; las guardas
+responden 400. Suite `scripts/test-realtime.mjs` en PASS. Build y
+typecheck en 0 errores. Semilla local regenerada limpia
+(`d1-init.sql` incluye las tablas de gamificación sembradas).
+
 ## Pendiente a propósito (fuera de esta fase)
 
 - Migraciones versionadas con `drizzle-kit` para D1 (hoy: esquema
