@@ -49,7 +49,16 @@ function isActive(item: { to: string, exact?: boolean }) {
 }
 
 const railOpen = ref(false)
-watch(() => route.fullPath, () => { railOpen.value = false })
+// Fase 16-E: marco fijo también en la consola. El contenido de la
+// sección es el desplazador (el riel queda fijo con su propio
+// scroll) y al cambiar de sección — o de subsección, que vive en
+// ?tab= — vuelve arriba: acá sí se mira el fullPath, porque cambiar
+// de pestaña de subsección ES cambiar de vista.
+const contentScroller = ref<HTMLElement | null>(null)
+watch(() => route.fullPath, () => {
+  railOpen.value = false
+  nextTick(() => contentScroller.value?.scrollTo({ top: 0 }))
+})
 
 const { openSettings: openUserSettings } = useUserSettings()
 
@@ -69,8 +78,8 @@ const userMenuItems = computed(() => [
 </script>
 
 <template>
-  <div class="min-h-screen bg-neutral-50 dark:bg-neutral-950">
-    <header class="sticky top-0 z-40 border-b border-default bg-white/90 backdrop-blur dark:bg-neutral-900/90">
+  <div data-frame="admin" class="flex h-dvh flex-col overflow-hidden bg-neutral-50 dark:bg-neutral-950">
+    <header class="z-40 shrink-0 border-b border-default bg-white/90 backdrop-blur dark:bg-neutral-900/90">
       <div class="flex h-14 items-center gap-3 px-4">
         <UButton
           v-if="isStaff" class="md:hidden" color="neutral" variant="ghost"
@@ -100,9 +109,11 @@ const userMenuItems = computed(() => [
       </div>
     </header>
 
-    <div class="mx-auto flex max-w-[1400px] items-start gap-6 px-4 py-6">
-      <!-- Riel de secciones: solo iconos en md, completo desde lg. -->
-      <aside v-if="isStaff" class="sticky top-20 hidden w-14 shrink-0 md:block lg:w-56">
+    <div class="mx-auto flex min-h-0 w-full max-w-[1400px] flex-1 gap-6 px-4">
+      <!-- Riel de secciones FIJO (Fase 16-E): solo iconos en md,
+           completo desde lg; si su contenido no cabe, se desplaza
+           por dentro sin mover el contenido. -->
+      <aside v-if="isStaff" data-scroll-region="admin-rail" class="hidden min-h-0 w-14 shrink-0 overflow-y-auto py-6 md:block lg:w-56">
         <nav :aria-label="t('adminShell.consoleNavLabel')">
           <ul class="space-y-0.5">
             <li v-for="item in visibleSections" :key="item.to">
@@ -119,7 +130,7 @@ const userMenuItems = computed(() => [
         </nav>
       </aside>
 
-      <main class="min-w-0 flex-1">
+      <main ref="contentScroller" data-scroll-region="admin-content" class="min-h-0 min-w-0 flex-1 overflow-y-auto py-6">
         <slot />
       </main>
     </div>

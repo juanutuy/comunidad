@@ -404,8 +404,10 @@ const visibilityOptions = [
 
       <!-- ============ CURRICULUM ============ -->
       <div v-show="tab === 0" class="flex flex-col gap-4 lg:flex-row lg:items-start">
-        <!-- Panel fijo de currículum -->
-        <div class="w-full shrink-0 space-y-3 lg:sticky lg:top-4 lg:w-[300px]">
+        <!-- Panel fijo de currículum: sticky dentro del desplazador
+             de contenido de la consola (Fase 16-E), con su propio
+             scroll interno si los capítulos no caben. -->
+        <div class="w-full shrink-0 space-y-3 lg:sticky lg:top-6 lg:max-h-[calc(100dvh-6.5rem)] lg:w-[300px] lg:overflow-y-auto">
           <div v-for="ch in chapters" :key="ch.id" class="rounded-xl border border-default bg-default"
             @dragover.prevent @drop="dropOnChapter(ch)">
             <div class="flex items-center gap-1 border-b border-default px-2 py-1.5" draggable="true"

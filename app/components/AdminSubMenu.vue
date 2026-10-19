@@ -19,6 +19,12 @@
 // Esto NO reemplaza a AdminQueueTabs: las vistas de datos de una
 // misma cola (Moderación: Reportes / En revisión) y los filtros de
 // una misma lista son otro patrón, legítimo, y se quedan.
+//
+// Fase 16-E: la columna queda FIJA con scroll interno propio — es
+// sticky DENTRO del desplazador de contenido de la consola (el
+// <main> del layout admin), con tope a la altura de la zona bajo el
+// header; si sus ítems no caben, se desplaza por dentro sin mover
+// el contenido de la subsección.
 export interface AdminSubMenuItem {
   label: string
   icon?: string
@@ -49,7 +55,7 @@ function isActive(item: AdminSubMenuItem) {
 </script>
 
 <template>
-  <nav aria-label="Subsecciones" class="shrink-0 lg:sticky lg:top-20 lg:w-60">
+  <nav aria-label="Subsecciones" data-scroll-region="admin-submenu" class="shrink-0 lg:sticky lg:top-6 lg:max-h-[calc(100dvh-6.5rem)] lg:w-60 lg:overflow-y-auto">
     <ul class="flex gap-1 overflow-x-auto pb-1 lg:flex-col lg:overflow-visible lg:pb-0">
       <li v-for="item in items" :key="item.to || item.value" class="shrink-0 lg:shrink">
         <NuxtLink

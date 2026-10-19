@@ -82,6 +82,18 @@ const dmUnread = computed(() => (dmData.value?.members || []).reduce((acc, m) =>
 watch(user, (u) => { if (u) { refreshDm(); refreshNotif() } })
 watch(() => route.fullPath, () => { refreshDm(); refreshNotif() })
 
+// Fase 16-E: marco fijo. El documento ya no se desplaza (la raíz es
+// h-dvh sin scroll): la columna central es EL desplazador de la zona
+// de miembro y al cambiar de página vuelve arriba — el router solo
+// sabe mover la ventana, que ya no se mueve, así que el reinicio se
+// hace sobre el contenedor. Solo importa el path: un cambio de query
+// dentro de la misma página (buscar de nuevo, abrir un DM) no debe
+// tirar al usuario al principio de lo que está leyendo.
+const centerScroller = ref<HTMLElement | null>(null)
+watch(() => route.path, () => {
+  nextTick(() => centerScroller.value?.scrollTo({ top: 0 }))
+})
+
 async function doLogout() {
   closePanel()
   await logout()
@@ -114,8 +126,8 @@ const isProfilePage = computed(() => route.path.startsWith('/profile/'))
 </script>
 
 <template>
-  <div class="min-h-screen bg-neutral-50 dark:bg-neutral-950">
-    <header class="sticky top-0 z-40 border-b border-default bg-white/90 backdrop-blur dark:bg-neutral-900/90">
+  <div data-frame="member" class="flex h-dvh flex-col overflow-hidden bg-neutral-50 dark:bg-neutral-950">
+    <header class="z-40 shrink-0 border-b border-default bg-white/90 backdrop-blur dark:bg-neutral-900/90">
       <div class="relative mx-auto flex h-14 max-w-[1400px] items-center gap-3 px-4">
         <UButton class="md:hidden" color="neutral" variant="ghost" icon="i-lucide-menu" :aria-label="t('nav.openMenu')" @click="openPanel" />
         <NuxtLink to="/feeds" class="flex shrink-0 items-center gap-2">
@@ -174,13 +186,18 @@ const isProfilePage = computed(() => route.path.startsWith('/profile/'))
       </div>
     </header>
 
-    <div
-      class="mx-auto grid max-w-[1400px] gap-6 px-4 py-6 md:grid-cols-[240px_minmax(0,1fr)]"
-      :class="isProfilePage ? '' : 'xl:grid-cols-[240px_minmax(0,1fr)_290px]'"
-    >
-      <!-- Lateral fijo desde tableta (md); en teléfono la navegación
-           vive en el panel deslizable (Fase 10). -->
-      <aside class="hidden space-y-5 md:block">
+    <!-- Fase 16-E: marco fijo como en la referencia — los lados NO se
+         mueven con la página porque el documento no se desplaza.
+         Fila bajo el header con tres regiones de alto completo de la
+         zona: lateral de canales y riel derecho con su PROPIO scroll
+         interno (overflow-y-auto en su contenedor: desplazar dentro
+         de un lado no mueve el centro, y viceversa) y la columna
+         central como desplazador principal del contenido. -->
+    <div class="mx-auto flex min-h-0 w-full max-w-[1400px] flex-1 gap-6 px-4">
+      <!-- Lateral fijo desde tableta (md) con scroll interno propio;
+           en teléfono la navegación vive en el panel deslizable
+           (Fase 10). -->
+      <aside data-scroll-region="channels-sidebar" class="hidden min-h-0 w-60 shrink-0 space-y-5 overflow-y-auto py-6 pr-1 md:block">
         <div>
           <ul class="space-y-0.5">
             <li v-for="item in sidebarNav" :key="item.id">
@@ -260,27 +277,32 @@ const isProfilePage = computed(() => route.path.startsWith('/profile/'))
         </UCard>
       </aside>
 
-      <main class="min-w-0">
+      <!-- Columna central: el desplazador principal. El pie vive al
+           final de ESTE scroll (ya no bajo el marco, donde quedaría
+           fuera de la ventana) y el respiro de la barra inferior
+           móvil también, para que no tape el final del contenido. -->
+      <main ref="centerScroller" data-scroll-region="center" class="min-h-0 min-w-0 flex-1 overflow-y-auto py-6">
         <slot />
+        <footer class="mt-10 border-t border-default">
+          <div class="flex flex-wrap items-center gap-x-4 gap-y-1 py-4 text-xs text-muted">
+            <span>{{ tenant?.name || t('common.community') }}</span>
+            <span class="flex-1" />
+            <NuxtLink to="/terms" class="hover:underline">{{ t('nav.termsLink') }}</NuxtLink>
+            <NuxtLink to="/privacy" class="hover:underline">{{ t('nav.privacyLink') }}</NuxtLink>
+          </div>
+        </footer>
+        <!-- Fase 10: respiro para que la barra inferior fija no tape
+             el final del contenido en teléfono. -->
+        <div v-if="user" aria-hidden="true" class="h-[calc(4rem+env(safe-area-inset-bottom))] md:hidden" />
       </main>
 
-      <aside v-if="!isProfilePage" class="hidden xl:block">
+      <!-- Riel derecho: fijo con scroll interno propio (su contenedor
+           lleva el overflow, con la altura de la zona bajo el
+           header); solo desde xl y nunca en el perfil (Fase 9). -->
+      <aside v-if="!isProfilePage" data-scroll-region="right-rail" class="hidden min-h-0 w-[290px] shrink-0 overflow-y-auto py-6 pl-1 xl:block">
         <RightRail />
       </aside>
     </div>
-
-    <footer class="border-t border-default">
-      <div class="mx-auto flex max-w-[1400px] flex-wrap items-center gap-x-4 gap-y-1 px-4 py-4 text-xs text-muted">
-        <span>{{ tenant?.name || t('common.community') }}</span>
-        <span class="flex-1" />
-        <NuxtLink to="/terms" class="hover:underline">{{ t('nav.termsLink') }}</NuxtLink>
-        <NuxtLink to="/privacy" class="hover:underline">{{ t('nav.privacyLink') }}</NuxtLink>
-      </div>
-    </footer>
-
-    <!-- Fase 10: respiro para que la barra inferior fija no tape el
-         final del contenido en teléfono. -->
-    <div v-if="user" aria-hidden="true" class="h-[calc(4rem+env(safe-area-inset-bottom))] md:hidden" />
 
     <MobilePanel :dm-unread="dmUnread" :groups="channelData?.groups || []" @logout="doLogout" />
     <MobileBottomBar v-if="user" :dm-unread="dmUnread" />
