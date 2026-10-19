@@ -5,6 +5,7 @@
 import type { PresenceUser, ThreadMessage } from '~/components/ChatThread.vue'
 
 const props = defineProps<{ slug: string }>()
+const { t } = useI18n()
 const api = useApi()
 const toast = useToast()
 const rt = useRealtime()
@@ -36,7 +37,7 @@ async function send(body: string) {
     upsert(messages.value, data.message) // el eco en vivo se deduplica por id
   }
   catch (e) {
-    toast.add({ title: 'No se pudo enviar el mensaje', description: (e as { data?: { message?: string } }).data?.message || 'Intentá de nuevo.', color: 'error' })
+    toast.add({ title: t('chat.sendFailed'), description: (e as { data?: { message?: string } }).data?.message || t('chat.retryText'), color: 'error' })
   }
 }
 
@@ -71,7 +72,7 @@ onUnmounted(() => {
 <template>
   <ChatThread
     :messages="messages" :live="live" :presence="presence" :typing-name="typingName"
-    :me-id="user?.id ?? null" placeholder="Escribí en el chat del canal…"
+    :me-id="user?.id ?? null" :placeholder="t('chat.channelPlaceholder')"
     @send="send" @typing="handle?.sendTyping()"
   />
 </template>

@@ -4,15 +4,16 @@
 // no exista ya un reporte pendiente de la misma persona; si ya
 // existía, la respuesta lo dice y acá se muestra como aviso amable.
 const { open, target, closeReport } = useReportDialog()
+const { t } = useI18n()
 const api = useApi()
 const toast = useToast()
 
-const reasons = [
-  { value: 'spam', label: 'Spam o publicidad no deseada' },
-  { value: 'acoso', label: 'Acoso o conducta ofensiva' },
-  { value: 'inapropiado', label: 'Contenido inapropiado' },
-  { value: 'otro', label: 'Otro motivo' },
-]
+const reasons = computed(() => [
+  { value: 'spam', label: t('report.reasonSpam') },
+  { value: 'acoso', label: t('report.reasonHarassment') },
+  { value: 'inapropiado', label: t('report.reasonInappropriate') },
+  { value: 'otro', label: t('report.reasonOther') },
+])
 const reason = ref('spam')
 const note = ref('')
 const sending = ref(false)
@@ -30,37 +31,37 @@ async function submit() {
       body: { targetType: target.value.type, targetId: target.value.id, reason: reason.value, note: note.value },
     })
     if (res.alreadyReported)
-      toast.add({ title: 'Ya reportaste este contenido', description: 'Tu reporte anterior sigue en la cola de moderación.', color: 'warning' })
+      toast.add({ title: t('report.alreadyToast'), description: t('report.alreadyToastText'), color: 'warning' })
     else
-      toast.add({ title: 'Reporte enviado', description: 'Un administrador lo va a revisar. Gracias por cuidar la comunidad.', color: 'success' })
+      toast.add({ title: t('report.sentToast'), description: t('report.sentToastText'), color: 'success' })
     closeReport()
   }
   catch (e) {
-    toast.add({ title: 'No se pudo enviar el reporte', description: (e as { data?: { message?: string } }).data?.message || '', color: 'error' })
+    toast.add({ title: t('report.failedToast'), description: (e as { data?: { message?: string } }).data?.message || '', color: 'error' })
   }
   finally { sending.value = false }
 }
 </script>
 
 <template>
-  <UModal v-model:open="open" title="Reportar contenido" description="Contanos qué pasa con este contenido. Un administrador lo revisa desde la consola de moderación.">
+  <UModal v-model:open="open" :title="t('report.title')" :description="t('report.description')">
     <template #body>
       <div class="space-y-4">
         <p v-if="target" class="truncate rounded-lg bg-elevated px-3 py-2 text-sm text-muted">
-          {{ target.type === 'post' ? 'Publicación' : 'Comentario' }}: «{{ target.label }}»
+          {{ target.type === 'post' ? t('report.postLabel') : t('report.commentLabel') }}: «{{ target.label }}»
         </p>
-        <UFormField label="Motivo">
+        <UFormField :label="t('report.reasonLabel')">
           <URadioGroup v-model="reason" :items="reasons" />
         </UFormField>
-        <UFormField label="Nota (opcional)" description="Cualquier detalle que ayude al administrador.">
-          <UTextarea v-model="note" :rows="3" :maxlength="500" class="w-full" placeholder="Ej.: es publicidad repetida en varios canales…" />
+        <UFormField :label="t('report.noteLabel')" :description="t('report.noteHelp')">
+          <UTextarea v-model="note" :rows="3" :maxlength="500" class="w-full" :placeholder="t('report.notePlaceholder')" />
         </UFormField>
       </div>
     </template>
     <template #footer>
       <div class="flex justify-end gap-2">
-        <UButton color="neutral" variant="ghost" label="Cancelar" @click="closeReport" />
-        <UButton color="error" variant="soft" label="Enviar reporte" icon="i-lucide-flag" :loading="sending" @click="submit" />
+        <UButton color="neutral" variant="ghost" :label="t('common.cancel')" @click="closeReport" />
+        <UButton color="error" variant="soft" :label="t('report.submit')" icon="i-lucide-flag" :loading="sending" @click="submit" />
       </div>
     </template>
   </UModal>

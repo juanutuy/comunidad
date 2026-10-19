@@ -4,7 +4,7 @@
 // el menú del avatar, el panel móvil y la antigua ruta /settings (que
 // redirige acá); lo renderiza UserSettingsModal.vue, montado en los
 // layouts default y admin.
-export type UserSettingsSection = 'perfil' | 'notificaciones' | 'privacidad' | 'bloqueos' | 'seguridad'
+export type UserSettingsSection = 'perfil' | 'notificaciones' | 'privacidad' | 'bloqueos' | 'idioma' | 'seguridad'
 
 export function useUserSettings() {
   const open = useState('user-settings-open', () => false)

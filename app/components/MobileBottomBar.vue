@@ -9,6 +9,7 @@
 defineProps<{ dmUnread: number }>()
 
 const { user, tenant } = useAuth()
+const { t } = useI18n()
 const { unread: notifUnread } = useNotifBadge()
 const { openPanel } = useMobilePanel()
 
@@ -26,28 +27,28 @@ const itemClass = 'flex h-full flex-col items-center justify-center gap-0.5 text
   <nav
     v-if="user"
     class="fixed inset-x-0 bottom-0 z-40 border-t border-default bg-white/95 pb-[env(safe-area-inset-bottom)] backdrop-blur dark:bg-neutral-900/95 md:hidden"
-    aria-label="Navegación móvil"
+    :aria-label="t('bottomBar.mobileNavigation')"
   >
     <div class="grid h-16 grid-cols-5">
       <NuxtLink to="/feeds" :class="itemClass" active-class="font-semibold text-primary">
         <UIcon name="i-lucide-home" class="text-[22px]" />
-        Inicio
+        {{ t('bottomBar.home') }}
       </NuxtLink>
       <NuxtLink to="/messages" :class="itemClass" class="relative" active-class="font-semibold text-primary">
         <span class="relative">
           <UIcon name="i-lucide-message-circle" class="text-[22px]" />
           <span v-if="dmUnread" class="absolute -top-1.5 -right-2.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[9px] font-bold text-white">{{ dmUnread }}</span>
         </span>
-        Mensajes
+        {{ t('bottomBar.messages') }}
       </NuxtLink>
 
       <PostComposer variant="bare" @published="onPublished">
         <template #trigger="{ openModal }">
-          <button type="button" :class="itemClass" class="w-full" aria-label="Crear publicación" @click="openModal()">
+          <button type="button" :class="itemClass" class="w-full" :aria-label="t('bottomBar.createPost')" @click="openModal()">
             <span class="flex h-9 w-9 items-center justify-center rounded-full text-white shadow-sm" :style="{ backgroundColor: tenant?.brandColor || '#2563eb' }">
               <UIcon name="i-lucide-plus" class="text-xl" />
             </span>
-            Crear
+            {{ t('bottomBar.create') }}
           </button>
         </template>
       </PostComposer>
@@ -57,11 +58,11 @@ const itemClass = 'flex h-full flex-col items-center justify-center gap-0.5 text
           <UIcon name="i-lucide-bell" class="text-[22px]" />
           <span v-if="notifUnread" class="absolute -top-1.5 -right-2.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[9px] font-bold text-white">{{ notifUnread > 9 ? '9+' : notifUnread }}</span>
         </span>
-        Avisos
+        {{ t('bottomBar.notices') }}
       </NuxtLink>
-      <button type="button" :class="itemClass" aria-label="Abrir el menú" @click="openPanel">
+      <button type="button" :class="itemClass" :aria-label="t('bottomBar.openMenu')" @click="openPanel">
         <UIcon name="i-lucide-menu" class="text-[22px]" />
-        Menú
+        {{ t('bottomBar.menu') }}
       </button>
     </div>
   </nav>

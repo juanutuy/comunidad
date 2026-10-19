@@ -20,6 +20,21 @@ type KeyPaths<T> = T extends object
   : never
 export type MessageKey = KeyPaths<Dict>
 
+// Espejo en variable de módulo del idioma activo: lo leen piezas
+// montadas fuera del árbol principal de la app (el menú slash del
+// editor, que TipTap monta con VueRenderer), donde un composable de
+// Nuxt no debería hacer falta. Lo actualizan applyResolved y
+// setUserLocale; el menú slash solo se abre tras interactuar, ya
+// hidratada la app.
+let moduleLocale: AppLocale = 'es'
+
+export function plainT(key: MessageKey, params: Record<string, string | number> = {}): string {
+  let text = FLAT[moduleLocale].get(key) ?? FLAT.es.get(key) ?? key
+  for (const [name, value] of Object.entries(params))
+    text = text.replaceAll(`{${name}}`, String(value))
+  return text
+}
+
 const DICTS: Record<AppLocale, Dict> = { es, en }
 
 function flatten(dict: unknown, prefix: string, out: Map<string, string>) {
@@ -67,6 +82,7 @@ export function useI18n() {
   // resuelto manda sobre el estado local (SSR y cliente coinciden).
   function applyResolved(resolved: string | undefined, userPref: string | null | undefined, tenantDefault: string | undefined) {
     locale.value = resolved === 'en' ? 'en' : 'es'
+    moduleLocale = locale.value
     userLocale.value = userPref === 'es' || userPref === 'en' ? userPref : null
     tenantDefaultLocale.value = tenantDefault === 'en' ? 'en' : 'es'
   }
@@ -80,6 +96,7 @@ export function useI18n() {
     })
     userLocale.value = res.userLocale
     locale.value = res.locale
+    moduleLocale = res.locale
     if (import.meta.client)
       document.cookie = `cm_locale=${res.locale}; path=/; max-age=${60 * 60 * 24 * 365}; samesite=lax`
     return res.locale

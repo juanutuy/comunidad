@@ -12,6 +12,9 @@ export interface SlashItem {
 }
 
 const props = defineProps<{ items: SlashItem[], command: (item: SlashItem) => void }>()
+// Este componente lo monta TipTap con VueRenderer (fuera del árbol
+// principal): usa plainT, que lee el idioma de la variable de
+// módulo de useI18n en vez de un composable de Nuxt.
 const selected = ref(0)
 watch(() => props.items, () => { selected.value = 0 })
 
@@ -53,6 +56,6 @@ defineExpose({ onKeyDown })
         <span class="block truncate text-xs text-muted">{{ item.hint }}</span>
       </span>
     </button>
-    <p v-if="!items.length" class="px-3 py-2 text-sm text-muted">Sin bloques que coincidan</p>
+    <p v-if="!items.length" class="px-3 py-2 text-sm text-muted">{{ plainT('editor.noBlocksMatch') }}</p>
   </div>
 </template>

@@ -4,6 +4,7 @@
 // Fase 7: acabado tipo referencia — títulos de bloque en mayúsculas
 // con «Ver todo», eventos con cuadrado de fecha y anfitrión.
 const { tenant } = useAuth()
+const { t, locale } = useI18n()
 const { initials } = useFormat()
 const api = useApi()
 
@@ -36,12 +37,13 @@ function blockVisible(key: string) {
 // Cuadrado de fecha del evento próximo: mes corto arriba, día grande
 // y día de semana debajo (como la referencia).
 function dateParts(iso: string) {
+  const loc = locale.value === 'en' ? 'en-US' : 'es'
   const d = new Date(iso)
   return {
-    month: d.toLocaleDateString('es', { month: 'short' }).replace('.', '').toUpperCase(),
+    month: d.toLocaleDateString(loc, { month: 'short' }).replace('.', '').toUpperCase(),
     day: d.getDate(),
-    weekday: d.toLocaleDateString('es', { weekday: 'short' }).replace('.', ''),
-    time: d.toLocaleTimeString('es', { hour: 'numeric', minute: '2-digit' }),
+    weekday: d.toLocaleDateString(loc, { weekday: 'short' }).replace('.', ''),
+    time: d.toLocaleTimeString(loc, { hour: 'numeric', minute: '2-digit' }),
   }
 }
 </script>
@@ -50,8 +52,8 @@ function dateParts(iso: string) {
   <div class="flex flex-col gap-5">
     <UCard v-if="blockVisible('upcoming_events')" :style="{ order: blockOrder('upcoming_events') }">
       <div class="mb-3 flex items-baseline justify-between gap-2">
-        <h3 class="text-xs font-bold tracking-wider text-muted uppercase">Próximos eventos</h3>
-        <NuxtLink to="/events" class="text-xs font-medium text-primary hover:underline">Ver todo</NuxtLink>
+        <h3 class="text-xs font-bold tracking-wider text-muted uppercase">{{ t('rail.upcomingEvents') }}</h3>
+        <NuxtLink to="/events" class="text-xs font-medium text-primary hover:underline">{{ t('common.viewAll') }}</NuxtLink>
       </div>
       <ul v-if="sidebar?.events?.length" class="space-y-3">
         <li v-for="e in sidebar.events" :key="e.slug">
@@ -64,31 +66,31 @@ function dateParts(iso: string) {
             <span class="min-w-0">
               <span class="block truncate text-sm font-medium group-hover:underline">{{ e.title }}</span>
               <span class="mt-0.5 block text-xs text-muted">{{ dateParts(e.starts_at).weekday }} · {{ dateParts(e.starts_at).time }}</span>
-              <span v-if="e.host_name" class="block truncate text-xs text-muted">Anfitrión: {{ e.host_name }}</span>
+              <span v-if="e.host_name" class="block truncate text-xs text-muted">{{ t('rail.hostLabel', { name: e.host_name }) }}</span>
             </span>
           </NuxtLink>
         </li>
       </ul>
-      <p v-else class="text-sm text-muted">No hay eventos próximos.</p>
+      <p v-else class="text-sm text-muted">{{ t('rail.noUpcoming') }}</p>
     </UCard>
 
     <UCard v-if="blockVisible('recent_posts')" :style="{ order: blockOrder('recent_posts') }">
       <div class="mb-3 flex items-baseline justify-between gap-2">
-        <h3 class="text-xs font-bold tracking-wider text-muted uppercase">Publicaciones recientes</h3>
-        <NuxtLink to="/feeds" class="text-xs font-medium text-primary hover:underline">Ver todo</NuxtLink>
+        <h3 class="text-xs font-bold tracking-wider text-muted uppercase">{{ t('rail.recentPosts') }}</h3>
+        <NuxtLink to="/feeds" class="text-xs font-medium text-primary hover:underline">{{ t('common.viewAll') }}</NuxtLink>
       </div>
       <ul v-if="sidebar?.recent?.length" class="space-y-2.5">
         <li v-for="p in sidebar.recent" :key="p.slug">
           <NuxtLink :to="`/p/${p.channel_slug}/${p.slug}`" class="text-sm leading-snug hover:underline">{{ p.title }}</NuxtLink>
         </li>
       </ul>
-      <p v-else class="text-sm text-muted">Todavía no hay publicaciones.</p>
+      <p v-else class="text-sm text-muted">{{ t('rail.noPosts') }}</p>
     </UCard>
 
     <UCard v-if="blockVisible('leaders')" :style="{ order: blockOrder('leaders') }">
       <div class="mb-3 flex items-baseline justify-between gap-2">
-        <h3 class="text-xs font-bold tracking-wider text-muted uppercase">Top líderes</h3>
-        <NuxtLink to="/leaderboard" class="text-xs font-medium text-primary hover:underline">Ver todo</NuxtLink>
+        <h3 class="text-xs font-bold tracking-wider text-muted uppercase">{{ t('rail.topLeaders') }}</h3>
+        <NuxtLink to="/leaderboard" class="text-xs font-medium text-primary hover:underline">{{ t('common.viewAll') }}</NuxtLink>
       </div>
       <ul v-if="sidebar?.leaders?.length" class="space-y-2.5">
         <li v-for="(l, i) in sidebar.leaders" :key="l.id" class="flex items-center gap-2.5">
@@ -96,18 +98,18 @@ function dateParts(iso: string) {
           <UAvatar :src="l.avatarUrl || undefined" :text="initials(l.name)" size="sm" />
           <span class="min-w-0 flex-1">
             <NuxtLink :to="`/profile/${l.slug}`" class="block truncate text-sm font-medium hover:underline">{{ l.name }}</NuxtLink>
-            <span class="block text-xs text-muted">Nivel {{ l.level }}</span>
+            <span class="block text-xs text-muted">{{ t('rail.levelLabel', { name: l.level }) }}</span>
           </span>
-          <span class="text-sm font-bold">{{ l.points }} pts</span>
+          <span class="text-sm font-bold">{{ l.points }} {{ t('common.points') }}</span>
         </li>
       </ul>
-      <p v-else class="text-sm text-muted">Todavía no hay puntajes.</p>
+      <p v-else class="text-sm text-muted">{{ t('rail.noScores') }}</p>
     </UCard>
 
     <UCard v-if="blockVisible('members')" :style="{ order: blockOrder('members') }">
       <div class="mb-3 flex items-baseline justify-between gap-2">
-        <h3 class="text-xs font-bold tracking-wider text-muted uppercase">Miembros</h3>
-        <NuxtLink to="/members" class="text-xs font-medium text-primary hover:underline">Ver todo</NuxtLink>
+        <h3 class="text-xs font-bold tracking-wider text-muted uppercase">{{ t('rail.members') }}</h3>
+        <NuxtLink to="/members" class="text-xs font-medium text-primary hover:underline">{{ t('common.viewAll') }}</NuxtLink>
       </div>
       <ul v-if="sidebar?.members?.length" class="space-y-2.5">
         <li v-for="m in sidebar.members" :key="m.id" class="flex items-center gap-2.5">
@@ -118,13 +120,13 @@ function dateParts(iso: string) {
           <NuxtLink :to="`/profile/${m.slug}`" class="min-w-0 flex-1 truncate text-sm font-medium hover:underline">{{ m.name }}</NuxtLink>
         </li>
       </ul>
-      <p v-else class="text-sm text-muted">Todavía no hay miembros para mostrar.</p>
+      <p v-else class="text-sm text-muted">{{ t('rail.noMembers') }}</p>
     </UCard>
 
     <UCard v-if="blockVisible('online_now')" :style="{ order: blockOrder('online_now') }">
       <div class="mb-3 flex items-baseline justify-between gap-2">
-        <h3 class="text-xs font-bold tracking-wider text-muted uppercase">En línea ({{ sidebar?.online?.length || 0 }})</h3>
-        <NuxtLink to="/members" class="text-xs font-medium text-primary hover:underline">Ver todo</NuxtLink>
+        <h3 class="text-xs font-bold tracking-wider text-muted uppercase">{{ t('rail.onlineNow', { count: sidebar?.online?.length || 0 }) }}</h3>
+        <NuxtLink to="/members" class="text-xs font-medium text-primary hover:underline">{{ t('common.viewAll') }}</NuxtLink>
       </div>
       <ul v-if="sidebar?.online?.length" class="space-y-2.5">
         <li v-for="m in sidebar.online" :key="m.id" class="flex items-center gap-2.5">
@@ -133,11 +135,11 @@ function dateParts(iso: string) {
             <span class="absolute -right-0.5 -bottom-0.5 h-2.5 w-2.5 rounded-full bg-green-500 ring-2 ring-white dark:ring-neutral-900" />
           </span>
           <NuxtLink :to="`/profile/${m.slug}`" class="min-w-0 flex-1 truncate text-sm font-medium hover:underline">
-            {{ m.name }}<span v-if="m.me" class="text-muted"> (vos)</span>
+            {{ m.name }}<span v-if="m.me" class="text-muted">{{ t('rail.youSuffix') }}</span>
           </NuxtLink>
         </li>
       </ul>
-      <p v-else class="text-sm text-muted">Nadie en línea en este momento.</p>
+      <p v-else class="text-sm text-muted">{{ t('rail.nobodyOnline') }}</p>
     </UCard>
     <p class="px-1 text-xs text-muted" :style="{ order: 99 }">{{ tenant?.tagline }}</p>
   </div>

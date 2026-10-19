@@ -18,6 +18,7 @@ const emit = defineEmits<{ 'update:open': [value: boolean], 'sent': [] }>()
 
 const api = useApi()
 const toast = useToast()
+const { t } = useI18n()
 const { fmtMoney } = useFormat()
 
 interface ManualMethod { id: number, type: string, title: string, details: string }
@@ -56,7 +57,7 @@ watch(() => props.open, async (isOpen) => {
 })
 
 async function submit() {
-  if (!methodId.value) { toast.add({ title: 'Elegí un método de pago', color: 'warning' }); return }
+  if (!methodId.value) { toast.add({ title: t('manualDialog.chooseMethodToast'), color: 'warning' }); return }
   submitting.value = true
   try {
     await api('/api/billing/manual', {
@@ -68,36 +69,36 @@ async function submit() {
   }
   catch (e) {
     const err = e as { statusCode?: number, data?: { message?: string } }
-    if (err.statusCode === 409 || err.data?.message?.includes('en revisión')) state.value = 'review'
-    else toast.add({ title: 'No se pudo registrar el pago', description: err.data?.message || '', color: 'error' })
+    // El duplicado se detecta por el 409 (Fase 18: el mensaje del
+    // servidor viene en el idioma del usuario, no se compara texto).
+    if (err.statusCode === 409) state.value = 'review'
+    else toast.add({ title: t('manualDialog.registerFailed'), description: err.data?.message || '', color: 'error' })
   }
   finally { submitting.value = false }
 }
 </script>
 
 <template>
-  <UModal :open="open" :title="`Pago manual · ${productName}`" @update:open="emit('update:open', $event)">
+  <UModal :open="open" :title="t('manualDialog.title', { name: productName })" @update:open="emit('update:open', $event)">
     <template #body>
       <div v-if="state === 'sent'" class="space-y-3">
-        <UAlert color="success" variant="soft" icon="i-lucide-check-circle-2" title="Pago enviado a revisión" description="La administración va a verificarlo. Cuando lo apruebe, el acceso se activa y te llega el aviso acá mismo. Declarar el pago no activa nada por sí solo." />
+        <UAlert color="success" variant="soft" icon="i-lucide-check-circle-2" :title="t('manualDialog.sentTitle')" :description="t('manualDialog.sentText')" />
         <div class="flex justify-end">
-          <UButton label="Entendido" @click="emit('update:open', false)" />
+          <UButton :label="t('manualDialog.understood')" @click="emit('update:open', false)" />
         </div>
       </div>
       <div v-else-if="state === 'review'" class="space-y-3">
-        <UAlert color="warning" variant="soft" icon="i-lucide-hourglass" title="Tu pago está en revisión" description="Ya hay un pago manual pendiente para esta misma compra. Cuando la administración lo revise, te llega el aviso: no hace falta enviar otro." />
+        <UAlert color="warning" variant="soft" icon="i-lucide-hourglass" :title="t('manualDialog.reviewTitle')" :description="t('manualDialog.reviewText')" />
         <div class="flex justify-end">
-          <UButton label="Cerrar" color="neutral" variant="soft" @click="emit('update:open', false)" />
+          <UButton :label="t('common.close')" color="neutral" variant="soft" @click="emit('update:open', false)" />
         </div>
       </div>
       <div v-else class="space-y-4">
         <p class="text-sm text-muted">
-          Total a pagar: <strong class="text-highlighted">{{ fmtMoney(amountCents) }}</strong>.
-          Elegí cómo querés pagar, seguí las instrucciones del método y, cuando hayas pagado, declará el pago:
-          la administración lo verifica y recién ahí se activa tu acceso.
+          {{ t('manualDialog.totalTextBefore') }}<strong class="text-highlighted">{{ fmtMoney(amountCents) }}</strong>{{ t('manualDialog.totalTextAfter') }}
         </p>
-        <div v-if="loading" class="py-4 text-center text-sm text-muted">Cargando métodos…</div>
-        <UAlert v-else-if="!methods.length" color="warning" variant="soft" icon="i-lucide-triangle-alert" title="Sin métodos disponibles" description="La comunidad activó los pagos manuales pero todavía no cargó ningún método. Volvé a intentar más tarde." />
+        <div v-if="loading" class="py-4 text-center text-sm text-muted">{{ t('manualDialog.loadingMethods') }}</div>
+        <UAlert v-else-if="!methods.length" color="warning" variant="soft" icon="i-lucide-triangle-alert" :title="t('manualDialog.noMethodsTitle')" :description="t('manualDialog.noMethodsText')" />
         <template v-else>
           <div class="space-y-2">
             <button
@@ -115,12 +116,12 @@ async function submit() {
               </span>
             </button>
           </div>
-          <UFormField label="Referencia de tu pago (opcional)" help="N.º de operación, fecha o cualquier dato que ayude a la administración a encontrarlo.">
-            <UInput v-model="reference" class="w-full" placeholder="Ej.: transferencia del 19/10, operación 483920" />
+          <UFormField :label="t('manualDialog.referenceLabel')" :help="t('manualDialog.referenceHelp')">
+            <UInput v-model="reference" class="w-full" :placeholder="t('manualDialog.referencePlaceholder')" />
           </UFormField>
           <div class="flex justify-end gap-2">
-            <UButton color="neutral" variant="soft" label="Cancelar" @click="emit('update:open', false)" />
-            <UButton label="Ya realicé el pago — enviar a revisión" icon="i-lucide-send" :loading="submitting" :disabled="!selected" @click="submit" />
+            <UButton color="neutral" variant="soft" :label="t('common.cancel')" @click="emit('update:open', false)" />
+            <UButton :label="t('manualDialog.submitButton')" icon="i-lucide-send" :loading="submitting" :disabled="!selected" @click="submit" />
           </div>
         </template>
       </div>

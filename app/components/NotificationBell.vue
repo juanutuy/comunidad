@@ -12,6 +12,7 @@ interface NotificationView {
 }
 
 const { user } = useAuth()
+const { t } = useI18n()
 const { timeAgo, initials } = useFormat()
 const api = useApi()
 const router = useRouter()
@@ -23,15 +24,15 @@ const { unread } = useNotifBadge()
 const open = ref(false)
 // Fase 5: filtro por tipo dentro del desplegable.
 const filter = ref('all')
-const filterChips = [
-  { label: 'Todo', value: 'all' },
-  { label: 'Menciones', value: 'mention' },
-  { label: 'Reacciones', value: 'reaction' },
-  { label: 'Comentarios', value: 'comment' },
-  { label: 'Publicaciones', value: 'new_post' },
-  { label: 'Mensajes', value: 'dm' },
-  { label: 'Seguidores', value: 'follow' },
-]
+const filterChips = computed(() => [
+  { label: t('notifications.filterAll'), value: 'all' },
+  { label: t('notifications.filterMentions'), value: 'mention' },
+  { label: t('notifications.filterReactions'), value: 'reaction' },
+  { label: t('notifications.filterComments'), value: 'comment' },
+  { label: t('notifications.filterPosts'), value: 'new_post' },
+  { label: t('notifications.filterMessages'), value: 'dm' },
+  { label: t('notifications.filterFollowers'), value: 'follow' },
+])
 const visibleItems = computed(() =>
   items.value.filter(n => filter.value === 'all' || n.type === filter.value).slice(0, 8))
 
@@ -98,7 +99,7 @@ onMounted(async () => {
 
 <template>
   <UPopover v-if="user" :open="open" @update:open="onOpenChange">
-    <UButton color="neutral" variant="ghost" icon="i-lucide-bell" class="relative" aria-label="Notificaciones">
+    <UButton color="neutral" variant="ghost" icon="i-lucide-bell" class="relative" :aria-label="t('notifications.title')">
       <span v-if="unread" class="absolute -top-0.5 -right-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
         {{ unread > 9 ? '9+' : unread }}
       </span>
@@ -106,8 +107,8 @@ onMounted(async () => {
     <template #content>
       <div class="w-80 p-2">
         <div class="flex items-center justify-between px-2 py-1">
-          <p class="text-sm font-bold">Notificaciones</p>
-          <UButton to="/notifications" size="xs" color="neutral" variant="ghost" label="Ver todas" @click="open = false" />
+          <p class="text-sm font-bold">{{ t('notifications.title') }}</p>
+          <UButton to="/notifications" size="xs" color="neutral" variant="ghost" :label="t('notifications.seeAll')" @click="open = false" />
         </div>
         <div class="flex flex-wrap gap-1 px-2 pb-1">
           <UButton
@@ -129,7 +130,7 @@ onMounted(async () => {
             </button>
           </li>
         </ul>
-        <p v-else class="px-2 py-4 text-center text-sm text-muted">{{ items.length ? 'Nada en este filtro.' : 'No tenés notificaciones todavía.' }}</p>
+        <p v-else class="px-2 py-4 text-center text-sm text-muted">{{ items.length ? t('notifications.nothingInFilter') : t('notifications.noNotificationsYet') }}</p>
       </div>
     </template>
   </UPopover>

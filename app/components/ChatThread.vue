@@ -28,6 +28,7 @@ const props = defineProps<{
 }>()
 const emit = defineEmits<{ send: [body: string], typing: [] }>()
 
+const { t } = useI18n()
 const { timeAgo, initials } = useFormat()
 const draft = ref('')
 const scroller = ref<HTMLElement | null>(null)
@@ -68,10 +69,10 @@ async function submit() {
   <div class="flex flex-col">
     <div class="mb-3 flex flex-wrap items-center gap-2">
       <UBadge :color="live ? 'success' : 'neutral'" variant="soft" :icon="live ? 'i-lucide-radio' : 'i-lucide-refresh-cw'" size="sm">
-        {{ live ? 'En vivo' : 'Actualización periódica' }}
+        {{ live ? t('chat.live') : t('chat.periodic') }}
       </UBadge>
       <template v-if="presence && presence.length">
-        <span class="text-xs text-muted">En la sala:</span>
+        <span class="text-xs text-muted">{{ t('chat.inRoom') }}</span>
         <span v-for="u in presence" :key="u.id" class="inline-flex items-center gap-1.5 rounded-full bg-elevated py-0.5 pr-2.5 pl-1 text-xs">
           <span class="relative flex">
             <UAvatar :src="u.avatarUrl || undefined" :text="initials(u.name)" size="3xs" />
@@ -95,15 +96,15 @@ async function submit() {
           <p class="text-sm whitespace-pre-line">{{ m.body }}</p>
         </div>
       </div>
-      <p v-if="!messages.length" class="py-6 text-center text-sm text-muted">Todavía no hay mensajes. ¡Sé la primera persona en escribir!</p>
+      <p v-if="!messages.length" class="py-6 text-center text-sm text-muted">{{ t('chat.empty') }}</p>
     </div>
 
-    <p class="mt-2 h-4 text-xs text-muted italic">{{ typingName ? `${typingName} está escribiendo…` : '' }}</p>
+    <p class="mt-2 h-4 text-xs text-muted italic">{{ typingName ? t('chat.typing', { name: typingName }) : '' }}</p>
 
     <UAlert v-if="blockedMessage" class="mt-1" color="warning" variant="soft" icon="i-lucide-lock" :title="blockedMessage" />
     <form v-else class="mt-1 flex items-end gap-2" @submit.prevent="submit">
-      <UTextarea v-model="draft" :rows="2" :placeholder="placeholder || 'Escribí un mensaje…'" class="flex-1" @input="emit('typing')" @keydown.enter.exact.prevent="submit" />
-      <UButton type="submit" icon="i-lucide-send" label="Enviar" :loading="sending" />
+      <UTextarea v-model="draft" :rows="2" :placeholder="placeholder || t('chat.writeMessage')" class="flex-1" @input="emit('typing')" @keydown.enter.exact.prevent="submit" />
+      <UButton type="submit" icon="i-lucide-send" :label="t('chat.send')" :loading="sending" />
     </form>
   </div>
 </template>

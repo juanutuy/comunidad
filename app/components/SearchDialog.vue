@@ -6,6 +6,7 @@
 import type { PostView } from '~/components/PostCard.vue'
 
 const { open, closeSearch } = useSearchDialog()
+const { t } = useI18n()
 const api = useApi()
 const router = useRouter()
 const { initials } = useFormat()
@@ -76,23 +77,23 @@ function seeAll() {
           <UIcon name="i-lucide-search" class="shrink-0 text-muted" />
           <UInput
             v-model="q" autofocus variant="none" size="lg" class="flex-1"
-            placeholder="Buscar en la comunidad…"
+            :placeholder="t('search.dialogPlaceholder')"
             @keydown.enter="seeAll"
           />
           <UIcon v-if="loading" name="i-lucide-loader-circle" class="shrink-0 animate-spin text-muted" />
-          <UButton color="neutral" variant="ghost" icon="i-lucide-x" aria-label="Cerrar búsqueda" @click="closeSearch" />
+          <UButton color="neutral" variant="ghost" icon="i-lucide-x" :aria-label="t('search.closeSearch')" @click="closeSearch" />
         </div>
 
         <div class="max-h-[55vh] overflow-y-auto p-2">
           <p v-if="!ready" class="px-3 py-6 text-center text-sm text-muted">
-            Escribí al menos 2 caracteres para buscar publicaciones, canales, cursos y miembros.
+            {{ t('search.dialogHint') }}
           </p>
           <p v-else-if="!loading && !total" class="px-3 py-6 text-center text-sm text-muted">
-            Sin resultados para «{{ q.trim() }}».
+            {{ t('search.dialogNoResults', { q: q.trim() }) }}
           </p>
 
           <template v-if="results.posts.length">
-            <p class="px-3 pt-2 pb-1 text-xs font-bold tracking-wider text-muted uppercase">Publicaciones</p>
+            <p class="px-3 pt-2 pb-1 text-xs font-bold tracking-wider text-muted uppercase">{{ t('search.posts') }}</p>
             <button
               v-for="p in results.posts.slice(0, 5)" :key="p.id" type="button"
               class="flex w-full items-start gap-3 rounded-lg px-3 py-2 text-left hover:bg-elevated"
@@ -102,14 +103,14 @@ function seeAll() {
               <span class="min-w-0">
                 <span class="block truncate font-medium">{{ p.title }}</span>
                 <span class="block truncate text-xs text-muted">
-                  {{ p.author.anonymous ? 'Anónimo' : p.author.name }} · en {{ p.channel.name }}<template v-if="p.locked"> · vista previa</template>
+                  {{ p.author.anonymous ? t('post.anonymous') : p.author.name }} · {{ t('search.inChannel', { channel: p.channel.name }) }}<template v-if="p.locked">{{ t('search.previewSuffix') }}</template>
                 </span>
               </span>
             </button>
           </template>
 
           <template v-if="results.channels.length">
-            <p class="px-3 pt-2 pb-1 text-xs font-bold tracking-wider text-muted uppercase">Canales</p>
+            <p class="px-3 pt-2 pb-1 text-xs font-bold tracking-wider text-muted uppercase">{{ t('search.channels') }}</p>
             <button
               v-for="c in results.channels.slice(0, 5)" :key="c.id" type="button"
               class="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left hover:bg-elevated"
@@ -123,7 +124,7 @@ function seeAll() {
           </template>
 
           <template v-if="results.courses.length">
-            <p class="px-3 pt-2 pb-1 text-xs font-bold tracking-wider text-muted uppercase">Cursos</p>
+            <p class="px-3 pt-2 pb-1 text-xs font-bold tracking-wider text-muted uppercase">{{ t('search.courses') }}</p>
             <button
               v-for="c in results.courses.slice(0, 5)" :key="c.id" type="button"
               class="flex w-full items-start gap-3 rounded-lg px-3 py-2 text-left hover:bg-elevated"
@@ -138,7 +139,7 @@ function seeAll() {
           </template>
 
           <template v-if="results.members.length">
-            <p class="px-3 pt-2 pb-1 text-xs font-bold tracking-wider text-muted uppercase">Miembros</p>
+            <p class="px-3 pt-2 pb-1 text-xs font-bold tracking-wider text-muted uppercase">{{ t('search.members') }}</p>
             <button
               v-for="m in results.members.slice(0, 5)" :key="m.id" type="button"
               class="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left hover:bg-elevated"
@@ -155,7 +156,7 @@ function seeAll() {
           class="border-t border-default px-4 py-2.5 text-left text-sm font-medium text-primary hover:bg-elevated"
           @click="seeAll"
         >
-          Ver todos los resultados ({{ total }})
+          {{ t('search.seeAllResults', { count: total }) }}
         </button>
       </div>
     </template>

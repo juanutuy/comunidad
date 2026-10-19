@@ -35,17 +35,18 @@ export interface PostView {
 const props = defineProps<{ post: PostView, linkable?: boolean }>()
 const emit = defineEmits<{ changed: [], deleted: [] }>()
 const { user } = useAuth()
+const { t } = useI18n()
 const { openReport } = useReportDialog()
 const { timeAgo, initials } = useFormat()
 const api = useApi()
 const toast = useToast()
 
-const reactionMeta = [
-  { type: 'love', icon: 'i-lucide-heart', label: 'Me encanta' },
-  { type: 'like', icon: 'i-lucide-thumbs-up', label: 'Me gusta' },
-  { type: 'fire', icon: 'i-lucide-flame', label: 'Fuego' },
-  { type: 'clap', icon: 'i-lucide-hand-metal', label: 'Aplausos' },
-]
+const reactionMeta = computed(() => [
+  { type: 'love', icon: 'i-lucide-heart', label: t('post.reactionLove') },
+  { type: 'like', icon: 'i-lucide-thumbs-up', label: t('post.reactionLike') },
+  { type: 'fire', icon: 'i-lucide-flame', label: t('post.reactionFire') },
+  { type: 'clap', icon: 'i-lucide-hand-metal', label: t('post.reactionClap') },
+])
 
 const localReactions = ref({ ...props.post.reactions })
 const localMine = ref([...props.post.myReactions])
@@ -79,7 +80,7 @@ const youtubeEmbed = computed(() => {
 })
 
 async function toggleReaction(type: string) {
-  if (!user.value) { toast.add({ title: 'Iniciá sesión para reaccionar', color: 'warning' }); return }
+  if (!user.value) { toast.add({ title: t('composer.loginToReact'), color: 'warning' }); return }
   const wasActive = localMine.value.includes(type)
   localMine.value = wasActive ? localMine.value.filter(t => t !== type) : [...localMine.value, type]
   localReactions.value[type] = (localReactions.value[type] || 0) + (wasActive ? -1 : 1)
@@ -88,7 +89,7 @@ async function toggleReaction(type: string) {
 }
 
 async function toggleBookmark() {
-  if (!user.value) { toast.add({ title: 'Iniciá sesión para guardar', color: 'warning' }); return }
+  if (!user.value) { toast.add({ title: t('composer.loginToSave'), color: 'warning' }); return }
   localBookmarked.value = !localBookmarked.value
   try { await api(`/api/posts/${props.post.id}/bookmark`, { method: 'POST' }) }
   catch { emit('changed') }
@@ -97,10 +98,10 @@ async function toggleBookmark() {
 async function togglePin() {
   try {
     await api(`/api/posts/${props.post.id}/pin`, { method: 'POST' })
-    toast.add({ title: 'Publicación actualizada', color: 'success' })
+    toast.add({ title: t('post.pinUpdated'), color: 'success' })
     emit('changed')
   }
-  catch { toast.add({ title: 'No se pudo fijar la publicación', color: 'error' }) }
+  catch { toast.add({ title: t('post.pinFailed'), color: 'error' }) }
 }
 
 // Fase 16-B: activar/desactivar comentarios desde el menú (autor o
@@ -111,10 +112,10 @@ async function toggleComments() {
   try {
     const res = await api<{ allowComments: boolean }>(`/api/posts/${props.post.id}/comments-toggle`, { method: 'POST' })
     localAllowComments.value = res.allowComments
-    toast.add({ title: res.allowComments ? 'Comentarios activados' : 'Comentarios desactivados', color: 'success' })
+    toast.add({ title: res.allowComments ? t('post.commentsOnToast') : t('post.commentsOffToast'), color: 'success' })
     emit('changed')
   }
-  catch { toast.add({ title: 'No se pudo cambiar el estado de los comentarios', color: 'error' }) }
+  catch { toast.add({ title: t('post.commentsToggleFailed'), color: 'error' }) }
 }
 
 // Fase 16-B: copiar el enlace REAL del detalle (origen actual + ruta
@@ -124,10 +125,10 @@ async function copyLink() {
   const url = `${window.location.origin}/p/${props.post.channel.slug}/${props.post.slug}`
   try {
     await navigator.clipboard.writeText(url)
-    toast.add({ title: 'Enlace copiado', description: url, color: 'success' })
+    toast.add({ title: t('post.linkCopied'), description: url, color: 'success' })
   }
   catch {
-    window.prompt('Copiá el enlace de la publicación:', url)
+    window.prompt(t('post.copyLinkPrompt'), url)
   }
 }
 
@@ -174,7 +175,7 @@ const localPoll = ref<PollView | null>(props.post.poll ?? null)
 watch(() => props.post.poll, p => { localPoll.value = p ?? null })
 const voting = ref(false)
 async function vote(optionId: number) {
-  if (!user.value) { toast.add({ title: 'Iniciá sesión para votar', color: 'warning' }); return }
+  if (!user.value) { toast.add({ title: t('composer.loginToVote'), color: 'warning' }); return }
   if (voting.value || localPoll.value?.myOptionId === optionId) return
   voting.value = true
   try {
@@ -182,7 +183,7 @@ async function vote(optionId: number) {
     localPoll.value = res.poll
   }
   catch (e) {
-    toast.add({ title: 'No se pudo registrar tu voto', description: (e as { data?: { message?: string } }).data?.message || '', color: 'error' })
+    toast.add({ title: t('post.voteFailed'), description: (e as { data?: { message?: string } }).data?.message || '', color: 'error' })
   }
   finally { voting.value = false }
 }
@@ -193,10 +194,10 @@ async function hidePost() {
   try {
     await api(`/api/posts/${props.post.id}/hide`, { method: 'POST' })
     locallyHidden.value = true
-    toast.add({ title: 'Publicación oculta', description: 'Podés volver a mostrarla desde Ajustes de cuenta.', color: 'success' })
+    toast.add({ title: t('post.hiddenToast'), description: t('post.hiddenToastText'), color: 'success' })
     emit('changed')
   }
-  catch { toast.add({ title: 'No se pudo ocultar la publicación', color: 'error' }) }
+  catch { toast.add({ title: t('post.hideFailed'), color: 'error' }) }
 }
 // Fase 7 → 16-B: el menú «…» reúne TODAS las acciones de la
 // publicación, con la composición de la referencia y todo funcional:
@@ -210,22 +211,22 @@ const isModeratorStaff = computed(() => !!user.value && ['admin', 'moderator'].i
 const postMenuItems = computed(() => {
   const items: { label: string, icon: string, color?: 'error', onSelect: () => void }[] = []
   if (!user.value) return [items]
-  items.push({ label: localBookmarked.value ? 'Quitar de guardados' : 'Guardar publicación', icon: localBookmarked.value ? 'i-lucide-bookmark-check' : 'i-lucide-bookmark', onSelect: toggleBookmark })
+  items.push({ label: localBookmarked.value ? t('post.menuUnsave') : t('post.menuSave'), icon: localBookmarked.value ? 'i-lucide-bookmark-check' : 'i-lucide-bookmark', onSelect: toggleBookmark })
   if (isModeratorStaff.value)
-    items.push({ label: props.post.pinned ? 'Desfijar publicación' : 'Fijar publicación', icon: 'i-lucide-pin', onSelect: togglePin })
+    items.push({ label: props.post.pinned ? t('post.menuUnpin') : t('post.menuPin'), icon: 'i-lucide-pin', onSelect: togglePin })
   if (isMine.value)
-    items.push({ label: 'Editar publicación', icon: 'i-lucide-pencil', onSelect: startEdit })
+    items.push({ label: t('post.menuEdit'), icon: 'i-lucide-pencil', onSelect: startEdit })
   if (isMine.value || isModeratorStaff.value)
-    items.push({ label: localAllowComments.value ? 'Desactivar comentarios' : 'Activar comentarios', icon: localAllowComments.value ? 'i-lucide-message-circle-off' : 'i-lucide-message-circle', onSelect: toggleComments })
-  items.push({ label: 'Copiar enlace', icon: 'i-lucide-link', onSelect: copyLink })
-  items.push({ label: 'Ver publicación', icon: 'i-lucide-external-link', onSelect: viewPost })
+    items.push({ label: localAllowComments.value ? t('post.menuCommentsOff') : t('post.menuCommentsOn'), icon: localAllowComments.value ? 'i-lucide-message-circle-off' : 'i-lucide-message-circle', onSelect: toggleComments })
+  items.push({ label: t('post.menuCopyLink'), icon: 'i-lucide-link', onSelect: copyLink })
+  items.push({ label: t('post.menuView'), icon: 'i-lucide-external-link', onSelect: viewPost })
   if (!isMine.value) {
-    items.push({ label: 'Ocultar publicación', icon: 'i-lucide-eye-off', onSelect: hidePost })
+    items.push({ label: t('post.menuHide'), icon: 'i-lucide-eye-off', onSelect: hidePost })
     // Fase 12: reportar contenido ajeno (el servidor también lo valida).
-    items.push({ label: 'Reportar', icon: 'i-lucide-flag', onSelect: () => openReport({ type: 'post', id: props.post.id, label: displayTitle.value }) })
+    items.push({ label: t('post.menuReport'), icon: 'i-lucide-flag', onSelect: () => openReport({ type: 'post', id: props.post.id, label: displayTitle.value }) })
   }
   if (canDelete.value)
-    items.push({ label: 'Eliminar publicación', icon: 'i-lucide-trash-2', color: 'error', onSelect: () => { confirmDelete.value = true } })
+    items.push({ label: t('post.menuDelete'), icon: 'i-lucide-trash-2', color: 'error', onSelect: () => { confirmDelete.value = true } })
   return [items]
 })
 
@@ -237,12 +238,12 @@ async function deletePost() {
   deleting.value = true
   try {
     await api(`/api/posts/${props.post.id}`, { method: 'DELETE' })
-    toast.add({ title: 'Publicación eliminada', color: 'success' })
+    toast.add({ title: t('post.deletedToast'), color: 'success' })
     confirmDelete.value = false
     emit('deleted')
     emit('changed')
   }
-  catch { toast.add({ title: 'No se pudo eliminar la publicación', color: 'error' }) }
+  catch { toast.add({ title: t('post.deleteFailed'), color: 'error' }) }
   finally { deleting.value = false }
 }
 </script>
@@ -253,54 +254,54 @@ async function deletePost() {
       <span class="relative shrink-0">
         <UAvatar v-if="post.author.anonymous && !post.author.mine" icon="i-lucide-venetian-mask" size="md" :ui="{ root: 'bg-elevated' }" />
         <UAvatar v-else :src="post.author.avatarUrl || undefined" :text="initials(post.author.name)" size="md" />
-        <span v-if="post.author.online" class="absolute -right-0.5 -bottom-0.5 h-3 w-3 rounded-full bg-green-500 ring-2 ring-white dark:ring-neutral-900" title="En línea" />
+        <span v-if="post.author.online" class="absolute -right-0.5 -bottom-0.5 h-3 w-3 rounded-full bg-green-500 ring-2 ring-white dark:ring-neutral-900" :title="t('common.online')" />
       </span>
       <div class="min-w-0 flex-1">
         <div class="flex items-start gap-2">
           <div class="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1 text-sm">
             <!-- Post anónimo (Fase 8): sin enlace al perfil. El admin
                  ve además la autoría real, entre paréntesis. -->
-            <span v-if="post.author.anonymous && !post.author.mine" class="font-semibold">Anónimo</span>
+            <span v-if="post.author.anonymous && !post.author.mine" class="font-semibold">{{ t('post.anonymous') }}</span>
             <NuxtLink v-else :to="`/profile/${post.author.slug}`" class="font-semibold hover:underline">
               {{ post.author.name }}
             </NuxtLink>
             <UBadge v-if="post.author.anonymous" color="neutral" variant="subtle" size="sm" icon="i-lucide-venetian-mask">
-              Anónimo
+              {{ t('post.anonymous') }}
             </UBadge>
             <span v-if="post.author.realAuthor" class="text-xs text-muted">
-              (autor: <NuxtLink :to="`/profile/${post.author.realAuthor.slug}`" class="hover:underline">{{ post.author.realAuthor.name }}</NuxtLink>)
+              ({{ t('post.authorLabel') }}: <NuxtLink :to="`/profile/${post.author.realAuthor.slug}`" class="hover:underline">{{ post.author.realAuthor.name }}</NuxtLink>)
             </span>
             <UBadge v-if="post.author.role === 'admin' || post.author.realRole === 'admin'" color="primary" variant="solid" size="sm">
-              Admin
+              {{ t('members.adminBadge') }}
             </UBadge>
-            <span class="text-muted"># en</span>
+            <span class="text-muted">{{ t('post.inChannel') }}</span>
             <NuxtLink :to="`/channels/${post.channel.slug}`" class="font-medium text-primary hover:underline">
               {{ post.channel.name }}
             </NuxtLink>
             <span class="text-muted">· {{ timeAgo(post.createdAt) }}</span>
             <span v-if="displayEdited" class="flex items-center gap-1 text-muted">
-              · <UIcon name="i-lucide-pencil" class="text-xs" /> Editado
+              · <UIcon name="i-lucide-pencil" class="text-xs" /> {{ t('post.edited') }}
             </span>
             <UBadge v-if="post.pinned" color="warning" variant="subtle" icon="i-lucide-pin">
-              Fijado
+              {{ t('post.pinned') }}
             </UBadge>
             <UBadge v-if="post.status === 'review'" color="warning" variant="subtle" icon="i-lucide-eye">
-              En revisión
+              {{ t('post.inReview') }}
             </UBadge>
             <UBadge v-if="post.kind === 'poll'" color="primary" variant="subtle" icon="i-lucide-bar-chart-3">
-              Encuesta
+              {{ t('post.poll') }}
             </UBadge>
             <UBadge v-if="post.channel.type === 'paid'" color="neutral" variant="subtle" icon="i-lucide-crown">
-              Premium
+              {{ t('post.premium') }}
             </UBadge>
           </div>
           <UButton
             size="sm" color="neutral" :variant="localBookmarked ? 'soft' : 'ghost'"
             :icon="localBookmarked ? 'i-lucide-bookmark-check' : 'i-lucide-bookmark'"
-            :title="localBookmarked ? 'Guardado' : 'Guardar'" class="shrink-0" @click="toggleBookmark"
+            :title="localBookmarked ? t('post.saved') : t('post.save')" class="shrink-0" @click="toggleBookmark"
           />
           <UDropdownMenu v-if="user && postMenuItems[0]?.length" :items="postMenuItems" class="shrink-0">
-            <UButton size="sm" color="neutral" variant="ghost" icon="i-lucide-more-horizontal" title="Más acciones" />
+            <UButton size="sm" color="neutral" variant="ghost" icon="i-lucide-more-horizontal" :title="t('post.moreActions')" />
           </UDropdownMenu>
         </div>
 
@@ -319,13 +320,13 @@ async function deletePost() {
           </p>
           <p v-if="post.mediaCount" class="mt-2 flex items-center gap-1.5 text-xs text-muted">
             <UIcon name="i-lucide-paperclip" />
-            {{ post.mediaCount }} archivo{{ post.mediaCount === 1 ? '' : 's' }} adjunto{{ post.mediaCount === 1 ? '' : 's' }} en la publicación completa
+            {{ t(post.mediaCount === 1 ? 'post.attachmentsOne' : 'post.attachmentsMany', { count: post.mediaCount }) }}
           </p>
           <div class="mt-3 flex items-center gap-2 text-sm font-medium">
             <UIcon name="i-lucide-lock" />
-            Contenido completo solo con acceso a este canal.
+            {{ t('post.lockedText') }}
             <NuxtLink :to="`/channels/${post.channel.slug}`" class="text-primary hover:underline">
-              Obtener acceso
+              {{ t('post.getAccess') }}
             </NuxtLink>
           </div>
         </div>
@@ -338,21 +339,21 @@ async function deletePost() {
             {{ displayBody }}
           </p>
           <div v-if="post.mediaType === 'video' && youtubeEmbed" class="mt-3 aspect-video overflow-hidden rounded-lg">
-            <iframe :src="youtubeEmbed" class="h-full w-full" allowfullscreen title="Video de la publicación" />
+            <iframe :src="youtubeEmbed" class="h-full w-full" allowfullscreen :title="t('post.postVideoTitle')" />
           </div>
           <div v-else-if="post.mediaType === 'image' && post.mediaUrl" class="mt-3">
-            <img :src="post.mediaUrl" alt="Imagen de la publicación" class="max-h-96 w-full rounded-lg object-cover">
+            <img :src="post.mediaUrl" :alt="t('post.postImageAlt')" class="max-h-96 w-full rounded-lg object-cover">
           </div>
           <div v-else-if="post.mediaType === 'video' && post.mediaUrl" class="mt-3 text-sm">
-            <a :href="post.mediaUrl" target="_blank" rel="noopener" class="text-primary hover:underline">Ver video</a>
+            <a :href="post.mediaUrl" target="_blank" rel="noopener" class="text-primary hover:underline">{{ t('post.viewVideo') }}</a>
           </div>
           <a
             v-else-if="post.mediaType === 'file' && post.mediaUrl" :href="post.mediaUrl" download
             class="mt-3 flex items-center gap-3 rounded-lg border border-default p-3 text-sm transition hover:bg-elevated"
           >
             <UIcon name="i-lucide-paperclip" class="shrink-0 text-lg text-muted" />
-            <span class="min-w-0 flex-1 truncate font-medium">{{ post.attachmentName || 'Archivo adjunto' }}</span>
-            <span class="flex shrink-0 items-center gap-1 text-primary"><UIcon name="i-lucide-download" /> Descargar</span>
+            <span class="min-w-0 flex-1 truncate font-medium">{{ post.attachmentName || t('post.attachedFile') }}</span>
+            <span class="flex shrink-0 items-center gap-1 text-primary"><UIcon name="i-lucide-download" /> {{ t('post.download') }}</span>
           </a>
 
           <div v-if="localPoll" class="mt-4 space-y-2">
@@ -372,7 +373,7 @@ async function deletePost() {
               </span>
             </button>
             <p class="text-xs text-muted">
-              {{ localPoll.totalVotes }} voto{{ localPoll.totalVotes === 1 ? '' : 's' }}<span v-if="localPoll.myOptionId"> · Tocá otra opción para cambiar tu voto</span><span v-else-if="user"> · Tocá una opción para votar</span>
+              {{ t(localPoll.totalVotes === 1 ? 'post.voteOne' : 'post.votesMany', { count: localPoll.totalVotes }) }}<span v-if="localPoll.myOptionId">{{ t('post.changeVoteHint') }}</span><span v-else-if="user">{{ t('post.voteHint') }}</span>
             </p>
           </div>
         </div>
@@ -390,18 +391,18 @@ async function deletePost() {
             @click="toggleReaction(r.type)"
           />
           <NuxtLink v-if="localAllowComments" :to="`/p/${post.channel.slug}/${post.slug}`" class="ml-1">
-            <UButton size="sm" color="neutral" variant="ghost" icon="i-lucide-message-circle" :label="`${post.commentCount} comentarios`" />
+            <UButton size="sm" color="neutral" variant="ghost" icon="i-lucide-message-circle" :label="t('post.commentsCount', { count: post.commentCount })" />
           </NuxtLink>
-          <span v-else class="ml-1 flex items-center gap-1.5 px-2 text-sm text-muted" title="El autor desactivó los comentarios">
-            <UIcon name="i-lucide-lock" /> Comentarios desactivados
+          <span v-else class="ml-1 flex items-center gap-1.5 px-2 text-sm text-muted" :title="t('post.commentsOffHint')">
+            <UIcon name="i-lucide-lock" /> {{ t('post.commentsOff') }}
           </span>
         </div>
 
-        <UModal v-model:open="confirmDelete" title="Eliminar publicación" description="Esta acción no se puede deshacer: se borran también sus comentarios y reacciones.">
+        <UModal v-model:open="confirmDelete" :title="t('post.deleteTitle')" :description="t('post.deleteText')">
           <template #footer>
             <div class="flex justify-end gap-2">
-              <UButton color="neutral" variant="ghost" label="Cancelar" @click="confirmDelete = false" />
-              <UButton color="error" label="Sí, eliminar" icon="i-lucide-trash-2" :loading="deleting" @click="deletePost" />
+              <UButton color="neutral" variant="ghost" :label="t('common.cancel')" @click="confirmDelete = false" />
+              <UButton color="error" :label="t('post.deleteConfirm')" icon="i-lucide-trash-2" :loading="deleting" @click="deletePost" />
             </div>
           </template>
         </UModal>

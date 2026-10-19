@@ -23,12 +23,13 @@ import Suggestion from '@tiptap/suggestion'
 import SlashList from './editor/SlashList.vue'
 import type { SlashItem } from './editor/SlashList.vue'
 
+const { t } = useI18n()
 const props = withDefaults(defineProps<{
   modelValue: string
   mode?: 'slash' | 'classic'
   placeholder?: string
   uploadImage?: (file: File) => Promise<string>
-}>(), { mode: 'slash', placeholder: 'Escribí acá…', uploadImage: undefined })
+}>(), { mode: 'slash', placeholder: undefined, uploadImage: undefined })
 const emit = defineEmits<{ 'update:modelValue': [value: string] }>()
 
 // Nodo de audio: bloque atómico <audio controls src> (el sanitizador
@@ -93,20 +94,20 @@ async function insertImageFile(file: File) {
 
 function slashItems(): SlashItem[] {
   const items: SlashItem[] = [
-    { title: 'Texto', hint: 'Párrafo común', icon: 'i-lucide-text', command: ({ editor: e, range }) => e.chain().focus().deleteRange(range).setNode('paragraph').run() },
-    { title: 'Encabezado 1', hint: 'Título grande', icon: 'i-lucide-heading-1', command: ({ editor: e, range }) => e.chain().focus().deleteRange(range).setNode('heading', { level: 1 }).run() },
-    { title: 'Encabezado 2', hint: 'Título mediano', icon: 'i-lucide-heading-2', command: ({ editor: e, range }) => e.chain().focus().deleteRange(range).setNode('heading', { level: 2 }).run() },
-    { title: 'Encabezado 3', hint: 'Título chico', icon: 'i-lucide-heading-3', command: ({ editor: e, range }) => e.chain().focus().deleteRange(range).setNode('heading', { level: 3 }).run() },
-    { title: 'Lista', hint: 'Viñetas', icon: 'i-lucide-list', command: ({ editor: e, range }) => e.chain().focus().deleteRange(range).toggleBulletList().run() },
-    { title: 'Lista numerada', hint: '1, 2, 3…', icon: 'i-lucide-list-ordered', command: ({ editor: e, range }) => e.chain().focus().deleteRange(range).toggleOrderedList().run() },
-    { title: 'Lista de tareas', hint: 'Con casillas', icon: 'i-lucide-list-checks', command: ({ editor: e, range }) => e.chain().focus().deleteRange(range).toggleTaskList().run() },
-    { title: 'Cita', hint: 'Bloque de cita', icon: 'i-lucide-quote', command: ({ editor: e, range }) => e.chain().focus().deleteRange(range).toggleBlockquote().run() },
-    { title: 'Bloque de código', hint: 'Código con formato fijo', icon: 'i-lucide-code-xml', command: ({ editor: e, range }) => e.chain().focus().deleteRange(range).toggleCodeBlock().run() },
-    { title: 'Divisor', hint: 'Línea horizontal', icon: 'i-lucide-minus', command: ({ editor: e, range }) => e.chain().focus().deleteRange(range).setHorizontalRule().run() },
+    { title: t('editor.slashText'), hint: t('editor.slashTextHint'), icon: 'i-lucide-text', command: ({ editor: e, range }) => e.chain().focus().deleteRange(range).setNode('paragraph').run() },
+    { title: t('editor.slashHeading1'), hint: t('editor.slashHeading1Hint'), icon: 'i-lucide-heading-1', command: ({ editor: e, range }) => e.chain().focus().deleteRange(range).setNode('heading', { level: 1 }).run() },
+    { title: t('editor.slashHeading2'), hint: t('editor.slashHeading2Hint'), icon: 'i-lucide-heading-2', command: ({ editor: e, range }) => e.chain().focus().deleteRange(range).setNode('heading', { level: 2 }).run() },
+    { title: t('editor.slashHeading3'), hint: t('editor.slashHeading3Hint'), icon: 'i-lucide-heading-3', command: ({ editor: e, range }) => e.chain().focus().deleteRange(range).setNode('heading', { level: 3 }).run() },
+    { title: t('editor.slashList'), hint: t('editor.slashListHint'), icon: 'i-lucide-list', command: ({ editor: e, range }) => e.chain().focus().deleteRange(range).toggleBulletList().run() },
+    { title: t('editor.slashNumbered'), hint: t('editor.slashNumberedHint'), icon: 'i-lucide-list-ordered', command: ({ editor: e, range }) => e.chain().focus().deleteRange(range).toggleOrderedList().run() },
+    { title: t('editor.slashTasks'), hint: t('editor.slashTasksHint'), icon: 'i-lucide-list-checks', command: ({ editor: e, range }) => e.chain().focus().deleteRange(range).toggleTaskList().run() },
+    { title: t('editor.slashQuote'), hint: t('editor.slashQuoteHint'), icon: 'i-lucide-quote', command: ({ editor: e, range }) => e.chain().focus().deleteRange(range).toggleBlockquote().run() },
+    { title: t('editor.slashCode'), hint: t('editor.slashCodeHint'), icon: 'i-lucide-code-xml', command: ({ editor: e, range }) => e.chain().focus().deleteRange(range).toggleCodeBlock().run() },
+    { title: t('editor.slashDivider'), hint: t('editor.slashDividerHint'), icon: 'i-lucide-minus', command: ({ editor: e, range }) => e.chain().focus().deleteRange(range).setHorizontalRule().run() },
   ]
   if (props.uploadImage) {
     items.push({
-      title: 'Imagen', hint: 'Subir una imagen al texto', icon: 'i-lucide-image',
+      title: t('editor.slashImage'), hint: t('editor.slashImageHint'), icon: 'i-lucide-image',
       command: ({ editor: e, range }) => { e.chain().focus().deleteRange(range).run(); pickImage() },
     })
   }
@@ -189,7 +190,7 @@ onMounted(() => {
     Image,
     TaskList,
     TaskItem.configure({ nested: true }),
-    Placeholder.configure({ placeholder: props.placeholder }),
+    Placeholder.configure({ placeholder: props.placeholder ?? t('editor.writeHere') }),
     AudioNode,
     VideoEmbedNode,
   ]
@@ -256,22 +257,22 @@ const classicButtons = computed(() => {
   const on = (name: string, attrs?: Record<string, unknown>) => !!e && e.isActive(name, attrs)
   void tick.value
   return [
-    { icon: 'i-lucide-undo-2', title: 'Deshacer', active: false, run: () => e?.chain().focus().undo().run() },
-    { icon: 'i-lucide-redo-2', title: 'Rehacer', active: false, run: () => e?.chain().focus().redo().run() },
-    { icon: 'i-lucide-bold', title: 'Negrita', active: on('bold'), run: () => e?.chain().focus().toggleBold().run() },
-    { icon: 'i-lucide-italic', title: 'Itálica', active: on('italic'), run: () => e?.chain().focus().toggleItalic().run() },
-    { icon: 'i-lucide-underline', title: 'Subrayado', active: on('underline'), run: () => e?.chain().focus().toggleUnderline().run() },
-    { icon: 'i-lucide-strikethrough', title: 'Tachado', active: on('strike'), run: () => e?.chain().focus().toggleStrike().run() },
-    { icon: 'i-lucide-heading-1', title: 'Encabezado 1', active: on('heading', { level: 1 }), run: () => e?.chain().focus().toggleHeading({ level: 1 }).run() },
-    { icon: 'i-lucide-heading-2', title: 'Encabezado 2', active: on('heading', { level: 2 }), run: () => e?.chain().focus().toggleHeading({ level: 2 }).run() },
-    { icon: 'i-lucide-heading-3', title: 'Encabezado 3', active: on('heading', { level: 3 }), run: () => e?.chain().focus().toggleHeading({ level: 3 }).run() },
-    { icon: 'i-lucide-list', title: 'Lista con viñetas', active: on('bulletList'), run: () => e?.chain().focus().toggleBulletList().run() },
-    { icon: 'i-lucide-list-ordered', title: 'Lista numerada', active: on('orderedList'), run: () => e?.chain().focus().toggleOrderedList().run() },
-    { icon: 'i-lucide-quote', title: 'Cita', active: on('blockquote'), run: () => e?.chain().focus().toggleBlockquote().run() },
-    { icon: 'i-lucide-code-xml', title: 'Bloque de código', active: on('codeBlock'), run: () => e?.chain().focus().toggleCodeBlock().run() },
-    { icon: 'i-lucide-link', title: 'Enlace', active: on('link'), run: toggleLink },
-    { icon: 'i-lucide-image', title: 'Imagen', active: false, run: pickImage, hidden: !props.uploadImage },
-    { icon: 'i-lucide-youtube', title: 'Incrustar video de YouTube/Vimeo', active: false, run: () => { videoForm.open = !videoForm.open; linkForm.open = false } },
+    { icon: 'i-lucide-undo-2', title: t('editor.undo'), active: false, run: () => e?.chain().focus().undo().run() },
+    { icon: 'i-lucide-redo-2', title: t('editor.redo'), active: false, run: () => e?.chain().focus().redo().run() },
+    { icon: 'i-lucide-bold', title: t('editor.bold'), active: on('bold'), run: () => e?.chain().focus().toggleBold().run() },
+    { icon: 'i-lucide-italic', title: t('editor.italic'), active: on('italic'), run: () => e?.chain().focus().toggleItalic().run() },
+    { icon: 'i-lucide-underline', title: t('editor.underline'), active: on('underline'), run: () => e?.chain().focus().toggleUnderline().run() },
+    { icon: 'i-lucide-strikethrough', title: t('editor.strike'), active: on('strike'), run: () => e?.chain().focus().toggleStrike().run() },
+    { icon: 'i-lucide-heading-1', title: t('editor.heading1'), active: on('heading', { level: 1 }), run: () => e?.chain().focus().toggleHeading({ level: 1 }).run() },
+    { icon: 'i-lucide-heading-2', title: t('editor.heading2'), active: on('heading', { level: 2 }), run: () => e?.chain().focus().toggleHeading({ level: 2 }).run() },
+    { icon: 'i-lucide-heading-3', title: t('editor.heading3'), active: on('heading', { level: 3 }), run: () => e?.chain().focus().toggleHeading({ level: 3 }).run() },
+    { icon: 'i-lucide-list', title: t('editor.bulletList'), active: on('bulletList'), run: () => e?.chain().focus().toggleBulletList().run() },
+    { icon: 'i-lucide-list-ordered', title: t('editor.orderedList'), active: on('orderedList'), run: () => e?.chain().focus().toggleOrderedList().run() },
+    { icon: 'i-lucide-quote', title: t('editor.quote'), active: on('blockquote'), run: () => e?.chain().focus().toggleBlockquote().run() },
+    { icon: 'i-lucide-code-xml', title: t('editor.codeBlock'), active: on('codeBlock'), run: () => e?.chain().focus().toggleCodeBlock().run() },
+    { icon: 'i-lucide-link', title: t('editor.link'), active: on('link'), run: toggleLink },
+    { icon: 'i-lucide-image', title: t('editor.image'), active: false, run: pickImage, hidden: !props.uploadImage },
+    { icon: 'i-lucide-youtube', title: t('editor.embedVideo'), active: false, run: () => { videoForm.open = !videoForm.open; linkForm.open = false } },
   ].filter(b => !('hidden' in b && b.hidden))
 })
 </script>
@@ -290,14 +291,14 @@ const classicButtons = computed(() => {
     <div v-if="linkForm.open" class="absolute inset-x-0 top-0 z-20 flex items-center gap-2 rounded-lg border border-default bg-default p-2 shadow-lg">
       <UIcon name="i-lucide-link" class="ml-1 shrink-0 text-muted" />
       <UInput v-model="linkForm.url" placeholder="https://…" class="flex-1" size="sm" @keyup.enter="applyLink" />
-      <UButton size="sm" label="Aplicar" @click="applyLink" />
+      <UButton size="sm" :label="t('editor.apply')" @click="applyLink" />
       <UButton size="sm" color="neutral" variant="ghost" icon="i-lucide-x" @click="linkForm.open = false" />
     </div>
     <!-- Formulario de video (modo clásico) -->
     <div v-if="videoForm.open" class="absolute inset-x-0 top-0 z-20 flex items-center gap-2 rounded-lg border border-default bg-default p-2 shadow-lg">
       <UIcon name="i-lucide-youtube" class="ml-1 shrink-0 text-muted" />
-      <UInput v-model="videoForm.url" placeholder="Pegá el enlace de YouTube o Vimeo…" class="flex-1" size="sm" @keyup.enter="applyVideo" />
-      <UButton size="sm" label="Incrustar" @click="applyVideo" />
+      <UInput v-model="videoForm.url" :placeholder="t('editor.videoPlaceholder')" class="flex-1" size="sm" @keyup.enter="applyVideo" />
+      <UButton size="sm" :label="t('editor.embed')" @click="applyVideo" />
       <UButton size="sm" color="neutral" variant="ghost" icon="i-lucide-x" @click="videoForm.open = false" />
     </div>
 
@@ -306,12 +307,12 @@ const classicButtons = computed(() => {
       v-if="bubble.show && editor" class="absolute z-20 flex items-center gap-0.5 rounded-lg border border-default bg-default p-1 shadow-lg"
       :style="{ left: `${bubble.x}px`, top: `${bubble.y}px` }"
     >
-      <UButton size="xs" :color="editor.isActive('bold') ? 'primary' : 'neutral'" :variant="editor.isActive('bold') ? 'soft' : 'ghost'" icon="i-lucide-bold" title="Negrita" @click="editor.chain().focus().toggleBold().run()" />
-      <UButton size="xs" :color="editor.isActive('italic') ? 'primary' : 'neutral'" :variant="editor.isActive('italic') ? 'soft' : 'ghost'" icon="i-lucide-italic" title="Itálica" @click="editor.chain().focus().toggleItalic().run()" />
-      <UButton size="xs" :color="editor.isActive('underline') ? 'primary' : 'neutral'" :variant="editor.isActive('underline') ? 'soft' : 'ghost'" icon="i-lucide-underline" title="Subrayado" @click="editor.chain().focus().toggleUnderline().run()" />
-      <UButton size="xs" :color="editor.isActive('strike') ? 'primary' : 'neutral'" :variant="editor.isActive('strike') ? 'soft' : 'ghost'" icon="i-lucide-strikethrough" title="Tachado" @click="editor.chain().focus().toggleStrike().run()" />
-      <UButton size="xs" :color="editor.isActive('code') ? 'primary' : 'neutral'" :variant="editor.isActive('code') ? 'soft' : 'ghost'" icon="i-lucide-code" title="Código" @click="editor.chain().focus().toggleCode().run()" />
-      <UButton size="xs" :color="editor.isActive('link') ? 'primary' : 'neutral'" :variant="editor.isActive('link') ? 'soft' : 'ghost'" icon="i-lucide-link" title="Enlace" @click="toggleLink" />
+      <UButton size="xs" :color="editor.isActive('bold') ? 'primary' : 'neutral'" :variant="editor.isActive('bold') ? 'soft' : 'ghost'" icon="i-lucide-bold" :title="t('editor.bold')" @click="editor.chain().focus().toggleBold().run()" />
+      <UButton size="xs" :color="editor.isActive('italic') ? 'primary' : 'neutral'" :variant="editor.isActive('italic') ? 'soft' : 'ghost'" icon="i-lucide-italic" :title="t('editor.italic')" @click="editor.chain().focus().toggleItalic().run()" />
+      <UButton size="xs" :color="editor.isActive('underline') ? 'primary' : 'neutral'" :variant="editor.isActive('underline') ? 'soft' : 'ghost'" icon="i-lucide-underline" :title="t('editor.underline')" @click="editor.chain().focus().toggleUnderline().run()" />
+      <UButton size="xs" :color="editor.isActive('strike') ? 'primary' : 'neutral'" :variant="editor.isActive('strike') ? 'soft' : 'ghost'" icon="i-lucide-strikethrough" :title="t('editor.strike')" @click="editor.chain().focus().toggleStrike().run()" />
+      <UButton size="xs" :color="editor.isActive('code') ? 'primary' : 'neutral'" :variant="editor.isActive('code') ? 'soft' : 'ghost'" icon="i-lucide-code" :title="t('editor.code')" @click="editor.chain().focus().toggleCode().run()" />
+      <UButton size="xs" :color="editor.isActive('link') ? 'primary' : 'neutral'" :variant="editor.isActive('link') ? 'soft' : 'ghost'" icon="i-lucide-link" :title="t('editor.link')" @click="toggleLink" />
     </div>
 
     <EditorContent v-if="editor" :editor="editor" />

@@ -21,6 +21,7 @@ const emit = defineEmits<{ published: [], updated: [] }>()
 const { target: editTarget, consumeTarget, notifySaved } = usePostEditor()
 
 const { user, gates } = useAuth()
+const { t, locale } = useI18n()
 const { initials } = useFormat()
 // Fase 14: compuerta «Crear publicaciones» — si el servidor dice que
 // este miembro todavía no alcanza el nivel, el compositor se
@@ -140,26 +141,26 @@ function onInlineImage(e: Event) {
   ;(e.target as HTMLInputElement).value = ''
   if (!file) return
   upload('image', file).then(({ url }) => editorRef.value?.insertImage(url))
-    .catch(err => toast.add({ title: 'No se pudo subir la imagen', description: (err as { data?: { message?: string } }).data?.message || '', color: 'error' }))
+    .catch(err => toast.add({ title: t('composer.imageUploadFailed'), description: (err as { data?: { message?: string } }).data?.message || '', color: 'error' }))
 }
 function onAudio(e: Event) {
   const file = (e.target as HTMLInputElement).files?.[0]
   ;(e.target as HTMLInputElement).value = ''
   if (!file) return
   upload('audio', file).then(({ url }) => editorRef.value?.insertAudio(url))
-    .catch(err => toast.add({ title: 'No se pudo subir el audio', description: (err as { data?: { message?: string } }).data?.message || '', color: 'error' }))
+    .catch(err => toast.add({ title: t('composer.audioUploadFailed'), description: (err as { data?: { message?: string } }).data?.message || '', color: 'error' }))
 }
 function onAttachFile(e: Event) {
   const file = (e.target as HTMLInputElement).files?.[0]
   ;(e.target as HTMLInputElement).value = ''
   if (!file) return
   upload('file', file).then(({ url, name }) => { attachedMedia.value = { type: 'file', url, name } })
-    .catch(err => toast.add({ title: 'No se pudo subir el archivo', description: (err as { data?: { message?: string } }).data?.message || '', color: 'error' }))
+    .catch(err => toast.add({ title: t('composer.fileUploadFailed'), description: (err as { data?: { message?: string } }).data?.message || '', color: 'error' }))
 }
 function insertVideo() {
   if (!videoUrl.value.trim()) return
   if (editorRef.value?.insertVideo(videoUrl.value)) { videoUrl.value = ''; videoPopOpen.value = false }
-  else toast.add({ title: 'Enlace de video no reconocido', description: 'Pegá un enlace de YouTube o Vimeo.', color: 'warning' })
+  else toast.add({ title: t('composer.videoNotRecognized'), description: t('composer.videoNotRecognizedText'), color: 'warning' })
 }
 function insertGif() {
   if (!gifUrl.value.trim()) return
@@ -174,12 +175,12 @@ function insertEmoji(e: string) {
 
 const pendingPreset = ref<'photo' | 'video' | 'poll' | null>(null)
 function openModal(preset?: 'photo' | 'video' | 'poll') {
-  if (!user.value) { toast.add({ title: 'Iniciá sesión para publicar', color: 'warning' }); return }
+  if (!user.value) { toast.add({ title: t('composer.loginToPost'), color: 'warning' }); return }
   // Fase 16: dentro de un canal de «solo el equipo», un miembro no
   // abre el editor: el aviso (en la variante de barra es la alerta
   // fija; en la «bare» va como toast).
   if (staffOnlyChannel.value) {
-    toast.add({ title: 'Solo el equipo puede publicar en este canal', description: 'Podés leer, comentar y reaccionar como siempre.', color: 'warning' })
+    toast.add({ title: t('composer.staffOnlyTitle'), description: t('composer.staffOnlyToastText'), color: 'warning' })
     return
   }
   // Fase 14: con la compuerta de publicación activa para este
@@ -187,8 +188,8 @@ function openModal(preset?: 'photo' | 'video' | 'poll') {
   // de barra además pinta la alerta fija en el lugar del compositor).
   if (createGate.value) {
     toast.add({
-      title: `Necesitás el nivel ${createGate.value.levelName} para publicar`,
-      description: `Tenés ${createGate.value.myPoints} puntos y el nivel se alcanza con ${createGate.value.neededPoints}.`,
+      title: t('composer.gateToastTitle', { level: createGate.value.levelName }),
+      description: t('composer.gateToastText', { mine: createGate.value.myPoints, needed: createGate.value.neededPoints }),
       color: 'warning',
     })
     return
@@ -291,12 +292,12 @@ function discard() {
 
 async function submit(mode: 'now' | 'draft' | 'schedule') {
   if (mode === 'schedule' && !scheduledAt.value) {
-    toast.add({ title: 'Elegí la fecha y hora de publicación', color: 'warning' })
+    toast.add({ title: t('composer.scheduleNeedsDate'), color: 'warning' })
     return
   }
   if (mode !== 'draft' && !canSubmit.value) return
   if (mode === 'draft' && !bodyText.value && !title.value.trim()) {
-    toast.add({ title: 'Escribí algo antes de guardar el borrador', color: 'warning' })
+    toast.add({ title: t('composer.draftNeedsContent'), color: 'warning' })
     return
   }
   publishing.value = true
@@ -319,12 +320,12 @@ async function submit(mode: 'now' | 'draft' | 'schedule') {
       payload.attachmentName = attachedMedia.value.type === 'file' ? attachedMedia.value.name : ''
     }
     const created = await api<{ status?: string }>('/api/posts', { method: 'POST', body: payload })
-    if (mode === 'draft') toast.add({ title: 'Borrador guardado', description: 'Lo encontrás en «Mis borradores».', color: 'success' })
-    else if (mode === 'schedule') toast.add({ title: 'Publicación programada', description: `Se publica el ${new Date(scheduledAt.value).toLocaleString('es', { dateStyle: 'medium', timeStyle: 'short' })}.`, color: 'success' })
+    if (mode === 'draft') toast.add({ title: t('composer.draftSaved'), description: t('composer.draftSavedText'), color: 'success' })
+    else if (mode === 'schedule') toast.add({ title: t('composer.scheduledToast'), description: t('composer.scheduledToastText', { date: new Date(scheduledAt.value).toLocaleString(locale.value === 'en' ? 'en-US' : 'es', { dateStyle: 'medium', timeStyle: 'short' }) }), color: 'success' })
     // Fase 12: con la revisión previa encendida, el servidor devuelve
     // status 'review': el post no se publica todavía.
-    else if (created.status === 'review') toast.add({ title: 'Publicación enviada a revisión', description: 'Un administrador la va a revisar antes de que aparezca en el feed.', color: 'success' })
-    else toast.add({ title: 'Publicación creada', color: 'success' })
+    else if (created.status === 'review') toast.add({ title: t('composer.reviewToast'), description: t('composer.reviewToastText'), color: 'success' })
+    else toast.add({ title: t('composer.createdToast'), color: 'success' })
     confirmDiscard.value = false
     open.value = false
     resetForm()
@@ -332,7 +333,7 @@ async function submit(mode: 'now' | 'draft' | 'schedule') {
     if (props.variant === 'bare') await refreshNuxtData()
   }
   catch (e) {
-    toast.add({ title: 'No se pudo guardar', description: (e as { data?: { message?: string } }).data?.message || (e as Error).message || 'Intentá de nuevo.', color: 'error' })
+    toast.add({ title: t('composer.saveFailed'), description: (e as { data?: { message?: string } }).data?.message || (e as Error).message || t('composer.retryText'), color: 'error' })
   }
   finally { publishing.value = false }
 }
@@ -347,7 +348,7 @@ async function submit(mode: 'now' | 'draft' | 'schedule') {
 async function submitEdit() {
   if (!editId.value || !canSubmitEdit.value) return
   if (editStatus.value === 'scheduled' && !scheduledAt.value) {
-    toast.add({ title: 'Elegí la fecha y hora de publicación', color: 'warning' })
+    toast.add({ title: t('composer.scheduleNeedsDate'), color: 'warning' })
     return
   }
   publishing.value = true
@@ -366,7 +367,7 @@ async function submitEdit() {
     if (user.value?.role === 'admin' && editStatus.value === 'published' && asAnnouncement.value !== originalPinned.value)
       await api(`/api/posts/${id}/pin`, { method: 'POST' })
     notifySaved({ id, title: title.value, body: htmlText(bodyHtml.value), bodyHtml: bodyHtml.value, allowComments: allowComments.value })
-    toast.add({ title: 'Publicación actualizada', color: 'success' })
+    toast.add({ title: t('composer.updatedToast'), color: 'success' })
     confirmDiscard.value = false
     open.value = false
     resetForm()
@@ -374,19 +375,19 @@ async function submitEdit() {
     if (props.variant === 'bare') await refreshNuxtData()
   }
   catch (e) {
-    toast.add({ title: 'No se pudo guardar', description: (e as { data?: { message?: string } }).data?.message || (e as Error).message || 'Intentá de nuevo.', color: 'error' })
+    toast.add({ title: t('composer.saveFailed'), description: (e as { data?: { message?: string } }).data?.message || (e as Error).message || t('composer.retryText'), color: 'error' })
   }
   finally { publishing.value = false }
 }
 
 const chevronItems = computed(() => [
   [{
-    label: scheduleMode.value ? 'Sin programar' : 'Programar…',
+    label: scheduleMode.value ? t('composer.unscheduleOption') : t('composer.scheduleOption'),
     icon: 'i-lucide-calendar-clock',
     onSelect: () => { scheduleMode.value = !scheduleMode.value },
   },
   {
-    label: 'Guardar borrador',
+    label: t('composer.saveDraft'),
     icon: 'i-lucide-save',
     onSelect: () => submit('draft'),
   }],
@@ -400,15 +401,15 @@ const chevronItems = computed(() => [
        un toast: no se pinta una alerta dentro de la barra fija. -->
   <UAlert
     v-if="user && createGate && variant === 'bar'" color="warning" variant="soft" icon="i-lucide-lock"
-    :title="`Necesitás el nivel ${createGate.levelName} para publicar`"
-    :description="`Esta comunidad reserva la publicación a quienes alcanzan ese nivel. Tenés ${createGate.myPoints} puntos y el nivel se alcanza con ${createGate.neededPoints}: participá comentando y reaccionando para llegar.`"
+    :title="t('composer.gateTitle', { level: createGate.levelName })"
+    :description="t('composer.gateText', { mine: createGate.myPoints, needed: createGate.neededPoints })"
   />
   <!-- Fase 16: canal de «solo el equipo» — el compositor se
        reemplaza por el aviso para los miembros sin permiso. -->
   <UAlert
     v-else-if="user && staffOnlyChannel && variant === 'bar'" color="neutral" variant="soft" icon="i-lucide-lock"
-    title="Solo el equipo puede publicar en este canal"
-    description="Las publicaciones nuevas de este canal las hace el equipo de la comunidad. Podés leer, comentar y reaccionar como siempre."
+    :title="t('composer.staffOnlyTitle')"
+    :description="t('composer.staffOnlyText')"
   />
   <div v-else-if="user" :class="variant === 'bare' ? 'contents' : undefined">
     <!-- Disparador externo (variante «bare», Fase 10): la barra
@@ -419,15 +420,15 @@ const chevronItems = computed(() => [
       <div class="flex items-center gap-3 px-4 pt-4">
         <UAvatar :src="user.avatarUrl || undefined" :text="initials(user.name)" size="md" />
         <button type="button" class="min-w-0 flex-1 rounded-full bg-elevated px-4 py-2.5 text-left text-sm text-muted transition hover:bg-accented" @click="openModal()">
-          Escribí algo…
+          {{ t('composer.writeSomething') }}
         </button>
       </div>
       <div class="flex flex-wrap items-center gap-1 px-4 py-3">
-        <UButton color="neutral" variant="ghost" size="sm" icon="i-lucide-image" label="Foto" @click="openModal('photo')" />
-        <UButton color="neutral" variant="ghost" size="sm" icon="i-lucide-video" label="Video" @click="openModal('video')" />
-        <UButton color="neutral" variant="ghost" size="sm" icon="i-lucide-bar-chart-3" label="Encuesta" @click="openModal('poll')" />
+        <UButton color="neutral" variant="ghost" size="sm" icon="i-lucide-image" :label="t('composer.photo')" @click="openModal('photo')" />
+        <UButton color="neutral" variant="ghost" size="sm" icon="i-lucide-video" :label="t('composer.video')" @click="openModal('video')" />
+        <UButton color="neutral" variant="ghost" size="sm" icon="i-lucide-bar-chart-3" :label="t('composer.poll')" @click="openModal('poll')" />
         <span class="flex-1" />
-        <UButton label="Publicar" icon="i-lucide-send" size="sm" @click="openModal()" />
+        <UButton :label="t('composer.publish')" icon="i-lucide-send" size="sm" @click="openModal()" />
       </div>
     </UCard>
 
@@ -441,9 +442,9 @@ const chevronItems = computed(() => [
           <UAvatar v-if="anonymous" icon="i-lucide-venetian-mask" size="lg" :ui="{ root: 'bg-elevated' }" />
           <UAvatar v-else :src="user.avatarUrl || undefined" :text="initials(user.name)" size="lg" />
           <div class="min-w-0 flex-1">
-            <p class="truncate font-semibold">{{ anonymous ? 'Anónimo' : user.name }}</p>
+            <p class="truncate font-semibold">{{ anonymous ? t('composer.anonymousName') : user.name }}</p>
             <div class="flex items-center gap-1 text-sm text-muted">
-              <span>Publicando en</span>
+              <span>{{ t('composer.publishingIn') }}</span>
               <!-- Fase 16-C: al crear se elige el canal; al editar el
                    canal es FIJO (un post no se muda de canal, como en
                    la referencia) y se muestra como texto. -->
@@ -458,25 +459,25 @@ const chevronItems = computed(() => [
             <UButton
               v-if="user.role === 'admin' && (mode === 'create' || editStatus === 'published')" size="sm" :color="asAnnouncement ? 'primary' : 'neutral'"
               :variant="asAnnouncement ? 'soft' : 'ghost'" icon="i-lucide-megaphone"
-              :title="mode === 'edit' ? 'Fijado en el canal (anuncio)' : 'Publicar como anuncio (queda fijado en el canal)'" @click="asAnnouncement = !asAnnouncement"
+              :title="mode === 'edit' ? t('composer.announcementEditTitle') : t('composer.announcementTitle')" @click="asAnnouncement = !asAnnouncement"
             />
             <UButton
               size="sm" :color="anonymous ? 'primary' : 'neutral'" :variant="anonymous ? 'soft' : 'ghost'"
               icon="i-lucide-venetian-mask" :disabled="mode === 'edit'"
-              :title="mode === 'edit' ? 'El anonimato se elige al crear la publicación y no se puede cambiar' : 'Publicar como anónimo: nadie ve tu nombre ni tu perfil'"
+              :title="mode === 'edit' ? t('composer.anonymousEditTitle') : t('composer.anonymousTitle')"
               @click="anonymous = !anonymous"
             />
             <UButton
               size="sm" :color="allowComments ? 'primary' : 'neutral'" :variant="allowComments ? 'soft' : 'ghost'"
               :icon="allowComments ? 'i-lucide-message-circle' : 'i-lucide-message-circle-off'"
-              :title="allowComments ? 'Comentarios permitidos' : 'Comentarios desactivados'" @click="allowComments = !allowComments"
+              :title="allowComments ? t('composer.commentsOnTitle') : t('composer.commentsOffTitle')" @click="allowComments = !allowComments"
             />
             <UButton
               v-if="!isPhone" size="sm" color="neutral" variant="ghost"
               :icon="maximized ? 'i-lucide-minimize-2' : 'i-lucide-maximize-2'"
-              :title="maximized ? 'Reducir' : 'Maximizar'" @click="maximized = !maximized"
+              :title="maximized ? t('composer.minimize') : t('composer.maximize')" @click="maximized = !maximized"
             />
-            <UButton size="sm" color="neutral" variant="ghost" icon="i-lucide-x" title="Cerrar" @click="requestClose" />
+            <UButton size="sm" color="neutral" variant="ghost" icon="i-lucide-x" :title="t('common.close')" @click="requestClose" />
           </div>
         </div>
       </template>
@@ -484,19 +485,19 @@ const chevronItems = computed(() => [
         <div class="space-y-3">
           <input
             v-model="title" type="text" maxlength="160"
-            :placeholder="kind === 'poll' ? 'Título (opcional)' : 'Escribí un título'"
+            :placeholder="kind === 'poll' ? t('composer.pollTitlePlaceholder') : t('composer.titlePlaceholder')"
             class="w-full bg-transparent text-xl font-bold outline-none placeholder:text-dimmed"
           >
           <ClientOnly>
             <RichEditor
               ref="editorRef" v-model="bodyHtml" mode="slash" :upload-image="uploadImage"
-              :placeholder="kind === 'poll' ? '¿Cuál es tu pregunta?' : '¿Qué tenés en mente? Escribí «/» para insertar bloques…'"
+              :placeholder="kind === 'poll' ? t('composer.pollQuestionPlaceholder') : t('composer.bodyPlaceholder')"
             />
           </ClientOnly>
 
           <!-- Panel de encuesta integrado al editor -->
           <div v-if="kind === 'poll'" class="space-y-2 rounded-lg border border-default p-3">
-            <p class="flex items-center gap-2 text-sm font-semibold"><UIcon name="i-lucide-bar-chart-3" /> Opciones de la encuesta</p>
+            <p class="flex items-center gap-2 text-sm font-semibold"><UIcon name="i-lucide-bar-chart-3" /> {{ t('composer.pollOptionsTitle') }}</p>
             <!-- Fase 16-C: en edición las opciones son SOLO LECTURA
                  (regla del producto, la misma de siempre: con votos
                  serían datos falsos y sin votos tampoco se reescribe
@@ -506,15 +507,15 @@ const chevronItems = computed(() => [
               <ul class="list-inside list-disc space-y-1 text-sm text-muted">
                 <li v-for="label in editPollLabels" :key="label">{{ label }}</li>
               </ul>
-              <p class="text-xs text-muted">Las opciones de una encuesta ya creada no se editan: borrá la publicación y creala de nuevo si necesitás cambiarlas.</p>
+              <p class="text-xs text-muted">{{ t('composer.pollOptionsLockedNote') }}</p>
             </template>
             <template v-else>
               <div v-for="(_, i) in pollOptions" :key="i" class="flex items-center gap-2">
-                <UInput v-model="pollOptions[i]" :placeholder="`Opción ${i + 1}`" class="flex-1" maxlength="80" />
+                <UInput v-model="pollOptions[i]" :placeholder="t('composer.optionPlaceholder', { n: i + 1 })" class="flex-1" maxlength="80" />
                 <UButton v-if="pollOptions.length > 2" size="sm" color="neutral" variant="ghost" icon="i-lucide-x" @click="removePollOption(i)" />
               </div>
-              <UButton v-if="pollOptions.length < 4" size="sm" color="neutral" variant="soft" icon="i-lucide-plus" label="Agregar opción" @click="addPollOption" />
-              <p class="text-xs text-muted">Los miembros pueden votar y cambiar su voto. La pregunta es el texto del editor.</p>
+              <UButton v-if="pollOptions.length < 4" size="sm" color="neutral" variant="soft" icon="i-lucide-plus" :label="t('composer.addOption')" @click="addPollOption" />
+              <p class="text-xs text-muted">{{ t('composer.pollNote') }}</p>
             </template>
           </div>
 
@@ -524,54 +525,54 @@ const chevronItems = computed(() => [
                archivo) y quitarlo o reemplazarlo se guarda con el
                resto de la edición. -->
           <div v-if="attachedMedia" class="flex items-center gap-2 rounded-lg border border-default px-3 py-2 text-sm">
-            <img v-if="attachedMedia.type === 'image'" :src="attachedMedia.url" alt="Imagen adjunta" class="h-8 w-8 shrink-0 rounded object-cover">
+            <img v-if="attachedMedia.type === 'image'" :src="attachedMedia.url" :alt="t('composer.attachedImage')" class="h-8 w-8 shrink-0 rounded object-cover">
             <UIcon v-else :name="attachedMedia.type === 'video' ? 'i-lucide-video' : 'i-lucide-paperclip'" class="shrink-0 text-muted" />
-            <span class="min-w-0 flex-1 truncate font-medium">{{ attachedMedia.type === 'file' ? attachedMedia.name : attachedMedia.type === 'image' ? 'Imagen de la publicación' : 'Video de la publicación' }}</span>
-            <UButton size="xs" color="neutral" variant="ghost" icon="i-lucide-x" title="Quitar adjunto" @click="attachedMedia = null" />
+            <span class="min-w-0 flex-1 truncate font-medium">{{ attachedMedia.type === 'file' ? attachedMedia.name : attachedMedia.type === 'image' ? t('composer.attachedImage') : t('composer.attachedVideo') }}</span>
+            <UButton size="xs" color="neutral" variant="ghost" icon="i-lucide-x" :title="t('composer.removeAttachment')" @click="attachedMedia = null" />
           </div>
 
           <div v-if="scheduleMode || (mode === 'edit' && editStatus === 'scheduled')" class="flex flex-wrap items-center gap-2 rounded-lg bg-elevated p-3">
             <UIcon name="i-lucide-calendar-clock" />
-            <span class="text-sm font-medium">Publicar el</span>
+            <span class="text-sm font-medium">{{ t('composer.publishOn') }}</span>
             <UInput v-model="scheduledAt" type="datetime-local" />
           </div>
           <p v-if="mode === 'create'" class="text-xs text-muted">
-            Los borradores y programados quedan en <NuxtLink to="/drafts" class="text-primary hover:underline" @click="open = false">Mis borradores</NuxtLink>.
+            {{ t('composer.draftsNoteBefore') }}<NuxtLink to="/drafts" class="text-primary hover:underline" @click="open = false">{{ t('composer.draftsNoteLink') }}</NuxtLink>.
           </p>
         </div>
       </template>
       <template #footer>
         <!-- Barra inferior de solo iconos, como la referencia -->
         <div class="flex w-full items-center gap-0.5">
-          <UButton size="sm" color="neutral" variant="ghost" icon="i-lucide-plus" title="Insertar bloque (o escribí «/» en el texto)" @click="editorRef?.insertSlash()" />
-          <label class="inline-flex cursor-pointer rounded-md p-2 text-muted transition hover:bg-elevated hover:text-default" title="Insertar imagen">
+          <UButton size="sm" color="neutral" variant="ghost" icon="i-lucide-plus" :title="t('composer.insertBlock')" @click="editorRef?.insertSlash()" />
+          <label class="inline-flex cursor-pointer rounded-md p-2 text-muted transition hover:bg-elevated hover:text-default" :title="t('composer.insertImage')">
             <UIcon name="i-lucide-image" class="text-lg" />
             <input type="file" accept="image/png,image/jpeg,image/webp,image/gif" class="hidden" @change="onInlineImage">
           </label>
           <UPopover v-model:open="videoPopOpen">
-            <UButton size="sm" color="neutral" variant="ghost" icon="i-lucide-video" title="Incrustar video (YouTube o Vimeo)" />
+            <UButton size="sm" color="neutral" variant="ghost" icon="i-lucide-video" :title="t('composer.embedVideo')" />
             <template #content>
               <div class="flex w-80 items-center gap-2 p-3">
-                <UInput v-model="videoUrl" placeholder="Enlace de YouTube o Vimeo…" class="flex-1" size="sm" @keyup.enter="insertVideo" />
-                <UButton size="sm" label="Insertar" @click="insertVideo" />
+                <UInput v-model="videoUrl" :placeholder="t('composer.videoPlaceholder')" class="flex-1" size="sm" @keyup.enter="insertVideo" />
+                <UButton size="sm" :label="t('common.insert')" @click="insertVideo" />
               </div>
             </template>
           </UPopover>
-          <label class="inline-flex cursor-pointer rounded-md p-2 text-muted transition hover:bg-elevated hover:text-default" title="Insertar audio (MP3, M4A, OGG, WAV)">
+          <label class="inline-flex cursor-pointer rounded-md p-2 text-muted transition hover:bg-elevated hover:text-default" :title="t('composer.insertAudio')">
             <UIcon name="i-lucide-music" class="text-lg" />
             <input type="file" accept="audio/*" class="hidden" @change="onAudio">
           </label>
           <UPopover v-model:open="gifPopOpen">
-            <UButton size="sm" color="neutral" variant="ghost" icon="i-lucide-image-play" title="Insertar GIF por enlace" />
+            <UButton size="sm" color="neutral" variant="ghost" icon="i-lucide-image-play" :title="t('composer.insertGif')" />
             <template #content>
               <div class="flex w-80 items-center gap-2 p-3">
-                <UInput v-model="gifUrl" placeholder="Enlace del GIF (https://…)" class="flex-1" size="sm" @keyup.enter="insertGif" />
-                <UButton size="sm" label="Insertar" @click="insertGif" />
+                <UInput v-model="gifUrl" :placeholder="t('composer.gifPlaceholder')" class="flex-1" size="sm" @keyup.enter="insertGif" />
+                <UButton size="sm" :label="t('common.insert')" @click="insertGif" />
               </div>
             </template>
           </UPopover>
           <UPopover v-model:open="emojiPopOpen">
-            <UButton size="sm" color="neutral" variant="ghost" icon="i-lucide-smile" title="Insertar emoji" />
+            <UButton size="sm" color="neutral" variant="ghost" icon="i-lucide-smile" :title="t('composer.insertEmoji')" />
             <template #content>
               <div class="grid w-72 grid-cols-8 gap-0.5 p-2">
                 <button v-for="e in EMOJIS" :key="e" type="button" class="rounded-md p-1.5 text-xl leading-none transition hover:bg-elevated" @click="insertEmoji(e)">{{ e }}</button>
@@ -581,32 +582,32 @@ const chevronItems = computed(() => [
           <UButton
             size="sm" :color="kind === 'poll' ? 'primary' : 'neutral'" :variant="kind === 'poll' ? 'soft' : 'ghost'"
             icon="i-lucide-bar-chart-3" :disabled="mode === 'edit'"
-            :title="mode === 'edit' ? 'El tipo de publicación no se cambia al editar' : 'Encuesta'" @click="kind = kind === 'poll' ? 'post' : 'poll'"
+            :title="mode === 'edit' ? t('composer.pollEditTitle') : t('composer.pollTitle')" @click="kind = kind === 'poll' ? 'post' : 'poll'"
           />
-          <label class="inline-flex cursor-pointer rounded-md p-2 text-muted transition hover:bg-elevated hover:text-default" title="Adjuntar un archivo descargable">
+          <label class="inline-flex cursor-pointer rounded-md p-2 text-muted transition hover:bg-elevated hover:text-default" :title="t('composer.attachFile')">
             <UIcon name="i-lucide-paperclip" class="text-lg" />
             <input type="file" class="hidden" @change="onAttachFile">
           </label>
-          <UButton size="sm" color="neutral" variant="ghost" icon="i-lucide-code-xml" title="Bloque de código" @click="editorRef?.insertCodeBlock()" />
+          <UButton size="sm" color="neutral" variant="ghost" icon="i-lucide-code-xml" :title="t('composer.codeBlock')" @click="editorRef?.insertCodeBlock()" />
           <span class="flex-1" />
-          <UButton color="neutral" variant="ghost" label="Cancelar" @click="requestClose" />
+          <UButton color="neutral" variant="ghost" :label="t('composer.cancel')" @click="requestClose" />
           <!-- Fase 16-C: en edición el botón principal es
                «Actualizar» (sin chevron: no hay programar/borrador
                nuevos sobre un post que ya existe; el programado
                ajusta su fecha en el cuerpo del modal). -->
           <UButton
-            v-if="mode === 'edit'" label="Actualizar" icon="i-lucide-send"
+            v-if="mode === 'edit'" :label="t('composer.update')" icon="i-lucide-send"
             :loading="publishing" :disabled="!canSubmitEdit" @click="submitEdit"
           />
           <div v-else class="flex">
             <UButton
-              :label="scheduleMode ? 'Programar' : 'Publicar'"
+              :label="scheduleMode ? t('composer.schedule') : t('composer.publish')"
               :icon="scheduleMode ? 'i-lucide-calendar-clock' : 'i-lucide-send'"
               :loading="publishing" :disabled="!canSubmit" class="rounded-r-none"
               @click="submit(scheduleMode ? 'schedule' : 'now')"
             />
             <UDropdownMenu :items="chevronItems">
-              <UButton icon="i-lucide-chevron-up" :loading="publishing" class="rounded-l-none border-l border-white/25" title="Más opciones de publicación" />
+              <UButton icon="i-lucide-chevron-up" :loading="publishing" class="rounded-l-none border-l border-white/25" :title="t('composer.morePublishOptions')" />
             </UDropdownMenu>
           </div>
         </div>
@@ -616,14 +617,14 @@ const chevronItems = computed(() => [
     <!-- Confirmación al cerrar con cambios sin guardar -->
     <UModal
       v-model:open="confirmDiscard"
-      :title="mode === 'edit' ? '¿Descartar cambios?' : '¿Descartar publicación?'"
-      :description="mode === 'edit' ? 'Tenés cambios sin guardar en esta publicación.' : 'Tenés contenido sin publicar en el editor.'"
+      :title="mode === 'edit' ? t('composer.discardEditTitle') : t('composer.discardCreateTitle')"
+      :description="mode === 'edit' ? t('composer.discardEditText') : t('composer.discardCreateText')"
     >
       <template #footer>
         <div class="flex w-full flex-wrap justify-end gap-2">
-          <UButton color="neutral" variant="ghost" label="Seguir editando" @click="confirmDiscard = false" />
-          <UButton v-if="mode === 'create'" color="neutral" variant="soft" label="Guardar borrador" icon="i-lucide-save" :loading="publishing" @click="submit('draft')" />
-          <UButton color="error" :label="mode === 'edit' ? 'Descartar cambios' : 'Descartar'" icon="i-lucide-trash-2" @click="discard" />
+          <UButton color="neutral" variant="ghost" :label="t('composer.keepEditing')" @click="confirmDiscard = false" />
+          <UButton v-if="mode === 'create'" color="neutral" variant="soft" :label="t('composer.saveDraft')" icon="i-lucide-save" :loading="publishing" @click="submit('draft')" />
+          <UButton color="error" :label="mode === 'edit' ? t('composer.discardChanges') : t('composer.discard')" icon="i-lucide-trash-2" @click="discard" />
         </div>
       </template>
     </UModal>

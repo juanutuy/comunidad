@@ -1,5 +1,6 @@
 <script setup lang="ts">
 const { user, tenant, logout } = useAuth()
+const { t, navLabel } = useI18n()
 const { initials } = useFormat()
 const api = useApi()
 const router = useRouter()
@@ -62,7 +63,7 @@ const logoSrc = computed(() => {
 })
 // Fase 15: favicon propio del tenant cuando el admin lo configuró.
 useHead(() => ({
-  title: tenant.value?.name || 'Comunidad',
+  title: tenant.value?.name || t('common.community'),
   link: tenant.value?.faviconUrl ? [{ rel: 'icon', href: tenant.value.faviconUrl }] : [],
 }))
 
@@ -90,10 +91,10 @@ async function doLogout() {
 
 const userMenuItems = computed(() => [
   [
-    { label: 'Mi perfil', icon: 'i-lucide-user', to: `/profile/${user.value?.slug}` },
-    { label: 'Mis borradores', icon: 'i-lucide-file-edit', to: '/drafts' },
-    { label: 'Ajustes de cuenta', icon: 'i-lucide-settings-2', onSelect: () => openUserSettings() },
-    { label: 'Notificaciones', icon: 'i-lucide-bell', to: '/notifications' },
+    { label: t('nav.myProfile'), icon: 'i-lucide-user', to: `/profile/${user.value?.slug}` },
+    { label: t('nav.myDrafts'), icon: 'i-lucide-file-edit', to: '/drafts' },
+    { label: t('nav.accountSettings'), icon: 'i-lucide-settings-2', onSelect: () => openUserSettings() },
+    { label: t('nav.notifications'), icon: 'i-lucide-bell', to: '/notifications' },
     // Fase 12: el menú del avatar es personal y corto, como en la
     // referencia. La administración tiene su consola dedicada (Fase
     // 11): acá queda UNA sola entrada, no la lista de secciones.
@@ -101,10 +102,10 @@ const userMenuItems = computed(() => [
     // (administradores, moderadores y encargados de cursos); cada
     // uno aterriza en la consola recortada a su rol.
     ...(['admin', 'moderator', 'course_manager'].includes(user.value?.role || '')
-      ? [{ label: 'Panel de administración', icon: 'i-lucide-settings', to: '/admin' }]
+      ? [{ label: t('nav.adminPanel'), icon: 'i-lucide-settings', to: '/admin' }]
       : []),
   ],
-  [{ label: 'Cerrar sesión', icon: 'i-lucide-log-out', onSelect: doLogout }],
+  [{ label: t('nav.logout'), icon: 'i-lucide-log-out', onSelect: doLogout }],
 ])
 
 {}// Fase 9: el perfil usa todo el ancho con sus tres zonas propias (como
@@ -116,14 +117,14 @@ const isProfilePage = computed(() => route.path.startsWith('/profile/'))
   <div class="min-h-screen bg-neutral-50 dark:bg-neutral-950">
     <header class="sticky top-0 z-40 border-b border-default bg-white/90 backdrop-blur dark:bg-neutral-900/90">
       <div class="relative mx-auto flex h-14 max-w-[1400px] items-center gap-3 px-4">
-        <UButton class="md:hidden" color="neutral" variant="ghost" icon="i-lucide-menu" aria-label="Abrir el menú" @click="openPanel" />
+        <UButton class="md:hidden" color="neutral" variant="ghost" icon="i-lucide-menu" :aria-label="t('nav.openMenu')" @click="openPanel" />
         <NuxtLink to="/feeds" class="flex shrink-0 items-center gap-2">
-          <img v-if="logoSrc" :src="logoSrc" :alt="tenant?.name || 'Comunidad'" class="h-8 max-w-44 object-contain">
+          <img v-if="logoSrc" :src="logoSrc" :alt="tenant?.name || t('common.community')" class="h-8 max-w-44 object-contain">
           <template v-else>
             <span class="flex h-8 w-8 items-center justify-center rounded-lg font-bold text-white" :style="{ backgroundColor: tenant?.brandColor || '#2563eb' }">
               {{ (tenant?.name || 'C').charAt(0) }}
             </span>
-            <span class="hidden font-bold sm:block">{{ tenant?.name || 'Comunidad' }}</span>
+            <span class="hidden font-bold sm:block">{{ tenant?.name || t('common.community') }}</span>
           </template>
         </NuxtLink>
         <nav class="absolute left-1/2 hidden -translate-x-1/2 items-center gap-1 xl:flex">
@@ -132,21 +133,21 @@ const isProfilePage = computed(() => route.path.startsWith('/profile/'))
               v-if="isExternal(item.url)" :href="item.url" target="_blank" rel="noopener"
               class="rounded-full px-3.5 py-1.5 text-sm font-medium whitespace-nowrap text-muted transition hover:bg-elevated hover:text-highlighted"
             >
-              {{ item.label }}
+              {{ navLabel(item) }}
             </a>
             <NuxtLink
               v-else :to="item.url"
               class="rounded-full px-3.5 py-1.5 text-sm font-medium whitespace-nowrap text-muted transition hover:bg-elevated hover:text-highlighted"
               active-class="bg-elevated font-semibold text-highlighted"
             >
-              {{ item.label }}
+              {{ navLabel(item) }}
             </NuxtLink>
           </template>
         </nav>
         <span class="flex-1" />
-        <UButton color="neutral" variant="ghost" icon="i-lucide-search" aria-label="Buscar (Ctrl+K)" @click="openSearch" />
+        <UButton color="neutral" variant="ghost" icon="i-lucide-search" :aria-label="t('nav.searchLabel')" @click="openSearch" />
         <span v-if="user" class="relative hidden sm:inline-flex">
-          <UButton to="/messages" color="neutral" variant="ghost" icon="i-lucide-message-circle" aria-label="Mensajes" />
+          <UButton to="/messages" color="neutral" variant="ghost" icon="i-lucide-message-circle" :aria-label="t('nav.messages')" />
           <span v-if="dmUnread" class="pointer-events-none absolute -top-0.5 -right-0.5 flex h-4.5 min-w-4.5 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">{{ dmUnread }}</span>
         </span>
         <NotificationBell />
@@ -154,7 +155,7 @@ const isProfilePage = computed(() => route.path.startsWith('/profile/'))
         <template v-if="user">
           <!-- En teléfono el avatar abre el panel deslizable (como en
                la referencia); el menú desplegable queda desde md. -->
-          <UButton color="neutral" variant="ghost" class="md:hidden" aria-label="Abrir el menú" @click="openPanel">
+          <UButton color="neutral" variant="ghost" class="md:hidden" :aria-label="t('nav.openMenu')" @click="openPanel">
             <UAvatar :src="user.avatarUrl || undefined" :text="initials(user.name)" size="sm" />
           </UButton>
           <span class="hidden md:inline-flex">
@@ -167,8 +168,8 @@ const isProfilePage = computed(() => route.path.startsWith('/profile/'))
           </span>
         </template>
         <template v-else>
-          <UButton to="/login" color="neutral" variant="ghost" label="Iniciar sesión" />
-          <UButton to="/register" label="Unirse" :style="{ backgroundColor: tenant?.brandColor }" />
+          <UButton to="/login" color="neutral" variant="ghost" :label="t('nav.login')" />
+          <UButton to="/register" :label="t('nav.join')" :style="{ backgroundColor: tenant?.brandColor }" />
         </template>
       </div>
     </header>
@@ -187,17 +188,17 @@ const isProfilePage = computed(() => route.path.startsWith('/profile/'))
                 v-if="isExternal(item.url)" :href="item.url" target="_blank" rel="noopener"
                 class="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-elevated"
               >
-                <UIcon :name="navIcon(item.id)" class="shrink-0" /> {{ item.label }}
+                <UIcon :name="navIcon(item.id)" class="shrink-0" /> {{ navLabel(item) }}
               </a>
               <NuxtLink v-else :to="item.url" class="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-elevated" active-class="bg-elevated font-semibold">
-                <UIcon :name="navIcon(item.id)" class="shrink-0" /> {{ item.label }}
+                <UIcon :name="navIcon(item.id)" class="shrink-0" /> {{ navLabel(item) }}
               </NuxtLink>
             </li>
           </ul>
         </div>
         <div>
           <h3 class="mb-1.5 px-2 text-xs font-bold tracking-wider text-muted uppercase">
-            Canales
+            {{ t('nav.channels') }}
           </h3>
           <div v-for="group in channelData?.groups || []" :key="group.id" class="mb-3">
             <p class="mb-1 px-2 text-[11px] font-semibold tracking-wide text-muted">
@@ -219,7 +220,7 @@ const isProfilePage = computed(() => route.path.startsWith('/profile/'))
           <ul class="space-y-0.5 text-sm">
             <li>
               <NuxtLink to="/admin" class="flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-elevated" active-class="bg-elevated font-semibold">
-                <UIcon name="i-lucide-settings" class="shrink-0" /> Panel de administración
+                <UIcon name="i-lucide-settings" class="shrink-0" /> {{ t('nav.adminPanel') }}
               </NuxtLink>
             </li>
           </ul>
@@ -228,7 +229,7 @@ const isProfilePage = computed(() => route.path.startsWith('/profile/'))
              al menos un dato en Ajustes → Contacto. -->
         <div v-if="hasContact" class="border-t border-default pt-4">
           <h3 class="mb-1.5 px-2 text-xs font-bold tracking-wider text-muted uppercase">
-            Contacto
+            {{ t('nav.contact') }}
           </h3>
           <ul class="space-y-0.5 text-sm">
             <li v-if="tenant?.supportEmail">
@@ -238,7 +239,7 @@ const isProfilePage = computed(() => route.path.startsWith('/profile/'))
             </li>
             <li v-if="tenant?.websiteUrl">
               <a :href="tenant.websiteUrl" target="_blank" rel="noopener" class="flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-elevated">
-                <UIcon name="i-lucide-globe" class="shrink-0" /> Sitio web
+                <UIcon name="i-lucide-globe" class="shrink-0" /> {{ t('nav.website') }}
               </a>
             </li>
           </ul>
@@ -253,9 +254,9 @@ const isProfilePage = computed(() => route.path.startsWith('/profile/'))
           </div>
         </div>
         <UCard v-if="!user" class="text-sm">
-          <p class="font-semibold">Sumate a la conversación</p>
-          <p class="mt-1 text-muted">Creá tu cuenta gratis para publicar, comentar y guardar contenido.</p>
-          <UButton to="/register" class="mt-3" block label="Crear cuenta" />
+          <p class="font-semibold">{{ t('nav.joinCardTitle') }}</p>
+          <p class="mt-1 text-muted">{{ t('nav.joinCardText') }}</p>
+          <UButton to="/register" class="mt-3" block :label="t('nav.createAccount')" />
         </UCard>
       </aside>
 
@@ -270,10 +271,10 @@ const isProfilePage = computed(() => route.path.startsWith('/profile/'))
 
     <footer class="border-t border-default">
       <div class="mx-auto flex max-w-[1400px] flex-wrap items-center gap-x-4 gap-y-1 px-4 py-4 text-xs text-muted">
-        <span>{{ tenant?.name || 'Comunidad' }}</span>
+        <span>{{ tenant?.name || t('common.community') }}</span>
         <span class="flex-1" />
-        <NuxtLink to="/terms" class="hover:underline">Términos y condiciones</NuxtLink>
-        <NuxtLink to="/privacy" class="hover:underline">Política de privacidad</NuxtLink>
+        <NuxtLink to="/terms" class="hover:underline">{{ t('nav.termsLink') }}</NuxtLink>
+        <NuxtLink to="/privacy" class="hover:underline">{{ t('nav.privacyLink') }}</NuxtLink>
       </div>
     </footer>
 
