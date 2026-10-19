@@ -1409,6 +1409,79 @@ el post de bienvenida partía sin fijar, y venía fijado de la
 semilla): se corrigió la prueba con un ciclo completo sobre un
 post nuevo, no el producto.
 
+## Fase 16-C (hecha) — la edición de un post usa EL MISMO compositor del proyecto
+
+A pedido de Juan (con capturas): en la referencia, «Edit Post» abre
+**el mismo compositor** de crear; el nuestro abría un modal aparte
+tipo formulario («Editar publicación», «Título» en una caja con
+borde, «Guardar cambios»). Eso quedó unificado: **hay un solo
+editor de publicaciones en el proyecto** y es `PostComposer`, el
+del feed, ahora con dos modos (`create` / `edit`) sobre el mismo
+modal — imposible que crear y editar se desincronicen:
+
+- **Modo edit**: precarga título, cuerpo rico, estado de anónimo y
+  de comentarios, el adjunto principal y la encuesta. La cabecera
+  es la del compositor: avatar + nombre del autor + «Publicando en
+  # Canal» con el canal **fijo** (un post no se muda de canal, como
+  en la referencia), iconos de anuncio (admin, en publicadas),
+  anónimo y comentarios reflejando el estado del post, expandir y
+  cerrar con la misma confirmación de descarte de siempre. El botón
+  principal es **«Actualizar»**. Sin campos de formulario con
+  etiqueta «Título»/«Contenido» en ninguna parte.
+- **Una sola pieza, tres entradas**: «Editar publicación» de la
+  tarjeta (feed, canal, detalle, perfil, búsqueda, guardados) y el
+  «Editar» de **Mis borradores** abren ese modal en modo edit a
+  través de `usePostEditor`, con el `PostComposer` anfitrión
+  montado una vez en el layout de miembro. El modal de edición de
+  la 16-B (en `PostCard`) y el de borradores (en `/drafts`) se
+  retiraron del código: no quedan dos editores para lo mismo.
+- **Datos que no se pierden al editar**: el `PUT /api/posts/[id]`
+  acepta ahora también `allowComments` y el adjunto principal
+  (`mediaType`/`mediaUrl`/`attachmentName`, con las validaciones
+  de crear) cuando vienen en el cuerpo — el compositor manda
+  siempre el estado actual, así que guardar solo un cambio de
+  texto **conserva el adjunto**; quitarlo o reemplazarlo desde la
+  fila de adjunto del modal también se guarda. Los clientes que no
+  mandan esos campos no tocan ni el adjunto ni los comentarios. En
+  un programado, la fecha se ajusta en el mismo modal («Publicar
+  el») y se guarda con la misma edición. El fijado, si el admin lo
+  cambia en la cabecera, se aplica con el endpoint de fijar de la
+  tarjeta.
+- **Reglas que se mantienen**: el **anónimo no se convierte al
+  editar** (se fija solo al crear, Fase 8 — el PUT ni lo acepta; en
+  el modal el icono refleja el estado y está deshabilitado con su
+  explicación) y las **opciones de la encuesta no se editan** en un
+  post ya creado (en el modal se listan en solo lectura, con el
+  aviso de siempre; con votos, editarlas sería falsear resultados).
+  La pregunta sí se edita, porque es el texto del editor.
+- **Sincronización**: al actualizar, el compositor avisa por
+  `usePostEditor` y la tarjeta aplica el contenido nuevo (título,
+  cuerpo, «Editado», estado de comentarios) sin recargar — también
+  en la búsqueda, que no escucha `@changed` —; «Mis borradores»
+  refresca su lista y el detalle sirve el contenido nuevo.
+
+**Verificación (local, por contenido)**: build 0, typecheck 0,
+suite `test-realtime.mjs` PASS. Batería propia de 30 chequeos
+contra `wrangler dev`, todos PASS, simulando los payloads exactos
+del compositor: crear un post con adjunto de archivo, editarlo sin
+tocar el adjunto → feed y detalle sirven título/cuerpo nuevos con
+«Editado» y el adjunto **sigue**; cerrar comentarios en la misma
+edición → el detalle lo refleja y comentar responde 403, reabrir
+funciona; quitar el adjunto en la edición → el detalle queda sin
+adjunto; un `PUT` viejo (sin los campos nuevos) no pierde ni el
+adjunto ni el estado de comentarios; un miembro ajeno sigue con
+403 al editar; `/api/drafts` trae los campos de precarga
+(`allowComments`, `pinned`, adjunto), el programado cambia su hora
+desde la edición y el borrador editado se publica con el flujo de
+siempre. Greps estructurales: ningún modal `title="Editar
+publicación"` ni «Guardar cambios» en `PostCard`, `/drafts` ni
+`PostComposer` (el ítem del menú «Editar publicación» sigue, es el
+modal el que cambió). Datos de prueba y subidas de la batería
+borrados; la base local quedó en la semilla (7 posts, 0 uploads).
+(La primera corrida de la batería marcó 9 FAIL concentrados en el
+detalle: era la ruta de la prueba — el parámetro es `post`, no
+`slug` —; corregida la prueba, 30/30 sin tocar el producto.)
+
 ## Fase 17 (hecha) — dinero visible: Ingresos y órdenes, moneda del tenant, pagos manuales y página de planes
 
 La sección de dinero de la consola de la referencia, con código y
