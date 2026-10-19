@@ -4,7 +4,7 @@
 -- Es idempotente en tablas (IF NOT EXISTS); los INSERT asumen base vacía.
 
 CREATE TABLE IF NOT EXISTS tenants (id INTEGER PRIMARY KEY AUTOINCREMENT, slug TEXT NOT NULL UNIQUE, name TEXT NOT NULL, tagline TEXT NOT NULL DEFAULT '', brand_color TEXT NOT NULL DEFAULT '#2563eb', guidelines TEXT NOT NULL DEFAULT '[]', created_at TEXT NOT NULL);
-CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, slug TEXT NOT NULL UNIQUE, email TEXT NOT NULL UNIQUE, password_hash TEXT NOT NULL, bio TEXT NOT NULL DEFAULT '', location TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL, avatar_url TEXT NOT NULL DEFAULT '');
+CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, slug TEXT NOT NULL UNIQUE, email TEXT NOT NULL UNIQUE, password_hash TEXT NOT NULL, bio TEXT NOT NULL DEFAULT '', location TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL, avatar_url TEXT NOT NULL DEFAULT '', last_seen_at TEXT NOT NULL DEFAULT '');
 CREATE TABLE IF NOT EXISTS memberships (id INTEGER PRIMARY KEY AUTOINCREMENT, tenant_id INTEGER NOT NULL, user_id INTEGER NOT NULL, role TEXT NOT NULL DEFAULT 'member');
 CREATE TABLE IF NOT EXISTS channel_groups (id INTEGER PRIMARY KEY AUTOINCREMENT, tenant_id INTEGER NOT NULL, name TEXT NOT NULL, sort INTEGER NOT NULL DEFAULT 0);
 CREATE TABLE IF NOT EXISTS channels (id INTEGER PRIMARY KEY AUTOINCREMENT, tenant_id INTEGER NOT NULL, group_id INTEGER, slug TEXT NOT NULL, name TEXT NOT NULL, icon TEXT NOT NULL DEFAULT 'i-lucide-hash', description TEXT NOT NULL DEFAULT '', type TEXT NOT NULL DEFAULT 'free', price_cents INTEGER NOT NULL DEFAULT 0, sort INTEGER NOT NULL DEFAULT 0);
@@ -154,3 +154,17 @@ INSERT INTO library_items (id, tenant_id, title, kind, category, size_label, dow
 INSERT INTO library_items (id, tenant_id, title, kind, category, size_label, downloads, locked, created_at, file_key, file_name) VALUES (4, 1, 'Banco de portadas editables', 'image', 'Recursos Premium', '24 MB', 9, 1, '2026-10-16T10:30:00.141Z', '', '');
 INSERT INTO library_items (id, tenant_id, title, kind, category, size_label, downloads, locked, created_at, file_key, file_name) VALUES (5, 1, 'Audio: rutina de enfoque para crear', 'audio', 'Bienestar', '12 min', 31, 0, '2026-10-07T10:30:00.141Z', '', '');
 INSERT INTO library_items (id, tenant_id, title, kind, category, size_label, downloads, locked, created_at, file_key, file_name) VALUES (6, 1, 'Directorio de herramientas recomendadas', 'link', 'Guías', 'Enlace', 56, 0, '2026-09-24T10:30:00.141Z', '', '');
+
+-- Fase 3 (agregado a mano, espejo de server/utils/seed.ts): chat por
+-- canal, mensajes directos y presencia (users.last_seen_at ya va en el
+-- CREATE de users más arriba; en bases viejas lo suma la migración
+-- automática de la app al primer request).
+CREATE TABLE IF NOT EXISTS chat_messages (id INTEGER PRIMARY KEY AUTOINCREMENT, tenant_id INTEGER NOT NULL, channel_id INTEGER NOT NULL, author_id INTEGER NOT NULL, body TEXT NOT NULL, created_at TEXT NOT NULL);
+CREATE INDEX IF NOT EXISTS chat_messages_channel ON chat_messages (channel_id, id);
+CREATE TABLE IF NOT EXISTS dm_messages (id INTEGER PRIMARY KEY AUTOINCREMENT, tenant_id INTEGER NOT NULL, sender_id INTEGER NOT NULL, recipient_id INTEGER NOT NULL, body TEXT NOT NULL, read_at TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL);
+CREATE INDEX IF NOT EXISTS dm_messages_pair ON dm_messages (tenant_id, sender_id, recipient_id, id);
+CREATE INDEX IF NOT EXISTS dm_messages_unread ON dm_messages (recipient_id, read_at);
+INSERT INTO chat_messages (id, tenant_id, channel_id, author_id, body, created_at) VALUES (1, 1, 1, 2, '¿Alguien más está armando su calendario de contenido esta semana? Yo arranco hoy.', '2026-10-19T09:30:00.141Z');
+INSERT INTO chat_messages (id, tenant_id, channel_id, author_id, body, created_at) VALUES (2, 1, 1, 3, 'Yo lo dejé listo ayer con la plantilla del canal premium. ¡Funciona muy bien!', '2026-10-19T10:30:00.141Z');
+INSERT INTO chat_messages (id, tenant_id, channel_id, author_id, body, created_at) VALUES (3, 1, 1, 1, 'Este jueves lo revisamos en la sesión en vivo: traigan sus borradores y lo pulimos entre todos.', '2026-10-19T10:30:00.141Z');
+INSERT INTO dm_messages (id, tenant_id, sender_id, recipient_id, body, read_at, created_at) VALUES (1, 1, 1, 2, '¡Hola, Marco! ¿Querés compartir tu avance en la sesión en vivo de este mes? Creo que le va a servir a varios.', '', '2026-10-19T08:30:00.141Z');

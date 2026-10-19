@@ -3,12 +3,13 @@
 // `@usuario`. Nunca se notifica a la persona por su propia acción.
 import type { H3Event } from 'h3'
 import { nowIso, dbFor } from './db'
+import { publishRealtime, roomUser } from './realtime'
 
 export interface NotifyInput {
   tenantId: number
   userId: number // destinatario
   actorId: number | null
-  type: 'reaction' | 'comment' | 'new_post' | 'mention'
+  type: 'reaction' | 'comment' | 'new_post' | 'mention' | 'dm'
   title: string
   link: string
 }
@@ -18,6 +19,12 @@ export async function notify(event: H3Event, n: NotifyInput): Promise<void> {
   const db = await dbFor(event)
   await db.prepare('INSERT INTO notifications (tenant_id, user_id, actor_id, type, title, link, is_read, created_at) VALUES (?, ?, ?, ?, ?, ?, 0, ?)')
     .run(n.tenantId, n.userId, n.actorId, n.type, n.title, n.link, nowIso())
+  // Fase 3: empuje en vivo a la sala personal del destinatario para que
+  // su campana se actualice sin esperar el polling (que queda de respaldo).
+  const unread = (await db.prepare('SELECT COUNT(*) AS n FROM notifications WHERE user_id = ? AND is_read = 0').get(n.userId) as { n: number }).n
+  await publishRealtime(event, roomUser(n.tenantId, n.userId), {
+    type: 'notification', title: n.title, link: n.link, kind: n.type, unread,
+  })
 }
 
 // Menciones simples: cualquier `@slug` de un miembro del tenant que

@@ -79,6 +79,11 @@ CREATE INDEX IF NOT EXISTS notifications_user_read ON notifications (user_id, is
 CREATE TABLE IF NOT EXISTS lesson_progress (id INTEGER PRIMARY KEY AUTOINCREMENT, tenant_id INTEGER NOT NULL, user_id INTEGER NOT NULL, lesson_id INTEGER NOT NULL, completed_at TEXT NOT NULL);
 CREATE UNIQUE INDEX IF NOT EXISTS lesson_progress_unique ON lesson_progress (tenant_id, user_id, lesson_id);
 CREATE TABLE IF NOT EXISTS uploads (id INTEGER PRIMARY KEY AUTOINCREMENT, tenant_id INTEGER NOT NULL, user_id INTEGER NOT NULL, key TEXT NOT NULL, filename TEXT NOT NULL DEFAULT '', content_type TEXT NOT NULL DEFAULT '', size INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS chat_messages (id INTEGER PRIMARY KEY AUTOINCREMENT, tenant_id INTEGER NOT NULL, channel_id INTEGER NOT NULL, author_id INTEGER NOT NULL, body TEXT NOT NULL, created_at TEXT NOT NULL);
+CREATE INDEX IF NOT EXISTS chat_messages_channel ON chat_messages (channel_id, id);
+CREATE TABLE IF NOT EXISTS dm_messages (id INTEGER PRIMARY KEY AUTOINCREMENT, tenant_id INTEGER NOT NULL, sender_id INTEGER NOT NULL, recipient_id INTEGER NOT NULL, body TEXT NOT NULL, read_at TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL);
+CREATE INDEX IF NOT EXISTS dm_messages_pair ON dm_messages (tenant_id, sender_id, recipient_id, id);
+CREATE INDEX IF NOT EXISTS dm_messages_unread ON dm_messages (recipient_id, read_at);
 `
 
 // Migraciones aditivas (Fase 2) para bases creadas en la Fase 1 — ya hay
@@ -91,6 +96,9 @@ const MIGRATIONS = [
   `ALTER TABLE lessons ADD COLUMN content TEXT NOT NULL DEFAULT ''`,
   `ALTER TABLE library_items ADD COLUMN file_key TEXT NOT NULL DEFAULT ''`,
   `ALTER TABLE library_items ADD COLUMN file_name TEXT NOT NULL DEFAULT ''`,
+  // Fase 3: última conexión registrada al abrir un WebSocket de tiempo
+  // real (presencia aproximada en perfiles y lista de miembros).
+  `ALTER TABLE users ADD COLUMN last_seen_at TEXT NOT NULL DEFAULT ''`,
 ]
 
 async function runMigrations(db: AsyncDb): Promise<void> {

@@ -12,6 +12,7 @@ interface Badge { id: string, name: string, description: string, icon: string, e
 interface ProfileData {
   profile: {
     id: number, name: string, slug: string, bio: string, location: string, avatarUrl: string, memberSince: string
+    lastSeenAt: string, online: boolean
     points: number, level: { name: string, min: number, nextAt: number | null }, badges: Badge[]
     stats: { posts: number, comments: number, reactionsReceived: number, coursesCompleted: number }
   }
@@ -58,8 +59,10 @@ const tabItems = [
         <div class="min-w-0 flex-1 pt-1">
           <div class="flex flex-wrap items-center gap-2">
             <h1 class="text-2xl font-bold">{{ data.profile.name }}</h1>
+            <UBadge v-if="data.profile.online" color="success" variant="soft" size="lg"><span class="mr-1 h-2 w-2 rounded-full bg-green-500" /> En línea</UBadge>
             <UBadge color="primary" variant="soft" icon="i-lucide-award" size="lg">Nivel {{ data.profile.level.name }}</UBadge>
             <UBadge color="neutral" variant="subtle" size="lg">{{ data.profile.points }} pts</UBadge>
+            <UButton v-if="user && !isOwn" size="sm" variant="soft" icon="i-lucide-message-circle" label="Enviar mensaje" :to="`/messages?with=${data.profile.slug}`" />
           </div>
           <p class="text-sm text-muted">Miembro desde {{ fmtDate(data.profile.memberSince) }}<span v-if="data.profile.location"> · {{ data.profile.location }}</span></p>
           <p class="text-sm text-muted" v-if="data.profile.level.nextAt">Faltan {{ data.profile.level.nextAt - data.profile.points }} pts para el próximo nivel.</p>

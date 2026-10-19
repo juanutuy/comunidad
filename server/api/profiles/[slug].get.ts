@@ -2,6 +2,7 @@
 // publicaciones, comentarios y canales.
 import { POST_SELECT, canAccessChannel, channelBySlug, currentAuth, resolveTenant, serializePost } from '../../utils/community'
 import { badgesFor, levelFor, memberStats } from '../../utils/levels'
+import { isOnline } from '../../utils/chat'
 import { dbFor } from '../../utils/db'
 
 export default defineEventHandler(async (event) => {
@@ -27,6 +28,7 @@ export default defineEventHandler(async (event) => {
     profile: {
       id: user.id, name: user.name, slug: user.slug, bio: user.bio, location: user.location,
       avatarUrl: user.avatar_url || '', memberSince: user.created_at,
+      lastSeenAt: user.last_seen_at || '', online: isOnline(user.last_seen_at as string),
       points: stats.points, level: levelFor(stats.points), badges: badgesFor(stats), stats,
     },
     posts, comments, channels,

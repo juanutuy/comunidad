@@ -24,6 +24,8 @@ export const users = sqliteTable('users', {
   location: text('location').notNull().default(''),
   // Fase 2: se agrega a bases viejas por migración aditiva (ver utils/db.ts).
   avatarUrl: text('avatar_url').notNull().default(''),
+  // Fase 3 (migración aditiva): última conexión por WebSocket de tiempo real.
+  lastSeenAt: text('last_seen_at').notNull().default(''),
   createdAt: text('created_at').notNull(),
 })
 
@@ -198,7 +200,7 @@ export const notifications = sqliteTable('notifications', {
   tenantId: integer('tenant_id').notNull(),
   userId: integer('user_id').notNull().references(() => users.id), // destinatario
   actorId: integer('actor_id'), // quién originó la acción (puede ser null)
-  type: text('type', { enum: ['reaction', 'comment', 'new_post', 'mention'] }).notNull(),
+  type: text('type', { enum: ['reaction', 'comment', 'new_post', 'mention', 'dm'] }).notNull(),
   title: text('title').notNull(),
   link: text('link').notNull().default(''),
   isRead: integer('is_read', { mode: 'boolean' }).notNull().default(false),
@@ -213,6 +215,28 @@ export const uploads = sqliteTable('uploads', {
   filename: text('filename').notNull().default(''),
   contentType: text('content_type').notNull().default(''),
   size: integer('size').notNull().default(0),
+  createdAt: text('created_at').notNull(),
+})
+
+// Fase 3 — tiempo real: chat por canal y mensajes directos. Los mensajes
+// viven en la base (historial por REST); el Durable Object solo transporta
+// los eventos en vivo y la presencia por sala.
+export const chatMessages = sqliteTable('chat_messages', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  tenantId: integer('tenant_id').notNull(),
+  channelId: integer('channel_id').notNull().references(() => channels.id),
+  authorId: integer('author_id').notNull().references(() => users.id),
+  body: text('body').notNull(),
+  createdAt: text('created_at').notNull(),
+})
+
+export const dmMessages = sqliteTable('dm_messages', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  tenantId: integer('tenant_id').notNull(),
+  senderId: integer('sender_id').notNull().references(() => users.id),
+  recipientId: integer('recipient_id').notNull().references(() => users.id),
+  body: text('body').notNull(),
+  readAt: text('read_at').notNull().default(''), // '' = no leído
   createdAt: text('created_at').notNull(),
 })
 

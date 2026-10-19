@@ -25,6 +25,7 @@ const typeIcons: Record<string, string> = {
   comment: 'i-lucide-message-circle',
   new_post: 'i-lucide-pen-square',
   mention: 'i-lucide-at-sign',
+  dm: 'i-lucide-mail',
 }
 
 async function load() {
@@ -58,9 +59,21 @@ function go(n: NotificationView) {
 }
 
 watch(() => user.value?.id, load, { immediate: true })
-onMounted(() => {
+
+// Fase 3: sala personal por WebSocket — la campana se actualiza al
+// instante cuando llega una notificación. El polling de 60 s queda
+// como respaldo (y es el único mecanismo en `npm run dev`).
+const rt = useRealtime()
+let rtHandle: ReturnType<typeof rt.connect> | null = null
+onMounted(async () => {
   const t = setInterval(load, 60000)
   onUnmounted(() => clearInterval(t))
+  if (user.value && await rt.checkAvailable()) {
+    rtHandle = rt.connect('/api/rt/me', (data) => {
+      if (data.type === 'notification') load()
+    })
+    onUnmounted(() => rtHandle?.close())
+  }
 })
 </script>
 

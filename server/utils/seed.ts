@@ -119,6 +119,18 @@ export async function seedIfEmpty(db: AsyncDb) {
   await mkReaction(pVideo, admin, 'fire'); await mkReaction(pVideo, lucia, 'like'); await mkReaction(pVideo, diego, 'fire')
   await mkReaction(pPaid, lucia, 'love')
 
+  // Chat del canal general (Fase 3): conversación semilla breve.
+  const mkChat = async (channelId: number, authorId: number, body: string, created: string) =>
+    run('INSERT INTO chat_messages (tenant_id, channel_id, author_id, body, created_at) VALUES (?, ?, ?, ?, ?)', tenantId, channelId, authorId, body, created)
+  await mkChat(general, member, '¿Alguien más está armando su calendario de contenido esta semana? Yo arranco hoy.', daysAgo(0, 9))
+  await mkChat(general, lucia, 'Yo lo dejé listo ayer con la plantilla del canal premium. ¡Funciona muy bien!', daysAgo(0, 10))
+  await mkChat(general, admin, 'Este jueves lo revisamos en la sesión en vivo: traigan sus borradores y lo pulimos entre todos.', daysAgo(0, 10))
+
+  // Mensaje directo semilla: Valeria le escribe a Marco (queda sin leer
+  // para que member@demo.local vea el indicador de no leídos).
+  await run("INSERT INTO dm_messages (tenant_id, sender_id, recipient_id, body, read_at, created_at) VALUES (?, ?, ?, ?, '', ?)",
+    tenantId, admin, member, '¡Hola, Marco! ¿Querés compartir tu avance en la sesión en vivo de este mes? Creo que le va a servir a varios.', daysAgo(0, 8))
+
   for (const uid of [admin, member, lucia, diego])
     for (const cid of [general, anuncios, ayuda])
       await run('INSERT OR IGNORE INTO follows (tenant_id, user_id, channel_id) VALUES (?, ?, ?)', tenantId, uid, cid)

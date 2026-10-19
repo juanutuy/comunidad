@@ -13,7 +13,7 @@ const TABLES = [
   'tenants', 'users', 'memberships', 'channel_groups', 'channels', 'follows',
   'channel_access', 'posts', 'reactions', 'comments', 'bookmarks', 'courses',
   'chapters', 'lessons', 'lesson_progress', 'enrollments', 'events', 'rsvps',
-  'library_items', 'notifications', 'uploads',
+  'library_items', 'notifications', 'uploads', 'chat_messages', 'dm_messages',
 ]
 
 const db = new Database(join(process.cwd(), 'data', 'comunidad.db'), { readonly: true })

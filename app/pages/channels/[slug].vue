@@ -13,6 +13,11 @@ interface ChannelDetail {
   posts: PostView[]
 }
 const { data, refresh } = await useAsyncData(() => `channel-${slug.value}`, () => api<ChannelDetail>(`/api/channels/${slug.value}`), { watch: [slug] })
+const tab = ref('posts')
+const tabItems = [
+  { label: 'Publicaciones', value: 'posts', icon: 'i-lucide-newspaper' },
+  { label: 'Chat', value: 'chat', icon: 'i-lucide-messages-square' },
+]
 
 async function toggleFollow() {
   if (!user.value) { toast.add({ title: 'Iniciá sesión para seguir canales', color: 'warning' }); return }
@@ -68,7 +73,22 @@ async function demoAccess() {
       </UAlert>
     </UCard>
 
-    <PostCard v-for="post in data.posts" :key="post.id" :post="post" @changed="refresh" />
-    <UAlert v-if="!data.posts.length" color="neutral" variant="soft" title="Sin publicaciones todavía" description="Sé la primera persona en publicar en este canal desde el feed." />
+    <UTabs v-model="tab" :items="tabItems">
+      <template #content="{ item }">
+        <div v-if="item.value === 'posts'" class="mt-4 space-y-5">
+          <PostCard v-for="post in data.posts" :key="post.id" :post="post" @changed="refresh" />
+          <UAlert v-if="!data.posts.length" color="neutral" variant="soft" title="Sin publicaciones todavía" description="Sé la primera persona en publicar en este canal desde el feed." />
+        </div>
+        <UCard v-else class="mt-4">
+          <ChannelChat v-if="user && data.channel.hasAccess" :slug="slug" />
+          <UAlert v-else-if="!user" color="neutral" variant="soft" icon="i-lucide-lock" title="Iniciá sesión para usar el chat" description="El chat de cada canal es solo para miembros con acceso a ese canal.">
+            <template #actions>
+              <UButton size="sm" to="/login" label="Iniciar sesión" />
+            </template>
+          </UAlert>
+          <UAlert v-else color="warning" variant="soft" icon="i-lucide-lock" title="Sin acceso al chat de este canal" description="El chat sigue las mismas reglas que las publicaciones: necesitás acceso a este canal para participar." />
+        </UCard>
+      </template>
+    </UTabs>
   </div>
 </template>

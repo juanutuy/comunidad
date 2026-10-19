@@ -12,6 +12,7 @@ const { data: sidebar } = await useAsyncData('layout-sidebar', () =>
 
 const navItems = [
   { label: 'Feed', icon: 'i-lucide-newspaper', to: '/feeds' },
+  { label: 'Mensajes', icon: 'i-lucide-message-circle', to: '/messages' },
   { label: 'Cursos', icon: 'i-lucide-graduation-cap', to: '/courses' },
   { label: 'Eventos', icon: 'i-lucide-calendar-days', to: '/events' },
   { label: 'Videos', icon: 'i-lucide-play-square', to: '/videos' },
