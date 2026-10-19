@@ -11,8 +11,19 @@ export default defineEventHandler(async (event) => {
   const tenant = await resolveTenant(event)
   const user = await requireUser(event, tenant.id)
   const db = await dbFor(event)
-  const course = await db.prepare('SELECT id, price_cents FROM courses WHERE tenant_id = ? AND slug = ?').get(tenant.id, getRouterParam(event, 'slug')!) as { id: number, price_cents: number } | undefined
-  if (!course) throw createError({ statusCode: 404, message: 'Curso no encontrado.' })
+  const course = await db.prepare('SELECT id, price_cents, status, enroll_limit FROM courses WHERE tenant_id = ? AND slug = ?').get(tenant.id, getRouterParam(event, 'slug')!) as { id: number, price_cents: number, status?: string, enroll_limit?: number } | undefined
+  if (!course || course.status === 'draft') throw createError({ statusCode: 404, message: 'Curso no encontrado.' })
+  // Fase 8: límite de inscritos (0 = sin límite). Un curso secreto o
+  // privado SÍ admite inscripción por enlace directo de un miembro:
+  // la visibilidad afecta a los listados, no a este endpoint.
+  if (Number(course.enroll_limit || 0) > 0) {
+    const already = await db.prepare('SELECT id FROM enrollments WHERE tenant_id = ? AND course_id = ? AND user_id = ?').get(tenant.id, course.id, user.id)
+    if (!already) {
+      const count = (await db.prepare('SELECT COUNT(*) AS n FROM enrollments WHERE tenant_id = ? AND course_id = ?').get(tenant.id, course.id) as { n: number }).n
+      if (count >= Number(course.enroll_limit))
+        throw createError({ statusCode: 400, message: 'Este curso alcanzó su límite de inscritos.' })
+    }
+  }
   if (Number(course.price_cents) > 0) {
     const already = await db.prepare('SELECT id FROM enrollments WHERE tenant_id = ? AND course_id = ? AND user_id = ?').get(tenant.id, course.id, user.id)
     if (!already) {

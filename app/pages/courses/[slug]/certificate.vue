@@ -9,6 +9,7 @@ const { fmtDate } = useFormat()
 
 interface CertData {
   eligible: boolean
+  certificateEnabled: boolean
   progress: { completed: number, total: number, pct: number }
   certificate: { memberName: string, courseTitle: string, communityName: string, finishedAt: string | null } | null
 }
@@ -28,7 +29,13 @@ function printCert() {
     </div>
 
     <UAlert
-      v-if="data && !data.eligible"
+      v-if="data && !data.certificateEnabled"
+      color="neutral" variant="soft" icon="i-lucide-award"
+      title="Este curso no emite certificado"
+      description="La comunidad no habilitó el certificado de finalización para este curso."
+    />
+    <UAlert
+      v-else-if="data && !data.eligible"
       color="warning" variant="soft" icon="i-lucide-lock"
       title="Todavía no completaste el curso"
       :description="`Tu avance es ${data.progress.completed}/${data.progress.total} lecciones (${data.progress.pct}%). El certificado se habilita al llegar al 100%.`"

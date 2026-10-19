@@ -1,6 +1,11 @@
-// Visor de lección: devuelve el contenido si la lección es gratuita o el
-// usuario está inscrito en el curso; si no, 403 con los datos básicos.
+// Visor de lección (Fase 8): devuelve el contenido según el TIPO de
+// lección si el visitante puede verla — lección gratuita (muestra),
+// inscrito o admin — y si no está bloqueada por drip ni por
+// prerrequisito. Sin acceso devuelve los datos básicos y el motivo
+// del candado, nunca el contenido.
 import { currentAuth, resolveTenant } from '../../../../utils/community'
+import { completedLessonIds, courseAccessible, courseCurriculum, enrollmentOf, flattenLessons, lessonAvailability, serializeLessonForViewer } from '../../../../utils/courses'
+import type { CourseRow, LessonRow } from '../../../../utils/courses'
 import { dbFor } from '../../../../utils/db'
 
 export default defineEventHandler(async (event) => {
@@ -8,26 +13,36 @@ export default defineEventHandler(async (event) => {
   const slug = getRouterParam(event, 'slug')!
   const lessonId = Number(getRouterParam(event, 'id'))
   const db = await dbFor(event)
-  const course = await db.prepare('SELECT * FROM courses WHERE tenant_id = ? AND slug = ?').get(tenant.id, slug) as Record<string, unknown> | undefined
+  const course = await db.prepare('SELECT * FROM courses WHERE tenant_id = ? AND slug = ?').get(tenant.id, slug) as unknown as CourseRow | undefined
   if (!course) throw createError({ statusCode: 404, message: 'Curso no encontrado.' })
-  const { role: courseRole } = await currentAuth(event, tenant.id)
-  if (course.status === 'draft' && courseRole !== 'admin') throw createError({ statusCode: 404, message: 'Curso no encontrado.' })
-  const lesson = await db.prepare(`SELECT l.*, ch.title AS chapter_title FROM lessons l JOIN chapters ch ON ch.id = l.chapter_id WHERE l.id = ? AND ch.course_id = ?`).get(lessonId, course.id) as Record<string, unknown> | undefined
+  const { user, role } = await currentAuth(event, tenant.id)
+  const isAdmin = role === 'admin'
+  const enrollment = await enrollmentOf(event, tenant.id, Number(course.id), user?.id ?? null)
+  const enrolled = !!enrollment
+  if (!courseAccessible(course, { loggedIn: !!user, isAdmin, enrolled }))
+    throw createError({ statusCode: 404, message: 'Curso no encontrado.' })
+  // En el visor público solo existen las lecciones publicadas; el
+  // admin las borrador las abre desde el estudio (vista previa).
+  const includeDrafts = isAdmin && getQuery(event).preview === '1'
+  const curriculum = await courseCurriculum(event, Number(course.id), includeDrafts)
+  const flat = flattenLessons(curriculum)
+  const idx = flat.findIndex(l => Number(l.id) === lessonId)
+  const lesson = flat[idx] as LessonRow | undefined
   if (!lesson) throw createError({ statusCode: 404, message: 'Lección no encontrada.' })
-  const { user } = await currentAuth(event, tenant.id)
-  const enrolled = user ? !!await db.prepare('SELECT id FROM enrollments WHERE tenant_id = ? AND course_id = ? AND user_id = ?').get(tenant.id, course.id, user.id) : false
-  const canView = !!lesson.is_free || enrolled
-  const completed = user ? !!await db.prepare('SELECT id FROM lesson_progress WHERE tenant_id = ? AND user_id = ? AND lesson_id = ?').get(tenant.id, user.id, lessonId) : false
-  // Navegación anterior/siguiente dentro del curso (orden del currículum).
-  const all = await db.prepare(`SELECT l.id FROM lessons l JOIN chapters ch ON ch.id = l.chapter_id WHERE ch.course_id = ? ORDER BY ch.sort, l.sort`).all(course.id) as { id: number }[]
-  const idx = all.findIndex(l => l.id === lessonId)
+  const completedIds = await completedLessonIds(event, tenant.id, Number(course.id), user?.id ?? null)
+  const availability = lessonAvailability(course, lesson, {
+    isAdmin, enrolledAt: enrollment?.created_at ?? null,
+    completedIds, prevLessonId: idx > 0 ? Number(flat[idx - 1]!.id) : null,
+  })
+  const canView = (!!lesson.is_free || enrolled || isAdmin) && !availability.locked
   return {
     course: { slug: course.slug, title: course.title, enrolled },
-    lesson: {
-      id: lesson.id, title: lesson.title, chapterTitle: lesson.chapter_title, durationMin: lesson.duration_min,
-      isFree: !!lesson.is_free, content: canView ? lesson.content : '', videoUrl: canView ? (lesson.video_url as string || '') : '', canView, completed,
-    },
-    prevId: idx > 0 ? all[idx - 1]!.id : null,
-    nextId: idx >= 0 && idx < all.length - 1 ? all[idx + 1]!.id : null,
+    lesson: serializeLessonForViewer(lesson, {
+      canView,
+      completed: completedIds.has(lessonId),
+      availability,
+    }),
+    prevId: idx > 0 ? Number(flat[idx - 1]!.id) : null,
+    nextId: idx >= 0 && idx < flat.length - 1 ? Number(flat[idx + 1]!.id) : null,
   }
 })

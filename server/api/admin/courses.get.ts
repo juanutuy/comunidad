@@ -18,7 +18,8 @@ export default defineEventHandler(async (event) => {
       chapters.push({
         id: ch.id, title: ch.title, sort: ch.sort,
         lessons: lessonRows.map(l => ({
-          id: l.id, title: l.title, content: l.content || '', videoUrl: l.video_url || '',
+          id: l.id, title: l.title, kind: (l.kind as string) || 'text', status: (l.status as string) || 'published',
+          content: l.content || '', videoUrl: l.video_url || '',
           durationMin: l.duration_min, isFree: !!l.is_free, sort: l.sort,
         })),
       })
@@ -27,6 +28,8 @@ export default defineEventHandler(async (event) => {
     courses.push({
       id: c.id, slug: c.slug, title: c.title, description: c.description, level: c.level,
       priceCents: c.price_cents, status: c.status || 'published', imageUrl: c.image_url || '',
+      visibility: (c.visibility as string) || 'public', dripMode: (c.drip_mode as string) || 'none',
+      certificateEnabled: c.certificate_enabled === undefined ? true : !!c.certificate_enabled,
       enrolled, chapters,
     })
   }

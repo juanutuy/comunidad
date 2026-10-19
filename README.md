@@ -743,6 +743,97 @@ este entorno y queda declarada. Suite `scripts/test-realtime.mjs` en
 PASS. Semilla local intacta (el estado de prueba vive en `.wrangler`,
 descartable).
 
+## Fase 8 (hecha) — editor rico en dos modos y página-estudio de cursos
+
+La referencia usa DOS familias de editor y acá se igualan ambas con
+un solo componente propio (`app/components/RichEditor.vue`, sobre
+TipTap 3 — solo cliente; el Worker no lo carga):
+
+- **Modo «slash»** (compositor de posts): sin bordes ni cajas dentro
+  del modal; menú «/» con bloques (Texto, H1–H3, lista, lista
+  numerada, lista de tareas, cita, bloque de código, divisor, imagen)
+  y barra flotante al seleccionar texto.
+- **Modo «clásico»** (lecciones, descripción de cursos y de eventos):
+  barra FIJA superior (deshacer/rehacer, B/I/U/S, H1–H3, listas,
+  tareas, cita, código, enlace, imagen, incrustar YouTube).
+
+Todo el HTML pasa por un **sanitizador propio sin dependencias**
+(`server/utils/sanitize.ts`, tokenizador + lista blanca): fuera
+scripts, eventos inline, `javascript:`/`data:` en enlaces e imágenes,
+e iframes salvo embeds de YouTube/Vimeo con host y ruta validados. Se
+sanitiza al guardar Y se re-sanitiza al servir. De cada HTML se
+deriva el texto plano (`posts.body`, descripciones) que usan teasers,
+búsqueda y notificaciones; los posts viejos sin HTML se ven como
+siempre.
+
+**Compositor** (Parte B): título grande integrado, «Publicando en»
+como texto, toggles-icono (anuncio solo admin, **anónimo**,
+comentarios, maximizar), X con cambios → diálogo de descarte
+(Seguir editando / Guardar borrador / Descartar), barra inferior de
+solo iconos (imagen inline, video por URL, audio subido → nodo de
+audio, GIF **solo por URL** — sin picker externo: decisión
+registrada —, emoji con grilla propia, encuesta integrada, adjunto
+con tarjeta de descarga, código), Publicar + chevron (Programar /
+Guardar borrador), pantalla completa en teléfono. **Post anónimo
+real** (`posts.anonymous`): para miembros es «Anónimo» con avatar
+genérico y SIN slug ni ningún dato del autor en ningún serializador
+(feed, detalle, búsqueda, perfil, canal, videos); el admin ve
+«Anónimo (autor: …)»; las notificaciones no nombran al autor; solo se
+elige al crear.
+
+**Página-estudio de cursos** (Parte C, `/admin/courses/[id]/edit`;
+`/admin/courses` quedó como catálogo): cabecera con interruptor
+Publicado/Borrador e **indicador de autoguardado** (todo se guarda
+solo con debounce, sin botón Guardar), pestañas **Curriculum / Drip /
+Enrollments / Settings**. Curriculum con panel fijo (~300 px),
+capítulos y lecciones **reordenables por arrastre** (HTML5 nativo),
+«Add lesson» crea «Sin título» en borrador al instante. **Tipos de
+lección (7, sin quiz): Video, Text, Audio, PDF, Slides, Download,
+Embedded** (`lessons.kind` + campos por tipo; backfill: video solo si
+tenía `video_url` y ningún texto). **El tipo de una lección con
+contenido es inmutable** (lo enforce el servidor; una recién creada,
+vacía, sí puede elegir tipo) — decisión espejo de la referencia, que
+documenta el estudio cuando intentás cambiarlo. Ajustes por lección:
+prerrequisito (bloquea visor y completado), vista previa gratuita
+(visible sin inscripción — en cursos pagos actúa como muestra; no da
+acceso al resto), permitir descarga, recurso descargable adjunto y
+estado borrador/publicada (las borrador no existen para el público;
+el admin las previsualiza con `?preview=1`). **Drip**
+(`courses.drip_mode` = none/enrollment/dates + `unlock_offset_days` /
+`unlock_at` por lección): el visor bloquea con «Disponible el
+{fecha}», el completado responde 403 y el avance no cuenta lecciones
+sin liberar. **Enrollments**: lista real con avance y alta/baja
+manual de miembros (respeta el límite). **Settings**: descripción
+corta + descripción con editor clásico (`description_html`
+sanitizado), Visibility Public/Private/**Secret** (secreto = fuera de
+catálogo, portada y búsqueda; solo enlace directo para inscritos),
+límite de inscritos respetado al inscribir, precio único (los precios
+múltiples quedan fuera: chocan con el billing actual y los planes
+viven en su propia sección), miniatura + **banner** (`banner_url`,
+encabeza la landing) y **certificado por curso**
+(`certificate_enabled`): apagado → al 100% no hay certificado;
+encendido → sí. Los cursos que ya existían quedan ENCENDIDOS (la
+columna nace en 1: no cambia su comportamiento); **los cursos nuevos
+nacen APAGADOS** (opt-in, como la referencia) y se encienden desde
+Settings. El visor público renderiza los 7 tipos (audio con
+reproductor, PDF en visor, slides incrustadas o archivo, descarga,
+embed con sandbox).
+
+**Descripciones con editor clásico** (Parte D): eventos y cursos
+guardan `*_html` sanitizado + texto plano derivado; el detalle renderiza
+el HTML y el admin de eventos edita con la barra clásica.
+
+Verificación (local, `wrangler dev` + D1 local): build y typecheck en
+0; suite propia de 40+ chequeos por API (sanitizador servido, anónimo
+en ambos sentidos, los 7 tipos creados/reordenados/vistos, drip por
+inscripción y por fechas con fecha correcta, prerrequisito,
+certificado apagado/encendido, visibilidad secret/private, límite de
+inscritos, enrollments del estudio, eventos con HTML) en PASS; rutas
+HTML 200; posts semilla sin HTML intactos; cursos semilla abren en el
+estudio sin perder datos (certificado sigue encendido en ellos);
+`scripts/test-realtime.mjs` en PASS. Datos de prueba solo en
+`.wrangler` local (limpiado al terminar).
+
 ## Pendiente a propósito (fuera de esta fase)
 
 - Migraciones versionadas con `drizzle-kit` para D1 (hoy: esquema
