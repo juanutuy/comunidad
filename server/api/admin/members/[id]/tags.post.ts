@@ -1,8 +1,8 @@
 // Asignar las etiquetas privadas de un miembro (solo admin, Fase 14):
 // reemplaza el conjunto completo. Las etiquetas son invisibles para
 // el miembro: nunca salen por APIs públicas.
-import { requireAdmin, resolveTenant } from '../../../../../utils/community'
-import { dbFor } from '../../../../../utils/db'
+import { requireAdmin, resolveTenant } from '../../../../utils/community'
+import { dbFor } from '../../../../utils/db'
 
 export default defineEventHandler(async (event) => {
   const tenant = await resolveTenant(event)

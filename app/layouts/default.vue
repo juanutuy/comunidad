@@ -55,7 +55,10 @@ const userMenuItems = computed(() => [
     // Fase 12: el menú del avatar es personal y corto, como en la
     // referencia. La administración tiene su consola dedicada (Fase
     // 11): acá queda UNA sola entrada, no la lista de secciones.
-    ...(user.value?.role === 'admin'
+    // Fase 14: la entrada a la consola es para todo el staff
+    // (administradores, moderadores y encargados de cursos); cada
+    // uno aterriza en la consola recortada a su rol.
+    ...(['admin', 'moderator', 'course_manager'].includes(user.value?.role || '')
       ? [{ label: 'Panel de administración', icon: 'i-lucide-settings', to: '/admin' }]
       : []),
   ],
@@ -183,7 +186,7 @@ const isProfilePage = computed(() => route.path.startsWith('/profile/'))
                 <UIcon name="i-lucide-shield" class="shrink-0" /> Privacidad
               </NuxtLink>
             </li>
-            <li v-if="user?.role === 'admin'">
+            <li v-if="user && ['admin', 'moderator', 'course_manager'].includes(user.role || '')">
               <NuxtLink to="/admin" class="flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-elevated" active-class="bg-elevated font-semibold">
                 <UIcon name="i-lucide-settings" class="shrink-0" /> Panel de administración
               </NuxtLink>

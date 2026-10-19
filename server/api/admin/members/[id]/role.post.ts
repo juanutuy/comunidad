@@ -3,8 +3,8 @@
 // puede degradar al único administrador del tenant (quedaría sin
 // gestión) — incluye el caso de degradarse a uno mismo siendo el
 // único admin.
-import { requireAdmin, resolveTenant, ROLES } from '../../../../../utils/community'
-import { dbFor } from '../../../../../utils/db'
+import { requireAdmin, resolveTenant, ROLES } from '../../../../utils/community'
+import { dbFor } from '../../../../utils/db'
 
 export default defineEventHandler(async (event) => {
   const tenant = await resolveTenant(event)

@@ -11,8 +11,13 @@
 const props = withDefaults(defineProps<{ channelSlug?: string, variant?: 'bar' | 'bare' }>(), { variant: 'bar' })
 const emit = defineEmits<{ published: [] }>()
 
-const { user } = useAuth()
+const { user, gates } = useAuth()
 const { initials } = useFormat()
+// Fase 14: compuerta «Crear publicaciones» — si el servidor dice que
+// este miembro todavía no alcanza el nivel, el compositor se
+// reemplaza por el aviso (la API también devuelve 403: esto es la
+// explicación anticipada, no la única barrera).
+const createGate = computed(() => gates.value?.createPost?.blocked ? gates.value.createPost : null)
 const api = useApi()
 const toast = useToast()
 
@@ -125,6 +130,17 @@ function insertEmoji(e: string) {
 const pendingPreset = ref<'photo' | 'video' | 'poll' | null>(null)
 function openModal(preset?: 'photo' | 'video' | 'poll') {
   if (!user.value) { toast.add({ title: 'Iniciá sesión para publicar', color: 'warning' }); return }
+  // Fase 14: con la compuerta de publicación activa para este
+  // miembro, el modal ni se abre: el aviso va como toast (la variante
+  // de barra además pinta la alerta fija en el lugar del compositor).
+  if (createGate.value) {
+    toast.add({
+      title: `Necesitás el nivel ${createGate.value.levelName} para publicar`,
+      description: `Tenés ${createGate.value.myPoints} puntos y el nivel se alcanza con ${createGate.value.neededPoints}.`,
+      color: 'warning',
+    })
+    return
+  }
   if (!channelSlug.value || !publishable.value.some(c => c.slug === channelSlug.value)) {
     channelSlug.value = props.channelSlug && publishable.value.some(c => c.slug === props.channelSlug)
       ? props.channelSlug
@@ -229,7 +245,16 @@ const chevronItems = computed(() => [
 </script>
 
 <template>
-  <div v-if="user" :class="variant === 'bare' ? 'contents' : undefined">
+  <!-- Fase 14: en la variante de barra, la compuerta reemplaza al
+       compositor por el aviso. En la variante «bare» (barra inferior
+       móvil) el disparador sigue existiendo y openModal avisa con
+       un toast: no se pinta una alerta dentro de la barra fija. -->
+  <UAlert
+    v-if="user && createGate && variant === 'bar'" color="warning" variant="soft" icon="i-lucide-lock"
+    :title="`Necesitás el nivel ${createGate.levelName} para publicar`"
+    :description="`Esta comunidad reserva la publicación a quienes alcanzan ese nivel. Tenés ${createGate.myPoints} puntos y el nivel se alcanza con ${createGate.neededPoints}: participá comentando y reaccionando para llegar.`"
+  />
+  <div v-else-if="user" :class="variant === 'bare' ? 'contents' : undefined">
     <!-- Disparador externo (variante «bare», Fase 10): la barra
          inferior móvil pone su propio botón y solo usa el modal. -->
     <slot v-if="variant === 'bare'" name="trigger" :open-modal="openModal" />

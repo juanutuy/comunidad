@@ -30,7 +30,7 @@ interface CourseFull {
 interface StudioData { course: CourseFull, chapters: ChapterFull[] }
 
 const { data, refresh } = await useAsyncData(() => `studio-${courseId.value}`, () =>
-  user.value?.role === 'admin' ? api<StudioData>(`/api/admin/courses/${courseId.value}`) : Promise.resolve(null), { watch: [courseId] })
+  ['admin', 'course_manager'].includes(user.value?.role || '') ? api<StudioData>(`/api/admin/courses/${courseId.value}`) : Promise.resolve(null), { watch: [courseId] })
 
 const courseForm = reactive({
   title: '', level: 'Principiante', price: 0, status: 'published', imageUrl: '',
@@ -297,9 +297,9 @@ const allLessons = computed(() => chapters.value.flatMap(ch => ch.lessons.map(l 
 // --- Enrollments ---
 interface EnrollmentRow { id: number, userId: number, name: string, slug: string, email: string, avatarUrl: string, enrolledAt: string, progress: { completed: number, total: number, pct: number } }
 const { data: enrollData, refresh: refreshEnroll } = await useAsyncData(() => `studio-enroll-${courseId.value}`, () =>
-  user.value?.role === 'admin' ? api<{ enrollments: EnrollmentRow[] }>(`/api/admin/courses/${courseId.value}/enrollments`) : Promise.resolve({ enrollments: [] as EnrollmentRow[] }), { watch: [courseId] })
+  ['admin', 'course_manager'].includes(user.value?.role || '') ? api<{ enrollments: EnrollmentRow[] }>(`/api/admin/courses/${courseId.value}/enrollments`) : Promise.resolve({ enrollments: [] as EnrollmentRow[] }), { watch: [courseId] })
 const { data: membersData } = await useAsyncData('studio-members', () =>
-  user.value?.role === 'admin' ? api<{ members: { id: number, name: string, email: string }[] }>('/api/admin/members') : Promise.resolve({ members: [] }))
+  ['admin', 'course_manager'].includes(user.value?.role || '') ? api<{ members: { id: number, name: string, email: string }[] }>('/api/admin/courses/member-options') : Promise.resolve({ members: [] }))
 const memberToAdd = ref<number | undefined>(undefined)
 const addableMembers = computed(() => {
   const enrolledIds = new Set((enrollData.value?.enrollments || []).map(e => e.userId))
@@ -347,7 +347,7 @@ const visibilityOptions = [
     <UAlert v-if="!user" color="warning" variant="soft" icon="i-lucide-lock" title="Iniciá sesión" description="Necesitás una cuenta de administrador para usar el estudio de cursos.">
       <template #actions><UButton to="/" label="Ir al inicio" size="sm" /></template>
     </UAlert>
-    <UAlert v-else-if="user.role !== 'admin'" color="error" variant="soft" icon="i-lucide-shield-alert" title="Sin acceso" description="Esta sección es solo para administradores de la comunidad." />
+    <UAlert v-else-if="user.role !== 'admin'" color="error" variant="soft" icon="i-lucide-shield-alert" title="Sin acceso" description="Esta sección es solo para administradores y encargados de cursos de la comunidad." />
     <UAlert v-else-if="!data" color="neutral" variant="soft" icon="i-lucide-search-x" title="Curso no encontrado" description="Puede que haya sido eliminado.">
       <template #actions><UButton to="/admin/courses" label="Volver a cursos" size="sm" /></template>
     </UAlert>

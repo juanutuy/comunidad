@@ -16,24 +16,39 @@ const route = useRoute()
 const subItems = [
   { value: 'niveles', label: 'Niveles e insignias', icon: 'i-lucide-trophy' },
   { value: 'puntos', label: 'Puntos por acción', icon: 'i-lucide-coins' },
+  // Fase 14: compuertas por nivel (Level Gates) — se guardan con el
+  // mismo PUT, en el campo `gates` (acción → umbral del nivel).
+  { value: 'compuertas', label: 'Compuertas por nivel', icon: 'i-lucide-door-closed' },
 ]
-const tab = computed(() => (route.query.tab === 'puntos' ? 'puntos' : 'niveles'))
+const tab = computed(() => (route.query.tab === 'puntos' ? 'puntos' : route.query.tab === 'compuertas' ? 'compuertas' : 'niveles'))
 
 interface GamLevel { id: number, name: string, min: number, icon: string }
 interface GamPoint { action: string, label: string, description: string, points: number }
-interface GamData { levels: GamLevel[], points: GamPoint[] }
+interface GamGate { action: string, label: string, description: string, levelMin: number }
+interface GamData { levels: GamLevel[], points: GamPoint[], gates: GamGate[] }
 const { data, refresh } = await useAsyncData('admin-gamification', () =>
   user.value?.role === 'admin' ? api<GamData>('/api/admin/gamification') : Promise.resolve(null))
 
 interface LevelDraft { name: string, min: number, icon: string }
 const levels = ref<LevelDraft[]>([])
 const points = reactive<Record<string, number>>({})
+const gates = reactive<Record<string, number>>({})
 watchEffect(() => {
   if (data.value) {
     levels.value = data.value.levels.map(l => ({ name: l.name, min: l.min, icon: l.icon }))
     for (const p of data.value.points) points[p.action] = p.points
+    for (const g of data.value.gates || []) gates[g.action] = g.levelMin
   }
 })
+
+// Las opciones de cada compuerta salen de los niveles TAL COMO
+// QUEDARÍAN al guardar (el borrador de la pestaña de niveles): la
+// compuerta referencia el umbral, así que editar un umbral mueve la
+// referencia al nivel que tenga ese umbral en el borrador.
+const gateOptions = computed(() => [
+  { label: 'Sin compuerta — todas las personas', value: 0 },
+  ...levels.value.filter(l => Number(l.min) > 0).map(l => ({ label: `${l.name} (${Number(l.min)} pts o más)`, value: Number(l.min) })),
+])
 
 function addLevel() {
   const maxMin = levels.value.reduce((acc, l) => Math.max(acc, Number(l.min) || 0), 0)
@@ -52,6 +67,7 @@ async function save() {
       body: {
         levels: levels.value.map(l => ({ name: l.name, min: Number(l.min), icon: l.icon })),
         points: { ...points },
+        gates: { ...gates },
       },
     })
     toast.add({ title: 'Gamificación guardada', description: 'Los perfiles y el ranking ya usan los valores nuevos.', color: 'success' })
@@ -110,6 +126,32 @@ async function save() {
           </div>
         </div>
         <p class="mt-3 text-xs text-muted">El orden de las insignias sale del umbral: al guardar, la lista se ordena de menor a mayor.</p>
+      </UCard>
+
+      <UCard v-else-if="tab === 'compuertas'">
+        <template #header>
+          <h2 class="flex items-center gap-2 font-bold"><UIcon name="i-lucide-door-closed" /> Compuertas por nivel</h2>
+        </template>
+        <p class="mb-4 text-sm text-muted">
+          Frenan el spam de las cuentas nuevas: elegí un nivel mínimo para cada acción y quien no lo
+          alcanzó todavía no puede hacerla — la pantalla le avisa qué nivel necesita y con cuántos
+          puntos se alcanza. Los administradores, moderadores y encargados de cursos NUNCA quedan
+          bloqueados por una compuerta. «Sin compuerta» = la acción está abierta para todos.
+        </p>
+        <div class="space-y-3">
+          <div v-for="g in data?.gates || []" :key="g.action" class="flex flex-wrap items-center gap-3">
+            <span class="min-w-60 flex-1">
+              <span class="block text-sm font-medium">{{ g.label }}</span>
+              <span class="block text-xs text-muted">{{ g.description }}</span>
+            </span>
+            <USelect v-model.number="gates[g.action]" :items="gateOptions" class="w-64" />
+          </div>
+        </div>
+        <UAlert
+          class="mt-4" color="neutral" variant="soft" icon="i-lucide-info"
+          title="Las compuertas siguen al umbral"
+          description="Cada compuerta guarda el umbral de puntos del nivel elegido. Si después cambiás los umbrales en «Niveles e insignias», volvé a revisar esta pestaña: la compuerta queda atada al umbral guardado."
+        />
       </UCard>
 
       <UCard v-else>

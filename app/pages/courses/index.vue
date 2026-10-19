@@ -18,7 +18,7 @@ async function search() {
         <p class="text-muted">Aprendé a tu ritmo con cursos creados por la comunidad.</p>
       </div>
       <div class="flex flex-wrap gap-2">
-        <UButton v-if="user?.role === 'admin'" to="/admin/courses" label="Crear curso" icon="i-lucide-plus" color="primary" />
+        <UButton v-if="user && ['admin', 'course_manager'].includes(user.role || '')" to="/admin/courses" label="Crear curso" icon="i-lucide-plus" color="primary" />
         <UInput v-model="q" placeholder="Buscar cursos…" icon="i-lucide-search" @keyup.enter="search" />
         <UButton label="Buscar" @click="search" />
       </div>
@@ -41,7 +41,7 @@ async function search() {
         </div>
         <div class="mt-4 flex gap-2">
           <UButton :to="`/courses/${c.slug}`" label="Ver curso" size="sm" />
-          <UButton v-if="user?.role === 'admin'" :to="`/admin/courses/${c.id}/edit`" label="Editar" size="sm" color="neutral" variant="soft" icon="i-lucide-pencil" />
+          <UButton v-if="user && ['admin', 'course_manager'].includes(user.role || '')" :to="`/admin/courses/${c.id}/edit`" label="Editar" size="sm" color="neutral" variant="soft" icon="i-lucide-pencil" />
           <UBadge v-if="c.progress.pct === 100 && c.progress.total > 0" color="success" variant="soft" icon="i-lucide-award">Completado</UBadge>
           <UBadge v-else-if="c.enrolled" color="success" variant="soft" icon="i-lucide-check">Inscrito</UBadge>
         </div>

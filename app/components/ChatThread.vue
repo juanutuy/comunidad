@@ -20,6 +20,11 @@ const props = defineProps<{
   typingName?: string
   meId?: number | null
   placeholder?: string
+  // Fase 14: si viene un texto, el compositor se reemplaza por este
+  // aviso (compuerta por nivel de mensajes directos): el hilo se
+  // sigue leyendo, pero no se ofrece un control que el servidor
+  // rechazaría con 403.
+  blockedMessage?: string
 }>()
 const emit = defineEmits<{ send: [body: string], typing: [] }>()
 
@@ -95,7 +100,8 @@ async function submit() {
 
     <p class="mt-2 h-4 text-xs text-muted italic">{{ typingName ? `${typingName} está escribiendo…` : '' }}</p>
 
-    <form class="mt-1 flex items-end gap-2" @submit.prevent="submit">
+    <UAlert v-if="blockedMessage" class="mt-1" color="warning" variant="soft" icon="i-lucide-lock" :title="blockedMessage" />
+    <form v-else class="mt-1 flex items-end gap-2" @submit.prevent="submit">
       <UTextarea v-model="draft" :rows="2" :placeholder="placeholder || 'Escribí un mensaje…'" class="flex-1" @input="emit('typing')" @keydown.enter.exact.prevent="submit" />
       <UButton type="submit" icon="i-lucide-send" label="Enviar" :loading="sending" />
     </form>

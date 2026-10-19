@@ -61,6 +61,8 @@ watch(role, () => refresh())
               <div class="flex flex-wrap items-center gap-2">
                 <NuxtLink :to="`/profile/${m.slug}`" class="font-bold hover:underline">{{ m.name }}</NuxtLink>
                 <UBadge v-if="m.role === 'admin'" color="primary" variant="subtle" size="sm">Admin</UBadge>
+                <UBadge v-else-if="m.role === 'moderator'" color="warning" variant="subtle" size="sm">Moderador</UBadge>
+                <UBadge v-else-if="m.role === 'course_manager'" color="success" variant="subtle" size="sm">Encargado de cursos</UBadge>
                 <UBadge v-if="m.online" color="success" variant="soft" size="sm">En línea</UBadge>
               </div>
               <p class="text-xs text-muted">

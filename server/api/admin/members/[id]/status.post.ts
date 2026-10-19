@@ -6,9 +6,9 @@
 //                (lo corta requireCanWrite en cada escritura).
 // Guardas: nadie se suspende ni se restringe a sí mismo, y el último
 // administrador del tenant no puede salir de 'active'.
-import { requireAdmin, resolveTenant } from '../../../../../utils/community'
-import { dbFor } from '../../../../../utils/db'
-import { applyAutoJoin } from '../../../../../utils/members'
+import { requireAdmin, resolveTenant } from '../../../../utils/community'
+import { dbFor } from '../../../../utils/db'
+import { applyAutoJoin } from '../../../../utils/members'
 
 const STATUSES = ['active', 'suspended', 'restricted']
 

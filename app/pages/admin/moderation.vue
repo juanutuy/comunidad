@@ -32,7 +32,7 @@ interface ReviewPostView {
 interface ModerationData { counts: { pendingReports: number, inReview: number }, reports: ReportView[], reviewPosts: ReviewPostView[] }
 
 const { data, refresh } = await useAsyncData('admin-moderation', () =>
-  user.value?.role === 'admin' ? api<ModerationData>('/api/admin/moderation') : Promise.resolve(null))
+  ['admin', 'moderator'].includes(user.value?.role || '') ? api<ModerationData>('/api/admin/moderation') : Promise.resolve(null))
 
 const tab = computed(() => (route.query.tab === 'revision' ? 'revision' : 'reportes'))
 const subItems = computed(() => [
@@ -101,7 +101,7 @@ async function reviewAction(post: ReviewPostView, action: 'approve' | 'reject') 
       <h1 class="text-2xl font-bold">Moderación</h1>
       <p class="text-muted">Reportes de la comunidad y publicaciones en revisión de {{ tenant?.name }}.</p>
     </div>
-    <UAlert v-if="user && user.role !== 'admin'" color="warning" variant="soft" title="Solo administradores" description="Tu cuenta no tiene rol de administrador en esta comunidad." />
+    <UAlert v-if="user && !['admin', 'moderator'].includes(user.role || '')" color="warning" variant="soft" title="Solo moderación" description="Tu cuenta no tiene rol de administrador ni de moderador en esta comunidad." />
     <UAlert v-else-if="!user" color="neutral" variant="soft" title="Iniciá sesión con una cuenta administradora" />
     <template v-else>
       <AdminSubNav :items="subItems" />

@@ -20,16 +20,28 @@ export interface TenantInfo {
   guidelines: string[]
 }
 
+// Fase 14: estado de una compuerta por nivel para el usuario actual
+// (lo calcula el servidor en /api/tenant): si está bloqueada, la UI
+// avisa en vez de ofrecer el control.
+export interface GateState { blocked: boolean, levelName?: string, neededPoints?: number, myPoints?: number }
+export interface MyGates { createPost: GateState, dm: GateState }
+
 export function useAuth() {
   const user = useState<SessionUser | null>('auth-user', () => null)
   const tenant = useState<TenantInfo | null>('auth-tenant', () => null)
+  // Fase 14: estado de la membresía (active|pending|declined|
+  // suspended|restricted) y compuertas del usuario actual.
+  const status = useState<string | null>('auth-status', () => null)
+  const gates = useState<MyGates | null>('auth-gates', () => null)
   const api = useApi()
 
   async function fetchMe() {
     try {
-      const data = await api<{ tenant: TenantInfo, user: SessionUser | null }>('/api/tenant')
+      const data = await api<{ tenant: TenantInfo, user: SessionUser | null, status?: string | null, gates?: MyGates | null }>('/api/tenant')
       tenant.value = data.tenant
       user.value = data.user
+      status.value = data.status ?? null
+      gates.value = data.gates ?? null
     }
     catch {
       user.value = null
@@ -37,21 +49,30 @@ export function useAuth() {
   }
 
   async function login(email: string, password: string) {
-    const data = await api<{ user: SessionUser }>('/api/auth/login', { method: 'POST', body: { email, password } })
+    const data = await api<{ user: SessionUser, status?: string }>('/api/auth/login', { method: 'POST', body: { email, password } })
     user.value = data.user
-    return data.user
+    status.value = data.status ?? 'active'
+    await fetchMe()
+    return data
   }
 
-  async function register(name: string, email: string, password: string) {
-    const data = await api<{ user: SessionUser }>('/api/auth/register', { method: 'POST', body: { name, email, password } })
+  async function register(name: string, email: string, password: string, extra?: { inviteToken?: string, answers?: string[] }) {
+    const data = await api<{ user: SessionUser, status?: string }>('/api/auth/register', {
+      method: 'POST',
+      body: { name, email, password, inviteToken: extra?.inviteToken, answers: extra?.answers },
+    })
     user.value = data.user
-    return data.user
+    status.value = data.status ?? 'active'
+    await fetchMe()
+    return data
   }
 
   async function logout() {
     await api('/api/auth/logout', { method: 'POST' })
     user.value = null
+    status.value = null
+    gates.value = null
   }
 
-  return { user, tenant, fetchMe, login, register, logout }
+  return { user, tenant, status, gates, fetchMe, login, register, logout }
 }

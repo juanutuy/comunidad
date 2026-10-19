@@ -37,11 +37,17 @@ interface Stats {
   }
   busiestChannels: { id: number, name: string, slug: string, posts: number, comments: number, total: number }[]
   topContributors: { id: number, name: string, slug: string, avatarUrl: string, earned: number, totalPoints: number, levelName: string, levelIcon: string }[]
-  moderation?: { pendingReports: number, inReview: number }
+  moderation?: { pendingReports: number, inReview: number, joinRequests?: number }
   unanswered: { count: number, items: { id: number, title: string, slug: string, channelSlug: string, channelName: string, authorName: string, createdAt: string }[] }
   generatedAt: string
   recentMembers: { id: number, name: string, slug: string, avatarUrl: string, role: string, createdAt: string }[]
 }
+// Fase 14: el Panel es solo del administrador. El resto del staff
+// que entra por «Panel de administración» aterriza en SU sección:
+// el moderador en Moderación y el encargado de cursos en Cursos.
+if (user.value?.role === 'moderator') await navigateTo('/admin/moderation')
+else if (user.value?.role === 'course_manager') await navigateTo('/admin/courses')
+
 const { data: stats } = await useAsyncData('admin-stats', () =>
   user.value?.role === 'admin' ? api<Stats>(`/api/admin/stats?range=${range.value}`) : Promise.resolve(null), { watch: [range] })
 
@@ -127,12 +133,20 @@ const busiestMax = computed(() => Math.max(1, ...(stats.value?.busiestChannels |
            lista corta dentro del mismo bloque. -->
       <UCard>
         <h2 class="mb-3 flex items-center gap-2 font-bold"><UIcon name="i-lucide-bell-ring" /> Necesita tu atención</h2>
-        <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <NuxtLink to="/admin/moderation" class="flex items-center gap-3 rounded-lg border border-default p-3 transition hover:bg-elevated">
             <UIcon name="i-lucide-flag" class="shrink-0 text-xl text-warning" />
             <span class="min-w-0 flex-1">
               <span class="block font-semibold">{{ stats?.moderation?.pendingReports ?? 0 }} reportes por revisar</span>
               <span class="block text-xs text-muted">Contenido reportado por los miembros</span>
+            </span>
+            <UIcon name="i-lucide-chevron-right" class="shrink-0 text-muted" />
+          </NuxtLink>
+          <NuxtLink to="/admin/members/requests" class="flex items-center gap-3 rounded-lg border border-default p-3 transition hover:bg-elevated">
+            <UIcon name="i-lucide-user-plus" class="shrink-0 text-xl text-warning" />
+            <span class="min-w-0 flex-1">
+              <span class="block font-semibold">{{ stats?.moderation?.joinRequests ?? 0 }} solicitudes de ingreso</span>
+              <span class="block text-xs text-muted">Personas esperando aprobación para entrar</span>
             </span>
             <UIcon name="i-lucide-chevron-right" class="shrink-0 text-muted" />
           </NuxtLink>

@@ -8,7 +8,13 @@ const route = useRoute()
 const api = useApi()
 const toast = useToast()
 const rt = useRealtime()
-const { user } = useAuth()
+const { user, gates } = useAuth()
+// Fase 14: compuerta de mensajes directos — el hilo se lee, pero el
+// compositor se reemplaza por el aviso hasta alcanzar el nivel.
+const dmGate = computed(() => gates.value?.dm?.blocked ? gates.value.dm : null)
+const dmBlockedMessage = computed(() => dmGate.value
+  ? `Necesitás el nivel ${dmGate.value.levelName} para enviar mensajes directos. Tenés ${dmGate.value.myPoints} puntos y el nivel se alcanza con ${dmGate.value.neededPoints}.`
+  : undefined)
 const { timeAgo, initials } = useFormat()
 
 interface Member { id: number, name: string, slug: string, avatarUrl: string, role: string, lastSeenAt: string, online: boolean, unread: number }
@@ -250,6 +256,7 @@ onUnmounted(() => {
         </template>
         <ChatThread
           :messages="messages" :live="live" :typing-name="typingName" :me-id="user?.id ?? null"
+          :blocked-message="dmBlockedMessage"
           placeholder="Escribí un mensaje directo…" @send="send" @typing="handle?.sendTyping()"
         />
       </UCard>

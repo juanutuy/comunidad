@@ -11,7 +11,13 @@ async function submit() {
   loading.value = true
   error.value = ''
   try {
-    await login(form.email, form.password)
+    const data = await login(form.email, form.password)
+    // Fase 14: con la solicitud en revisión o rechazada, la sesión
+    // abre pero la comunidad queda detrás de la pantalla de estado.
+    if (data.status === 'pending' || data.status === 'declined') {
+      router.push('/pending')
+      return
+    }
     toast.add({ title: '¡Hola de nuevo!', color: 'success' })
     router.push('/feeds')
   }

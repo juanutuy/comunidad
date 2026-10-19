@@ -237,7 +237,7 @@ const mainLinks = computed(() => [
                 <UIcon name="i-lucide-settings-2" class="shrink-0 text-muted" /> Ajustes de cuenta
               </button>
             </li>
-            <li v-if="user?.role === 'admin'">
+            <li v-if="user && ['admin', 'moderator', 'course_manager'].includes(user.role || '')">
               <NuxtLink to="/admin" class="flex items-center gap-3 rounded-lg px-2 py-2 hover:bg-elevated" active-class="bg-elevated font-semibold" @click="closePanel">
                 <UIcon name="i-lucide-settings" class="shrink-0 text-muted" /> Panel de administración
               </NuxtLink>

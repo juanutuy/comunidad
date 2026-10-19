@@ -6,10 +6,10 @@
 // también se devuelve acá: el administrador puede copiarla y pasarla
 // manualmente. Generar un enlace nuevo invalida los anteriores sin
 // usar de ese miembro.
-import { requireAdmin, resolveTenant } from '../../../../../utils/community'
-import { dbFor, nowIso } from '../../../../../utils/db'
-import { newToken } from '../../../../../utils/members'
-import { sendEmail } from '../../../../../utils/email'
+import { requireAdmin, resolveTenant } from '../../../../utils/community'
+import { dbFor, nowIso } from '../../../../utils/db'
+import { newToken } from '../../../../utils/members'
+import { sendEmail } from '../../../../utils/email'
 
 export default defineEventHandler(async (event) => {
   const tenant = await resolveTenant(event)

@@ -134,7 +134,8 @@ const postMenuItems = computed(() => {
   return [items]
 })
 
-const canDelete = computed(() => !!user.value && (user.value.role === 'admin' || !!props.post.author.mine || user.value.slug === props.post.author.slug))
+// Fase 14: el moderador también puede eliminar publicaciones ajenas.
+const canDelete = computed(() => !!user.value && (['admin', 'moderator'].includes(user.value.role || '') || !!props.post.author.mine || user.value.slug === props.post.author.slug))
 const confirmDelete = ref(false)
 const deleting = ref(false)
 async function deletePost() {

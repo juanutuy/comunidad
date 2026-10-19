@@ -14,12 +14,24 @@ const api = useApi()
 const toast = useToast()
 const route = useRoute()
 
+interface SettingsData {
+  settings: {
+    name: string, tagline: string, brandColor: string, guidelines: string[], terms: string, privacy: string
+    moderationReview?: boolean
+    joinApproval?: boolean, joinQuestions?: string[], joinCooldownDays?: number, autoJoinChannels?: number[]
+  }
+  channels: { id: number, name: string, slug: string, type: string }[]
+}
 const { data } = await useAsyncData('admin-settings', () =>
   user.value?.role === 'admin'
-    ? api<{ settings: { name: string, tagline: string, brandColor: string, guidelines: string[], terms: string, privacy: string, moderationReview?: boolean } }>('/api/admin/settings')
+    ? api<SettingsData>('/api/admin/settings')
     : Promise.resolve(null))
 
-const form = reactive({ name: '', tagline: '', brandColor: '#2563eb', guidelinesText: '', terms: '', privacy: '', moderationReview: false })
+const form = reactive({
+  name: '', tagline: '', brandColor: '#2563eb', guidelinesText: '', terms: '', privacy: '', moderationReview: false,
+  // Fase 14: ingreso de miembros.
+  joinApproval: false, joinQuestions: [] as string[], joinCooldownDays: 0, autoJoin1: 0, autoJoin2: 0,
+})
 watchEffect(() => {
   if (data.value?.settings) {
     form.name = data.value.settings.name
@@ -29,6 +41,11 @@ watchEffect(() => {
     form.terms = data.value.settings.terms || ''
     form.privacy = data.value.settings.privacy || ''
     form.moderationReview = !!data.value.settings.moderationReview
+    form.joinApproval = !!data.value.settings.joinApproval
+    form.joinQuestions = [...(data.value.settings.joinQuestions || [])]
+    form.joinCooldownDays = data.value.settings.joinCooldownDays || 0
+    form.autoJoin1 = data.value.settings.autoJoinChannels?.[0] || 0
+    form.autoJoin2 = data.value.settings.autoJoinChannels?.[1] || 0
   }
 })
 
@@ -36,8 +53,20 @@ const subItems = [
   { value: 'general', label: 'General', icon: 'i-lucide-settings' },
   { value: 'legales', label: 'Textos legales', icon: 'i-lucide-scale' },
   { value: 'moderacion', label: 'Moderación', icon: 'i-lucide-shield-alert' },
+  { value: 'ingreso', label: 'Ingreso de miembros', icon: 'i-lucide-user-plus' },
 ]
-const tab = computed(() => (route.query.tab === 'legales' ? 'legales' : route.query.tab === 'moderacion' ? 'moderacion' : 'general'))
+const tab = computed(() => (route.query.tab === 'legales' ? 'legales' : route.query.tab === 'moderacion' ? 'moderacion' : route.query.tab === 'ingreso' ? 'ingreso' : 'general'))
+
+const channelOptions = computed(() => [
+  { label: 'Ninguno', value: 0 },
+  ...(data.value?.channels || []).map(c => ({ label: `# ${c.name}${c.type === 'private' ? ' (privado)' : c.type === 'paid' ? ' (pago)' : ''}`, value: c.id })),
+])
+function addQuestion() {
+  if (form.joinQuestions.length < 6) form.joinQuestions.push('')
+}
+function removeQuestion(i: number) {
+  form.joinQuestions.splice(i, 1)
+}
 
 const saving = ref(false)
 async function save() {
@@ -53,6 +82,10 @@ async function save() {
         terms: form.terms,
         privacy: form.privacy,
         moderationReview: form.moderationReview,
+        joinApproval: form.joinApproval,
+        joinQuestions: form.joinQuestions,
+        joinCooldownDays: Number(form.joinCooldownDays) || 0,
+        autoJoinChannels: [form.autoJoin1, form.autoJoin2].filter(id => id > 0),
       },
     })
     toast.add({ title: 'Ajustes guardados', color: 'success' })
@@ -106,6 +139,59 @@ async function save() {
           <UFormField label="Política de privacidad" description="Se muestra en /privacy. Si queda vacío se usa un texto por defecto.">
             <UTextarea v-model="form.privacy" :rows="10" class="w-full" placeholder="Texto de privacidad de tu comunidad…" />
           </UFormField>
+        </div>
+      </UCard>
+
+      <UCard v-else-if="tab === 'ingreso'">
+        <div class="space-y-6">
+          <div class="flex items-start justify-between gap-4">
+            <div class="min-w-0">
+              <p class="font-semibold">Aprobación previa para ingresar</p>
+              <p class="mt-1 text-sm text-muted">
+                Apagada, quien se registra entra de inmediato (lo más simple y lo que más convierte).
+                Encendida, cada registro queda en revisión: la persona no puede entrar hasta que un administrador
+                la apruebe desde <NuxtLink to="/admin/members/requests" class="text-primary hover:underline">Miembros → Solicitudes de ingreso</NuxtLink>.
+                Las invitaciones y las altas manuales no pasan por esta revisión: ya son una decisión del equipo.
+              </p>
+            </div>
+            <USwitch v-model="form.joinApproval" aria-label="Activar la aprobación previa para ingresar" />
+          </div>
+
+          <div>
+            <p class="font-semibold">Preguntas de ingreso</p>
+            <p class="mt-1 text-sm text-muted">
+              Hasta 6 preguntas que la persona responde al registrarse (solo se preguntan con la aprobación previa encendida).
+              Las respuestas llegan con la solicitud, para decidir con contexto. {{ form.joinQuestions.length }} de 6.
+            </p>
+            <div class="mt-3 space-y-2">
+              <div v-for="(q, i) in form.joinQuestions" :key="i" class="flex items-center gap-2">
+                <UInput v-model="form.joinQuestions[i]" class="flex-1" maxlength="200" placeholder="Ej.: ¿Qué querés aprender en esta comunidad?" />
+                <UButton color="error" variant="ghost" icon="i-lucide-trash-2" aria-label="Quitar pregunta" @click="removeQuestion(i)" />
+              </div>
+              <UButton v-if="form.joinQuestions.length < 6" size="sm" variant="soft" icon="i-lucide-plus" label="Agregar pregunta" @click="addQuestion" />
+            </div>
+          </div>
+
+          <UFormField label="Tiempo de espera tras un rechazo (días)" description="Cuánto tiene que esperar una persona rechazada antes de poder volver a solicitar el ingreso con el mismo correo. 0 = puede reintentar de inmediato. Rechazar no es suspender: una cuenta suspendida no vuelve por esta vía.">
+            <UInput v-model.number="form.joinCooldownDays" type="number" min="0" max="365" class="w-28" />
+          </UFormField>
+
+          <div>
+            <p class="font-semibold">Canales de auto-ingreso</p>
+            <p class="mt-1 text-sm text-muted">
+              Hasta 2 canales a los que entra automáticamente todo miembro nuevo, llegue como llegue
+              (registro aprobado, invitación o alta manual). Si un canal es privado, el auto-ingreso igual
+              suma a la persona: es tu decisión al elegirlo acá.
+            </p>
+            <div class="mt-3 grid gap-3 sm:grid-cols-2">
+              <UFormField label="Canal 1">
+                <USelect v-model="form.autoJoin1" :items="channelOptions" class="w-full" />
+              </UFormField>
+              <UFormField label="Canal 2">
+                <USelect v-model="form.autoJoin2" :items="channelOptions" class="w-full" />
+              </UFormField>
+            </div>
+          </div>
         </div>
       </UCard>
 

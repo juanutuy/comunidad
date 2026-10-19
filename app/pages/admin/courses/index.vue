@@ -8,7 +8,9 @@
 // crea (nace en borrador y se abre el estudio), se entra y se borra.
 definePageMeta({ layout: 'admin' })
 const { user } = useAuth()
-const isAdmin = computed(() => user.value?.role === 'admin')
+// Fase 14: el catálogo de cursos de la consola también es del
+// encargado de cursos (course_manager), no solo del administrador.
+const isAdmin = computed(() => ['admin', 'course_manager'].includes(user.value?.role || ''))
 const api = useApi()
 const toast = useToast()
 const { fmtMoney } = useFormat()
