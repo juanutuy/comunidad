@@ -10,7 +10,13 @@ export default defineEventHandler(async (event) => {
   const db = await dbFor(event)
   await publishDuePosts(event, tenant.id)
   const hf = hiddenFilterSql(user?.id ?? null)
-  const rows = await db.prepare(`${POST_SELECT} WHERE p.tenant_id = ? AND p.status = 'published'${hf.sql} ORDER BY p.pinned DESC, p.created_at DESC LIMIT 50`).all(tenant.id, ...hf.params) as Record<string, unknown>[]
+  // Fase 7: orden del feed elegido por el lector. «Recientes» (desc,
+  // por defecto) deja los fijados primero; «Antiguos» (asc) es
+  // cronológico simple, sin destacar fijados — así lo hace la
+  // referencia y evita que un anuncio viejo bloquee el orden.
+  const sort = getQuery(event).sort === 'asc' ? 'asc' : 'desc'
+  const orderBy = sort === 'asc' ? 'p.created_at ASC' : 'p.pinned DESC, p.created_at DESC'
+  const rows = await db.prepare(`${POST_SELECT} WHERE p.tenant_id = ? AND p.status = 'published'${hf.sql} ORDER BY ${orderBy} LIMIT 50`).all(tenant.id, ...hf.params) as Record<string, unknown>[]
   const followed = new Set(user
     ? (await db.prepare('SELECT channel_id FROM follows WHERE tenant_id = ? AND user_id = ?').all(tenant.id, user.id) as unknown as { channel_id: number }[]).map(f => f.channel_id)
     : [])

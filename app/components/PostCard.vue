@@ -13,8 +13,10 @@ export interface PostView {
   mediaUrl: string
   pinned: boolean
   kind?: string
+  allowComments?: boolean
+  edited?: boolean
   createdAt: string
-  author: { name: string, slug: string, avatarUrl?: string }
+  author: { name: string, slug: string, avatarUrl?: string, role?: string, online?: boolean }
   channel: { name: string, slug: string, type: string }
   reactions: Record<string, number>
   myReactions: string[]
@@ -109,9 +111,18 @@ async function hidePost() {
   }
   catch { toast.add({ title: 'No se pudo ocultar la publicación', color: 'error' }) }
 }
-const postMenuItems = computed(() => [
-  [{ label: 'Ocultar publicación', icon: 'i-lucide-eye-off', onSelect: hidePost }],
-])
+// Fase 7: el menú «…» de la cabecera reúne las acciones secundarias
+// (ocultar para mí, fijar si soy admin, eliminar si corresponde).
+const postMenuItems = computed(() => {
+  const items: { label: string, icon: string, onSelect: () => void }[] = []
+  if (user.value && user.value.slug !== props.post.author.slug)
+    items.push({ label: 'Ocultar publicación', icon: 'i-lucide-eye-off', onSelect: hidePost })
+  if (user.value?.role === 'admin')
+    items.push({ label: props.post.pinned ? 'Desfijar' : 'Fijar (anuncio)', icon: 'i-lucide-pin', onSelect: togglePin })
+  if (canDelete.value)
+    items.push({ label: 'Eliminar publicación', icon: 'i-lucide-trash-2', onSelect: () => { confirmDelete.value = true } })
+  return [items]
+})
 
 const canDelete = computed(() => !!user.value && (user.value.role === 'admin' || user.value.slug === props.post.author.slug))
 const confirmDelete = ref(false)
@@ -133,26 +144,45 @@ async function deletePost() {
 <template>
   <UCard v-if="!locallyHidden">
     <div class="flex items-start gap-3">
-      <UAvatar :src="post.author.avatarUrl || undefined" :text="initials(post.author.name)" size="md" />
+      <span class="relative shrink-0">
+        <UAvatar :src="post.author.avatarUrl || undefined" :text="initials(post.author.name)" size="md" />
+        <span v-if="post.author.online" class="absolute -right-0.5 -bottom-0.5 h-3 w-3 rounded-full bg-green-500 ring-2 ring-white dark:ring-neutral-900" title="En línea" />
+      </span>
       <div class="min-w-0 flex-1">
-        <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
-          <NuxtLink :to="`/profile/${post.author.slug}`" class="font-semibold hover:underline">
-            {{ post.author.name }}
-          </NuxtLink>
-          <span class="text-muted">en</span>
-          <NuxtLink :to="`/channels/${post.channel.slug}`" class="font-medium text-primary hover:underline">
-            {{ post.channel.name }}
-          </NuxtLink>
-          <span class="text-muted">· {{ timeAgo(post.createdAt) }}</span>
-          <UBadge v-if="post.pinned" color="warning" variant="subtle" icon="i-lucide-pin">
-            Fijado
-          </UBadge>
-          <UBadge v-if="post.kind === 'poll'" color="primary" variant="subtle" icon="i-lucide-bar-chart-3">
-            Encuesta
-          </UBadge>
-          <UBadge v-if="post.channel.type === 'paid'" color="neutral" variant="subtle" icon="i-lucide-crown">
-            Premium
-          </UBadge>
+        <div class="flex items-start gap-2">
+          <div class="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+            <NuxtLink :to="`/profile/${post.author.slug}`" class="font-semibold hover:underline">
+              {{ post.author.name }}
+            </NuxtLink>
+            <UBadge v-if="post.author.role === 'admin'" color="primary" variant="solid" size="sm">
+              Admin
+            </UBadge>
+            <span class="text-muted"># en</span>
+            <NuxtLink :to="`/channels/${post.channel.slug}`" class="font-medium text-primary hover:underline">
+              {{ post.channel.name }}
+            </NuxtLink>
+            <span class="text-muted">· {{ timeAgo(post.createdAt) }}</span>
+            <span v-if="post.edited" class="flex items-center gap-1 text-muted">
+              · <UIcon name="i-lucide-pencil" class="text-xs" /> Editado
+            </span>
+            <UBadge v-if="post.pinned" color="warning" variant="subtle" icon="i-lucide-pin">
+              Fijado
+            </UBadge>
+            <UBadge v-if="post.kind === 'poll'" color="primary" variant="subtle" icon="i-lucide-bar-chart-3">
+              Encuesta
+            </UBadge>
+            <UBadge v-if="post.channel.type === 'paid'" color="neutral" variant="subtle" icon="i-lucide-crown">
+              Premium
+            </UBadge>
+          </div>
+          <UButton
+            size="sm" color="neutral" :variant="localBookmarked ? 'soft' : 'ghost'"
+            :icon="localBookmarked ? 'i-lucide-bookmark-check' : 'i-lucide-bookmark'"
+            :title="localBookmarked ? 'Guardado' : 'Guardar'" class="shrink-0" @click="toggleBookmark"
+          />
+          <UDropdownMenu v-if="user && postMenuItems[0]?.length" :items="postMenuItems" class="shrink-0">
+            <UButton size="sm" color="neutral" variant="ghost" icon="i-lucide-more-horizontal" title="Más acciones" />
+          </UDropdownMenu>
         </div>
 
         <NuxtLink v-if="linkable !== false" :to="`/p/${post.channel.slug}/${post.slug}`" class="mt-1 block text-lg font-bold leading-snug hover:underline">
@@ -222,16 +252,12 @@ async function deletePost() {
             :title="r.label"
             @click="toggleReaction(r.type)"
           />
-          <NuxtLink :to="`/p/${post.channel.slug}/${post.slug}`" class="ml-1">
+          <NuxtLink v-if="post.allowComments !== false" :to="`/p/${post.channel.slug}/${post.slug}`" class="ml-1">
             <UButton size="sm" color="neutral" variant="ghost" icon="i-lucide-message-circle" :label="`${post.commentCount} comentarios`" />
           </NuxtLink>
-          <span class="flex-1" />
-          <UButton size="sm" color="neutral" :variant="localBookmarked ? 'soft' : 'ghost'" icon="i-lucide-bookmark" @click="toggleBookmark" />
-          <UDropdownMenu v-if="user && user.slug !== post.author.slug" :items="postMenuItems">
-            <UButton size="sm" color="neutral" variant="ghost" icon="i-lucide-more-horizontal" title="Más acciones" />
-          </UDropdownMenu>
-          <UButton v-if="user?.role === 'admin'" size="sm" color="neutral" variant="ghost" icon="i-lucide-pin" title="Fijar / desfijar (admin)" @click="togglePin" />
-          <UButton v-if="canDelete" size="sm" color="error" variant="ghost" icon="i-lucide-trash-2" title="Eliminar publicación" @click="confirmDelete = true" />
+          <span v-else class="ml-1 flex items-center gap-1.5 px-2 text-sm text-muted" title="El autor desactivó los comentarios">
+            <UIcon name="i-lucide-lock" /> Comentarios desactivados
+          </span>
         </div>
 
         <UModal v-model:open="confirmDelete" title="Eliminar publicación" description="Esta acción no se puede deshacer: se borran también sus comentarios y reacciones.">

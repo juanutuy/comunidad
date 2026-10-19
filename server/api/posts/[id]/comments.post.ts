@@ -12,8 +12,11 @@ export default defineEventHandler(async (event) => {
   const text = (body.body || '').trim()
   if (!text) throw createError({ statusCode: 400, message: 'El comentario no puede estar vacío.' })
   const db = await dbFor(event)
-  const post = await db.prepare(`SELECT p.author_id, p.title, p.slug, c.slug AS channel_slug FROM posts p JOIN channels c ON c.id = p.channel_id WHERE p.id = ? AND p.tenant_id = ? AND p.status = 'published'`).get(postId, tenant.id) as { author_id: number, title: string, slug: string, channel_slug: string } | undefined
+  const post = await db.prepare(`SELECT p.author_id, p.title, p.slug, p.allow_comments, c.slug AS channel_slug FROM posts p JOIN channels c ON c.id = p.channel_id WHERE p.id = ? AND p.tenant_id = ? AND p.status = 'published'`).get(postId, tenant.id) as { author_id: number, title: string, slug: string, allow_comments: number, channel_slug: string } | undefined
   if (!post) throw createError({ statusCode: 404, message: 'Publicación no encontrada.' })
+  // Fase 7: el autor pudo desactivar los comentarios al publicar.
+  if (post.allow_comments === 0)
+    throw createError({ statusCode: 403, message: 'Los comentarios están desactivados en esta publicación.' })
   const id = Number((await db.prepare('INSERT INTO comments (tenant_id, post_id, author_id, body, created_at) VALUES (?, ?, ?, ?, ?)')
     .run(tenant.id, postId, user.id, text, nowIso())).lastInsertRowId)
   const link = `/p/${post.channel_slug}/${post.slug}`

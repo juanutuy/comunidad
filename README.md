@@ -537,6 +537,74 @@ bloqueos de la Fase 5 intacta y la suite de tiempo real
 errores. Migraciones aditivas e idempotentes; `scripts/d1-init.sql`
 regenerado con las 39 tablas.
 
+## Fase 7 (hecha) — paridad visual del Home/Feed
+
+Fase de diseño y presentación comparada con EzyCommunity: mismas
+funciones, acabado de red social en vez de panel.
+
+- **Marco**: barra superior con logo/nombre de la comunidad, la
+  navegación principal en **pastillas centradas** (Inicio / Cursos /
+  Eventos / Miembros / Ranking, activa resaltada), buscador, icono de
+  **mensajes con badge de no leídos** (suma por conversación de
+  `/api/members`), campana y menú de avatar. Barra lateral con
+  accesos Videos y Biblioteca, sección **Canales** por grupos (`#`,
+  corona en pagos, candado en privados) y enlaces al pie (Precios,
+  Reglas, Términos, Privacidad, Panel de administración si es admin).
+  En móvil: hamburguesa para los canales y fila deslizable con todos
+  los destinos. El riel derecho sigue como tercera columna en
+  pantallas anchas; `/admin` conserva su navegación interna.
+- **Cabecera del feed**: tarjeta con banner en degradado del color de
+  marca del tenant + nombre y lema, y franja **«Feed»** con selector
+  de orden **Recientes / Antiguos** que ordena de verdad (parámetro
+  `sort` en `GET /api/feed`: `desc` por defecto con los fijados
+  primero; `asc` cronológico simple, sin destacar fijados).
+- **Compositor compacto + editor en modal** (`PostComposer.vue`,
+  reusado en el feed y en cada canal con el canal preseleccionado):
+  barra con avatar, campo «Escribí algo…» y atajos Foto / Video /
+  Encuesta que abren el **modal** ya posicionados. El modal trae
+  «Publicando en» con selector de canal, Título y cuerpo, adjuntos
+  (foto subida o por URL, video de YouTube), constructor de encuesta
+  de 2–4 opciones, y dos toggles nuevos: **«Permitir comentarios»**
+  (`posts.allow_comments`, migración aditiva; apagado → el detalle
+  avisa «Los comentarios están desactivados» y
+  `POST /api/posts/[id]/comments` responde **403**) y **«Publicar
+  como anuncio»** (solo admin: nace fijado; un `pin=true` de un
+  miembro se ignora en el servidor). El botón **Publicar** lleva
+  chevron con **«Programar…»** (fecha/hora → queda `scheduled`,
+  publicación perezosa de la Fase 5) y **«Guardar borrador»** (queda
+  en `/drafts`). Sin «Go Live» ni post anónimo: no existen en el
+  producto y no se fingen.
+- **Tarjeta de post**: avatar con **punto de presencia** del autor
+  (`last_seen_at`, como en perfiles), **insignia de rol** «Admin»
+  junto al nombre, línea «# en {Canal} · hace X · **Editado**»
+  (`posts.edited_at`, migración aditiva: se completa al editar un
+  borrador/programado por el `PUT` existente), **bookmark y menú «…»**
+  arriba a la derecha (el menú reúne Ocultar / Fijar / Eliminar), y el
+  botón de comentar pasa a mostrar candado «Comentarios desactivados»
+  cuando el post no los permite.
+- **Riel derecho**: bloques con título en mayúsculas y «Ver todo» —
+  **Próximos eventos** con **cuadrado de fecha** (mes, día grande,
+  día de semana) + título + hora + anfitrión (`host_name` nuevo en
+  `/api/sidebar`), Publicaciones recientes, Top líderes, **Miembros**
+  (bloque nuevo, en línea primero con su punto) y **En línea (n)**.
+- **Página de canal**: cabecera compacta con franja de marca, nombre
+  con `#`, descripción, tipo/acceso como estaba, y el mismo
+  compositor compacto en la pestaña de publicaciones.
+
+Verificado en local con `wrangler dev` (suite de 24 comprobaciones
+contra la API): orden Antiguos invierte el cronológico y Recientes
+deja los fijados primero; publicar texto y encuesta desde los
+payloads del modal; comentar con comentarios desactivados = 403 con
+su mensaje y `allowComments=false` en el modelo; anuncio del admin
+nace fijado y primero, `pin` de miembro ignorado; programado y
+borrador fuera del feed y presentes en `/api/drafts`; editar un
+borrador y publicarlo deja `edited=true`; sidebar con `members[]` y
+`host_name`; SSR del feed con el banner, la franja «Feed», el
+selector y la barra del compositor. Suite
+`scripts/test-realtime.mjs` en PASS y rutas `/ /feeds /courses
+/events /members /leaderboard /messages /admin /channels/general
+/p/:canal/:post` en 200. Build y typecheck en 0 errores.
+
 ## Pendiente a propósito (fuera de esta fase)
 
 - Migraciones versionadas con `drizzle-kit` para D1 (hoy: esquema

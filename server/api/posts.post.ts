@@ -20,6 +20,10 @@ interface CreateBody {
   options?: string[]
   status?: string
   scheduledAt?: string
+  // Fase 7: «Permitir comentarios» del editor (por defecto sí) y
+  // «Publicar como anuncio» (solo admin: nace fijado).
+  allowComments?: boolean
+  pin?: boolean
 }
 
 export default defineEventHandler(async (event) => {
@@ -59,12 +63,16 @@ export default defineEventHandler(async (event) => {
   }
 
   const mediaType = kind === 'poll' ? 'none' : ['image', 'video'].includes(body.mediaType || '') ? body.mediaType! : 'none'
+  const allowComments = body.allowComments === false ? 0 : 1
+  // «Publicar como anuncio» solo tiene efecto para el admin: un miembro
+  // no puede fijar su propio post mandando pin=true.
+  const pinned = body.pin === true && role === 'admin' ? 1 : 0
   const db = await dbFor(event)
   let slug = slugify(title)
   if (await db.prepare('SELECT id FROM posts WHERE channel_id = ? AND slug = ?').get(channel.id, slug))
     slug = `${slug}-${Math.floor(Math.random() * 9000 + 1000)}`
-  const id = Number((await db.prepare('INSERT INTO posts (tenant_id, channel_id, author_id, slug, title, body, teaser, media_type, media_url, pinned, created_at, status, scheduled_at, kind) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?)')
-    .run(tenant.id, channel.id, user.id, slug, title, text, text.slice(0, 160), mediaType, kind === 'poll' ? '' : (body.mediaUrl || '').trim(), nowIso(), status, scheduledAt, kind)).lastInsertRowId)
+  const id = Number((await db.prepare('INSERT INTO posts (tenant_id, channel_id, author_id, slug, title, body, teaser, media_type, media_url, pinned, created_at, status, scheduled_at, kind, allow_comments) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+    .run(tenant.id, channel.id, user.id, slug, title, text, text.slice(0, 160), mediaType, kind === 'poll' ? '' : (body.mediaUrl || '').trim(), pinned, nowIso(), status, scheduledAt, kind, allowComments)).lastInsertRowId)
   for (let i = 0; i < options.length; i++) {
     await db.prepare('INSERT INTO poll_options (tenant_id, post_id, label, sort) VALUES (?, ?, ?, ?)')
       .run(tenant.id, id, options[i], i + 1)

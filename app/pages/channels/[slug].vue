@@ -3,7 +3,7 @@ import type { PostView } from '~/components/PostCard.vue'
 
 const route = useRoute()
 const slug = computed(() => String(route.params.slug))
-const { user } = useAuth()
+const { user, tenant } = useAuth()
 const { fmtMoney } = useFormat()
 const api = useApi()
 const toast = useToast()
@@ -51,35 +51,39 @@ async function buyAccess() {
 
 <template>
   <div v-if="data" class="space-y-5">
-    <UCard>
-      <div class="flex flex-wrap items-start gap-4">
-        <span class="flex h-12 w-12 items-center justify-center rounded-xl bg-elevated">
-          <UIcon :name="data.channel.icon" class="text-2xl" />
-        </span>
-        <div class="min-w-0 flex-1">
-          <h1 class="flex flex-wrap items-center gap-2 text-2xl font-bold">
-            {{ data.channel.name }}
-            <UBadge v-if="data.channel.type === 'paid'" color="warning" variant="subtle" icon="i-lucide-crown">
-              Pago · {{ fmtMoney(data.channel.priceCents) }}
-            </UBadge>
-            <UBadge v-else-if="data.channel.type === 'private'" color="neutral" variant="subtle" icon="i-lucide-lock">
-              Privado
-            </UBadge>
-            <UBadge v-else color="success" variant="subtle">
-              Gratuito
-            </UBadge>
-          </h1>
-          <p class="mt-1 text-muted">{{ data.channel.description }}</p>
+    <!-- Cabecera compacta del canal (Fase 7): franja de marca + datos. -->
+    <UCard :ui="{ body: 'p-0 sm:p-0' }" class="overflow-hidden">
+      <div class="h-14" :style="{ background: `linear-gradient(120deg, ${tenant?.brandColor || '#2563eb'} 0%, ${tenant?.brandColor || '#2563eb'}80 100%)` }" />
+      <div class="px-5 py-4">
+        <div class="flex flex-wrap items-start gap-4">
+          <span class="-mt-9 flex h-12 w-12 items-center justify-center rounded-xl bg-white shadow ring-1 ring-black/5 dark:bg-neutral-900">
+            <UIcon :name="data.channel.icon" class="text-2xl" />
+          </span>
+          <div class="min-w-0 flex-1">
+            <h1 class="flex flex-wrap items-center gap-2 text-2xl font-bold">
+              # {{ data.channel.name }}
+              <UBadge v-if="data.channel.type === 'paid'" color="warning" variant="subtle" icon="i-lucide-crown">
+                Pago · {{ fmtMoney(data.channel.priceCents) }}
+              </UBadge>
+              <UBadge v-else-if="data.channel.type === 'private'" color="neutral" variant="subtle" icon="i-lucide-lock">
+                Privado
+              </UBadge>
+              <UBadge v-else color="success" variant="subtle">
+                Gratuito
+              </UBadge>
+            </h1>
+            <p class="mt-1 text-muted">{{ data.channel.description }}</p>
+          </div>
+          <UButton
+            :color="data.channel.following ? 'neutral' : 'primary'"
+            :variant="data.channel.following ? 'soft' : 'solid'"
+            :icon="data.channel.following ? 'i-lucide-check' : 'i-lucide-plus'"
+            :label="data.channel.following ? 'Siguiendo' : 'Seguir'"
+            @click="toggleFollow"
+          />
         </div>
-        <UButton
-          :color="data.channel.following ? 'neutral' : 'primary'"
-          :variant="data.channel.following ? 'soft' : 'solid'"
-          :icon="data.channel.following ? 'i-lucide-check' : 'i-lucide-plus'"
-          :label="data.channel.following ? 'Siguiendo' : 'Seguir'"
-          @click="toggleFollow"
-        />
       </div>
-      <UAlert v-if="data.channel.type === 'paid' && !data.channel.hasAccess" class="mt-4" color="warning" variant="soft" icon="i-lucide-lock" title="Este es un canal pago" :description="billing?.enabled ? 'Con acceso ves todas las publicaciones completas y participás en la conversación. El pago se procesa con Stripe y el acceso se activa al confirmarse.' : 'Con acceso ves todas las publicaciones completas y participás en la conversación. Los pagos en línea todavía no están activados en esta comunidad (próximamente); mientras tanto podés activar el acceso de demostración.'">
+      <UAlert v-if="data.channel.type === 'paid' && !data.channel.hasAccess" class="mx-5 mb-4" color="warning" variant="soft" icon="i-lucide-lock" title="Este es un canal pago" :description="billing?.enabled ? 'Con acceso ves todas las publicaciones completas y participás en la conversación. El pago se procesa con Stripe y el acceso se activa al confirmarse.' : 'Con acceso ves todas las publicaciones completas y participás en la conversación. Los pagos en línea todavía no están activados en esta comunidad (próximamente); mientras tanto podés activar el acceso de demostración.'">
         <template #actions>
           <UButton v-if="user && billing?.enabled" size="sm" color="warning" :label="`Comprar acceso · ${fmtMoney(data.channel.priceCents)}`" icon="i-lucide-credit-card" :loading="buying" @click="buyAccess" />
           <UButton v-if="user" size="sm" color="warning" variant="soft" label="Acceso demo" icon="i-lucide-key-round" @click="demoAccess" />
@@ -92,8 +96,9 @@ async function buyAccess() {
     <UTabs v-model="tab" :items="tabItems">
       <template #content="{ item }">
         <div v-if="item.value === 'posts'" class="mt-4 space-y-5">
+          <PostComposer v-if="user && data.channel.hasAccess" :channel-slug="slug" @published="refresh" />
           <PostCard v-for="post in data.posts" :key="post.id" :post="post" @changed="refresh" />
-          <UAlert v-if="!data.posts.length" color="neutral" variant="soft" title="Sin publicaciones todavía" description="Sé la primera persona en publicar en este canal desde el feed." />
+          <UAlert v-if="!data.posts.length" color="neutral" variant="soft" title="Sin publicaciones todavía" description="Sé la primera persona en publicar en este canal." />
         </div>
         <UCard v-else class="mt-4">
           <ChannelChat v-if="user && data.channel.hasAccess" :slug="slug" />

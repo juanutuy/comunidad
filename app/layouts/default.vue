@@ -3,23 +3,42 @@ const { user, tenant, logout } = useAuth()
 const { initials } = useFormat()
 const api = useApi()
 const router = useRouter()
+const route = useRoute()
 const showChannels = ref(false)
 
 const { data: channelData, refresh: refreshChannels } = await useAsyncData('layout-channels', () =>
   api<{ groups: { id: number, name: string, channels: { id: number, slug: string, name: string, icon: string, type: string, priceCents: number, following: boolean }[] }[] }>('/api/channels'))
 
-const navItems = [
-  { label: 'Feed', icon: 'i-lucide-newspaper', to: '/feeds' },
-  { label: 'Mensajes', icon: 'i-lucide-message-circle', to: '/messages' },
-  { label: 'Miembros', icon: 'i-lucide-users', to: '/members' },
-  { label: 'Cursos', icon: 'i-lucide-graduation-cap', to: '/courses' },
-  { label: 'Eventos', icon: 'i-lucide-calendar-days', to: '/events' },
-  { label: 'Videos', icon: 'i-lucide-play-square', to: '/videos' },
-  { label: 'Biblioteca', icon: 'i-lucide-library', to: '/library' },
-  { label: 'Ranking', icon: 'i-lucide-trophy', to: '/leaderboard' },
-  { label: 'Precios', icon: 'i-lucide-tag', to: '/pricing' },
-  { label: 'Reglas', icon: 'i-lucide-scroll-text', to: '/guidelines' },
+// Fase 7: navegación principal en pastillas, centrada en la barra
+// superior (Inicio / Cursos / Eventos / Miembros / Ranking).
+const mainNav = [
+  { label: 'Inicio', to: '/feeds' },
+  { label: 'Cursos', to: '/courses' },
+  { label: 'Eventos', to: '/events' },
+  { label: 'Miembros', to: '/members' },
+  { label: 'Ranking', to: '/leaderboard' },
 ]
+// En móvil la fila deslizable conserva todos los destinos.
+const mobileNav = [
+  { label: 'Inicio', to: '/feeds' },
+  { label: 'Mensajes', to: '/messages' },
+  { label: 'Miembros', to: '/members' },
+  { label: 'Cursos', to: '/courses' },
+  { label: 'Eventos', to: '/events' },
+  { label: 'Videos', to: '/videos' },
+  { label: 'Biblioteca', to: '/library' },
+  { label: 'Ranking', to: '/leaderboard' },
+  { label: 'Precios', to: '/pricing' },
+  { label: 'Reglas', to: '/guidelines' },
+]
+
+// Badge de mensajes sin leer en el icono de la barra: suma de los
+// no leídos por conversación (mismo dato que usa /messages).
+const { data: dmData, refresh: refreshDm } = await useAsyncData('layout-dm-unread', () =>
+  user.value ? api<{ members: { unread: number }[] }>('/api/members') : Promise.resolve({ members: [] as { unread: number }[] }))
+const dmUnread = computed(() => (dmData.value?.members || []).reduce((acc, m) => acc + (m.unread || 0), 0))
+watch(user, (u) => { if (u) refreshDm() })
+watch(() => route.fullPath, () => { refreshDm() })
 
 async function doLogout() {
   await logout()
@@ -57,16 +76,20 @@ function doSearch() {
 <template>
   <div class="min-h-screen bg-neutral-50 dark:bg-neutral-950">
     <header class="sticky top-0 z-40 border-b border-default bg-white/90 backdrop-blur dark:bg-neutral-900/90">
-      <div class="mx-auto flex h-14 max-w-[1400px] items-center gap-3 px-4">
+      <div class="relative mx-auto flex h-14 max-w-[1400px] items-center gap-3 px-4">
         <UButton class="lg:hidden" color="neutral" variant="ghost" icon="i-lucide-menu" @click="showChannels = !showChannels" />
-        <NuxtLink to="/feeds" class="flex items-center gap-2">
+        <NuxtLink to="/feeds" class="flex shrink-0 items-center gap-2">
           <span class="flex h-8 w-8 items-center justify-center rounded-lg font-bold text-white" :style="{ backgroundColor: tenant?.brandColor || '#2563eb' }">
             {{ (tenant?.name || 'C').charAt(0) }}
           </span>
           <span class="hidden font-bold sm:block">{{ tenant?.name || 'Comunidad' }}</span>
         </NuxtLink>
-        <nav class="ml-4 hidden items-center gap-1 md:flex">
-          <NuxtLink v-for="item in navItems" :key="item.to" :to="item.to" class="rounded-md px-2.5 py-1.5 text-sm font-medium text-muted hover:bg-elevated hover:text-highlighted" active-class="bg-elevated text-highlighted">
+        <nav class="absolute left-1/2 hidden -translate-x-1/2 items-center gap-1 lg:flex">
+          <NuxtLink
+            v-for="item in mainNav" :key="item.to" :to="item.to"
+            class="rounded-full px-3.5 py-1.5 text-sm font-medium whitespace-nowrap text-muted transition hover:bg-elevated hover:text-highlighted"
+            active-class="bg-elevated font-semibold text-highlighted"
+          >
             {{ item.label }}
           </NuxtLink>
         </nav>
@@ -75,6 +98,10 @@ function doSearch() {
           <UInput v-model="searchQuery" placeholder="Buscar en la comunidad…" icon="i-lucide-search" size="sm" class="w-52" />
         </form>
         <UButton to="/search" color="neutral" variant="ghost" icon="i-lucide-search" class="md:hidden" aria-label="Buscar" />
+        <span v-if="user" class="relative inline-flex">
+          <UButton to="/messages" color="neutral" variant="ghost" icon="i-lucide-message-circle" aria-label="Mensajes" />
+          <span v-if="dmUnread" class="pointer-events-none absolute -top-0.5 -right-0.5 flex h-4.5 min-w-4.5 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">{{ dmUnread }}</span>
+        </span>
         <NotificationBell />
         <UColorModeButton />
         <template v-if="user">
@@ -90,8 +117,8 @@ function doSearch() {
           <UButton to="/register" label="Unirse" :style="{ backgroundColor: tenant?.brandColor }" />
         </template>
       </div>
-      <nav class="flex gap-1 overflow-x-auto px-4 pb-2 md:hidden">
-        <NuxtLink v-for="item in navItems" :key="item.to" :to="item.to" class="whitespace-nowrap rounded-md px-2.5 py-1.5 text-sm font-medium text-muted hover:bg-elevated" active-class="bg-elevated text-highlighted">
+      <nav class="flex gap-1 overflow-x-auto px-4 pb-2 lg:hidden">
+        <NuxtLink v-for="item in mobileNav" :key="item.to" :to="item.to" class="rounded-full px-3 py-1.5 text-sm font-medium whitespace-nowrap text-muted hover:bg-elevated" active-class="bg-elevated font-semibold text-highlighted">
           {{ item.label }}
         </NuxtLink>
       </nav>
@@ -99,17 +126,68 @@ function doSearch() {
 
     <div class="mx-auto grid max-w-[1400px] gap-6 px-4 py-6 lg:grid-cols-[240px_minmax(0,1fr)] xl:grid-cols-[240px_minmax(0,1fr)_290px]">
       <aside :class="showChannels ? 'block' : 'hidden lg:block'" class="space-y-5">
-        <div v-for="group in channelData?.groups || []" :key="group.id">
-          <h3 class="mb-1.5 px-2 text-xs font-bold tracking-wider text-muted uppercase">
-            {{ group.name }}
-          </h3>
+        <div>
           <ul class="space-y-0.5">
-            <li v-for="ch in group.channels" :key="ch.id">
-              <NuxtLink :to="`/channels/${ch.slug}`" class="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-elevated" active-class="bg-elevated font-semibold">
-                <UIcon :name="ch.icon" class="shrink-0" />
-                <span class="min-w-0 flex-1 truncate">{{ ch.name }}</span>
-                <UIcon v-if="ch.type === 'paid'" name="i-lucide-crown" class="shrink-0 text-amber-500" />
-                <UIcon v-else-if="ch.type === 'private'" name="i-lucide-lock" class="shrink-0 text-muted" />
+            <li>
+              <NuxtLink to="/videos" class="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-elevated" active-class="bg-elevated font-semibold">
+                <UIcon name="i-lucide-play-square" class="shrink-0" /> Videos
+              </NuxtLink>
+            </li>
+            <li>
+              <NuxtLink to="/library" class="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-elevated" active-class="bg-elevated font-semibold">
+                <UIcon name="i-lucide-library" class="shrink-0" /> Biblioteca
+              </NuxtLink>
+            </li>
+          </ul>
+        </div>
+        <div>
+          <h3 class="mb-1.5 px-2 text-xs font-bold tracking-wider text-muted uppercase">
+            Canales
+          </h3>
+          <div v-for="group in channelData?.groups || []" :key="group.id" class="mb-3">
+            <p class="mb-1 px-2 text-[11px] font-semibold tracking-wide text-muted">
+              {{ group.name }}
+            </p>
+            <ul class="space-y-0.5">
+              <li v-for="ch in group.channels" :key="ch.id">
+                <NuxtLink :to="`/channels/${ch.slug}`" class="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-elevated" active-class="bg-elevated font-semibold">
+                  <UIcon :name="ch.icon" class="shrink-0" />
+                  <span class="min-w-0 flex-1 truncate">{{ ch.name }}</span>
+                  <UIcon v-if="ch.type === 'paid'" name="i-lucide-crown" class="shrink-0 text-amber-500" />
+                  <UIcon v-else-if="ch.type === 'private'" name="i-lucide-lock" class="shrink-0 text-muted" />
+                </NuxtLink>
+              </li>
+            </ul>
+          </div>
+        </div>
+        <div class="border-t border-default pt-4">
+          <h3 class="mb-1.5 px-2 text-xs font-bold tracking-wider text-muted uppercase">
+            Enlaces
+          </h3>
+          <ul class="space-y-0.5 text-sm">
+            <li>
+              <NuxtLink to="/pricing" class="flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-elevated" active-class="bg-elevated font-semibold">
+                <UIcon name="i-lucide-tag" class="shrink-0" /> Precios
+              </NuxtLink>
+            </li>
+            <li>
+              <NuxtLink to="/guidelines" class="flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-elevated" active-class="bg-elevated font-semibold">
+                <UIcon name="i-lucide-scroll-text" class="shrink-0" /> Reglas
+              </NuxtLink>
+            </li>
+            <li>
+              <NuxtLink to="/terms" class="flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-elevated" active-class="bg-elevated font-semibold">
+                <UIcon name="i-lucide-file-text" class="shrink-0" /> Términos
+              </NuxtLink>
+            </li>
+            <li>
+              <NuxtLink to="/privacy" class="flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-elevated" active-class="bg-elevated font-semibold">
+                <UIcon name="i-lucide-shield" class="shrink-0" /> Privacidad
+              </NuxtLink>
+            </li>
+            <li v-if="user?.role === 'admin'">
+              <NuxtLink to="/admin" class="flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-elevated" active-class="bg-elevated font-semibold">
+                <UIcon name="i-lucide-settings" class="shrink-0" /> Panel de administración
               </NuxtLink>
             </li>
           </ul>

@@ -1,7 +1,7 @@
 // Editar título y cuerpo de un borrador o programado propio (Fase 5).
 // Las publicaciones ya publicadas no se editan por esta vía.
 import { requireUser, resolveTenant } from '../../utils/community'
-import { dbFor } from '../../utils/db'
+import { dbFor, nowIso } from '../../utils/db'
 
 export default defineEventHandler(async (event) => {
   const tenant = await resolveTenant(event)
@@ -26,9 +26,11 @@ export default defineEventHandler(async (event) => {
       throw createError({ statusCode: 400, message: 'Elegí una fecha y hora futuras para programar.' })
     scheduledAt = when.toISOString()
   }
+  // Fase 7: toda edición deja marca (edited_at) para el «Editado»
+  // de la tarjeta cuando la publicación salga.
   if (scheduledAt)
-    await db.prepare('UPDATE posts SET title = ?, body = ?, teaser = ?, scheduled_at = ? WHERE id = ?').run(title, text, text.slice(0, 160), scheduledAt, postId)
+    await db.prepare('UPDATE posts SET title = ?, body = ?, teaser = ?, scheduled_at = ?, edited_at = ? WHERE id = ?').run(title, text, text.slice(0, 160), scheduledAt, nowIso(), postId)
   else
-    await db.prepare('UPDATE posts SET title = ?, body = ?, teaser = ? WHERE id = ?').run(title, text, text.slice(0, 160), postId)
+    await db.prepare('UPDATE posts SET title = ?, body = ?, teaser = ?, edited_at = ? WHERE id = ?').run(title, text, text.slice(0, 160), nowIso(), postId)
   return { ok: true }
 })

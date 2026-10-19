@@ -1,38 +1,66 @@
 <script setup lang="ts">
-// Rail derecho (Fase 5): próximos eventos, publicaciones recientes,
-// top líderes y miembros en línea. Los datos salen de /api/sidebar.
+// Rail derecho: próximos eventos, publicaciones recientes, top
+// líderes, miembros y usuarios en línea (datos de /api/sidebar).
+// Fase 7: acabado tipo referencia — títulos de bloque en mayúsculas
+// con «Ver todo», eventos con cuadrado de fecha y anfitrión.
 const { tenant } = useAuth()
-const { fmtDate, initials } = useFormat()
+const { initials } = useFormat()
 const api = useApi()
 
 interface SidebarData {
-  events: { slug: string, title: string, starts_at: string }[]
+  events: { slug: string, title: string, starts_at: string, host_name: string | null }[]
   recent: { slug: string, title: string, channel_slug: string }[]
   leaders: { id: number, name: string, slug: string, avatarUrl: string, points: number, level: string }[]
   online: { id: number, name: string, slug: string, avatarUrl: string, me: boolean }[]
+  members: { id: number, name: string, slug: string, avatarUrl: string, online: boolean }[]
 }
 const { data: sidebar } = await useAsyncData('right-rail', () =>
-  api<SidebarData>('/api/sidebar').catch(() => ({ events: [], recent: [], leaders: [], online: [] }) as SidebarData))
+  api<SidebarData>('/api/sidebar').catch(() => ({ events: [], recent: [], leaders: [], online: [], members: [] }) as SidebarData))
+
+// Cuadrado de fecha del evento próximo: mes corto arriba, día grande
+// y día de semana debajo (como la referencia).
+function dateParts(iso: string) {
+  const d = new Date(iso)
+  return {
+    month: d.toLocaleDateString('es', { month: 'short' }).replace('.', '').toUpperCase(),
+    day: d.getDate(),
+    weekday: d.toLocaleDateString('es', { weekday: 'short' }).replace('.', ''),
+    time: d.toLocaleTimeString('es', { hour: 'numeric', minute: '2-digit' }),
+  }
+}
 </script>
 
 <template>
   <div class="space-y-5">
     <UCard>
-      <h3 class="mb-3 flex items-center gap-2 text-sm font-bold">
-        <UIcon name="i-lucide-calendar-days" /> Próximos eventos
-      </h3>
+      <div class="mb-3 flex items-baseline justify-between gap-2">
+        <h3 class="text-xs font-bold tracking-wider text-muted uppercase">Próximos eventos</h3>
+        <NuxtLink to="/events" class="text-xs font-medium text-primary hover:underline">Ver todo</NuxtLink>
+      </div>
       <ul v-if="sidebar?.events?.length" class="space-y-3">
         <li v-for="e in sidebar.events" :key="e.slug">
-          <NuxtLink :to="`/events/${e.slug}`" class="text-sm font-medium hover:underline">{{ e.title }}</NuxtLink>
-          <p class="text-xs text-muted">{{ fmtDate(e.starts_at) }}</p>
+          <NuxtLink :to="`/events/${e.slug}`" class="group flex items-start gap-3">
+            <span class="flex w-12 shrink-0 flex-col items-center overflow-hidden rounded-lg border border-default">
+              <span class="w-full py-0.5 text-center text-[10px] font-bold tracking-wider text-white" :style="{ backgroundColor: tenant?.brandColor || '#2563eb' }">{{ dateParts(e.starts_at).month }}</span>
+              <span class="pt-0.5 text-lg leading-none font-bold">{{ dateParts(e.starts_at).day }}</span>
+              <span class="pb-1 text-[10px] text-muted capitalize">{{ dateParts(e.starts_at).weekday }}</span>
+            </span>
+            <span class="min-w-0">
+              <span class="block truncate text-sm font-medium group-hover:underline">{{ e.title }}</span>
+              <span class="mt-0.5 block text-xs text-muted">{{ dateParts(e.starts_at).weekday }} · {{ dateParts(e.starts_at).time }}</span>
+              <span v-if="e.host_name" class="block truncate text-xs text-muted">Anfitrión: {{ e.host_name }}</span>
+            </span>
+          </NuxtLink>
         </li>
       </ul>
       <p v-else class="text-sm text-muted">No hay eventos próximos.</p>
     </UCard>
+
     <UCard>
-      <h3 class="mb-3 flex items-center gap-2 text-sm font-bold">
-        <UIcon name="i-lucide-flame" /> Publicaciones recientes
-      </h3>
+      <div class="mb-3 flex items-baseline justify-between gap-2">
+        <h3 class="text-xs font-bold tracking-wider text-muted uppercase">Publicaciones recientes</h3>
+        <NuxtLink to="/feeds" class="text-xs font-medium text-primary hover:underline">Ver todo</NuxtLink>
+      </div>
       <ul v-if="sidebar?.recent?.length" class="space-y-2.5">
         <li v-for="p in sidebar.recent" :key="p.slug">
           <NuxtLink :to="`/p/${p.channel_slug}/${p.slug}`" class="text-sm leading-snug hover:underline">{{ p.title }}</NuxtLink>
@@ -40,10 +68,12 @@ const { data: sidebar } = await useAsyncData('right-rail', () =>
       </ul>
       <p v-else class="text-sm text-muted">Todavía no hay publicaciones.</p>
     </UCard>
+
     <UCard>
-      <h3 class="mb-3 flex items-center gap-2 text-sm font-bold">
-        <UIcon name="i-lucide-trophy" /> Top líderes
-      </h3>
+      <div class="mb-3 flex items-baseline justify-between gap-2">
+        <h3 class="text-xs font-bold tracking-wider text-muted uppercase">Top líderes</h3>
+        <NuxtLink to="/leaderboard" class="text-xs font-medium text-primary hover:underline">Ver todo</NuxtLink>
+      </div>
       <ul v-if="sidebar?.leaders?.length" class="space-y-2.5">
         <li v-for="(l, i) in sidebar.leaders" :key="l.id" class="flex items-center gap-2.5">
           <span class="w-4 text-center text-sm font-bold text-muted">{{ i + 1 }}</span>
@@ -56,12 +86,30 @@ const { data: sidebar } = await useAsyncData('right-rail', () =>
         </li>
       </ul>
       <p v-else class="text-sm text-muted">Todavía no hay puntajes.</p>
-      <NuxtLink to="/leaderboard" class="mt-3 block text-sm font-medium text-primary hover:underline">Ver ranking completo</NuxtLink>
     </UCard>
+
     <UCard>
-      <h3 class="mb-3 flex items-center gap-2 text-sm font-bold">
-        <span class="h-2 w-2 rounded-full bg-green-500" /> Miembros en línea
-      </h3>
+      <div class="mb-3 flex items-baseline justify-between gap-2">
+        <h3 class="text-xs font-bold tracking-wider text-muted uppercase">Miembros</h3>
+        <NuxtLink to="/members" class="text-xs font-medium text-primary hover:underline">Ver todo</NuxtLink>
+      </div>
+      <ul v-if="sidebar?.members?.length" class="space-y-2.5">
+        <li v-for="m in sidebar.members" :key="m.id" class="flex items-center gap-2.5">
+          <span class="relative shrink-0">
+            <UAvatar :src="m.avatarUrl || undefined" :text="initials(m.name)" size="sm" />
+            <span v-if="m.online" class="absolute -right-0.5 -bottom-0.5 h-2.5 w-2.5 rounded-full bg-green-500 ring-2 ring-white dark:ring-neutral-900" />
+          </span>
+          <NuxtLink :to="`/profile/${m.slug}`" class="min-w-0 flex-1 truncate text-sm font-medium hover:underline">{{ m.name }}</NuxtLink>
+        </li>
+      </ul>
+      <p v-else class="text-sm text-muted">Todavía no hay miembros para mostrar.</p>
+    </UCard>
+
+    <UCard>
+      <div class="mb-3 flex items-baseline justify-between gap-2">
+        <h3 class="text-xs font-bold tracking-wider text-muted uppercase">En línea ({{ sidebar?.online?.length || 0 }})</h3>
+        <NuxtLink to="/members" class="text-xs font-medium text-primary hover:underline">Ver todo</NuxtLink>
+      </div>
       <ul v-if="sidebar?.online?.length" class="space-y-2.5">
         <li v-for="m in sidebar.online" :key="m.id" class="flex items-center gap-2.5">
           <span class="relative shrink-0">

@@ -10,7 +10,8 @@ export default defineEventHandler(async (event) => {
   const tenant = await resolveTenant(event)
   const { user } = await currentAuth(event, tenant.id)
   const db = await dbFor(event)
-  const events = await db.prepare(`SELECT slug, title, starts_at FROM events WHERE tenant_id = ? AND starts_at >= datetime('now') ORDER BY starts_at LIMIT 3`).all(tenant.id)
+  // Fase 7: los eventos del rail llevan anfitrión (como la referencia).
+  const events = await db.prepare(`SELECT e.slug, e.title, e.starts_at, u.name AS host_name FROM events e LEFT JOIN users u ON u.id = e.host_id WHERE e.tenant_id = ? AND e.starts_at >= datetime('now') ORDER BY e.starts_at LIMIT 3`).all(tenant.id)
   const hf = hiddenFilterSql(user?.id ?? null)
   const recent = await db.prepare(`SELECT p.slug, p.title, c.slug AS channel_slug FROM posts p JOIN channels c ON c.id = p.channel_id WHERE p.tenant_id = ? AND c.type = 'free' AND p.status = 'published'${hf.sql} ORDER BY p.pinned DESC, p.created_at DESC LIMIT 5`).all(tenant.id, ...hf.params)
   // Top líderes: misma fórmula del ranking (actividad + point_events).
@@ -32,5 +33,11 @@ export default defineEventHandler(async (event) => {
     .filter(r => isOnline(r.last_seen_at as string))
     .slice(0, 8)
     .map(r => ({ id: r.id, name: r.name, slug: r.slug, avatarUrl: r.avatar_url || '', me: user ? Number(r.id) === user.id : false }))
-  return { events, recent, leaders, online }
+  // Fase 7: bloque MEMBERS del rail (en línea primero, como la
+  // referencia, con su punto de presencia).
+  const members = [...memberRows]
+    .sort((a, b) => Number(isOnline(b.last_seen_at as string)) - Number(isOnline(a.last_seen_at as string)))
+    .slice(0, 5)
+    .map(r => ({ id: r.id, name: r.name, slug: r.slug, avatarUrl: r.avatar_url || '', online: isOnline(r.last_seen_at as string) }))
+  return { events, recent, leaders, online, members }
 })

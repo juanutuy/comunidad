@@ -69,7 +69,8 @@ async function deleteComment(id: number) {
         </div>
         <p v-if="!data.comments.length" class="text-sm text-muted">Todavía no hay comentarios. ¡Empezá la conversación!</p>
       </div>
-      <div v-if="user" class="mt-5 flex gap-2">
+      <UAlert v-if="data.post.allowComments === false" class="mt-5" color="neutral" variant="soft" icon="i-lucide-lock" title="Los comentarios están desactivados" description="El autor desactivó los comentarios en esta publicación." />
+      <div v-else-if="user" class="mt-5 flex gap-2">
         <UTextarea v-model="newComment" :rows="2" placeholder="Escribí un comentario…" class="flex-1" />
         <UButton label="Comentar" icon="i-lucide-send" :loading="sending" @click="sendComment" />
       </div>

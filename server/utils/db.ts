@@ -150,6 +150,11 @@ const MIGRATIONS = [
   // Fase 6: foto de portada real y sitio web del miembro (perfil).
   `ALTER TABLE users ADD COLUMN cover_url TEXT NOT NULL DEFAULT ''`,
   `ALTER TABLE users ADD COLUMN website TEXT NOT NULL DEFAULT ''`,
+  // Fase 7: el autor puede desactivar los comentarios de su post
+  // (allow_comments, por defecto permitidos) y marca de edición
+  // (edited_at se completa al editar un borrador/programado).
+  `ALTER TABLE posts ADD COLUMN allow_comments INTEGER NOT NULL DEFAULT 1`,
+  `ALTER TABLE posts ADD COLUMN edited_at TEXT NOT NULL DEFAULT ''`,
 ]
 
 async function runMigrations(db: AsyncDb): Promise<void> {

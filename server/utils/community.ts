@@ -4,6 +4,7 @@
 // Promesas tanto en SQLite local como en Cloudflare D1.
 import type { H3Event } from 'h3'
 import { readSession } from './auth'
+import { isOnline } from './chat'
 import { dbFor } from './db'
 
 export interface TenantRow { id: number, slug: string, name: string, tagline: string, brand_color: string, guidelines: string }
@@ -155,16 +156,25 @@ export async function serializePost(event: H3Event, row: Record<string, unknown>
     pinned: !!row.pinned,
     kind: (row.kind as string) || 'post',
     status: (row.status as string) || 'published',
+    // Fase 7: comentarios desactivados por el autor y marca de edición.
+    allowComments: row.allow_comments === undefined || row.allow_comments === null ? true : !!row.allow_comments,
+    edited: !!row.edited_at,
     createdAt: row.created_at,
-    author: { name: row.author_name, slug: row.author_slug, avatarUrl: row.author_avatar || '' },
+    author: {
+      name: row.author_name, slug: row.author_slug, avatarUrl: row.author_avatar || '',
+      role: (row.author_role as string) || 'member',
+      online: isOnline(row.author_last_seen as string),
+    },
     channel: { name: row.channel_name, slug: row.channel_slug, type: row.channel_type },
     reactions, myReactions, commentCount, bookmarked, poll,
   }
 }
 
 export const POST_SELECT = `SELECT p.*, u.name AS author_name, u.slug AS author_slug, u.avatar_url AS author_avatar,
+  u.last_seen_at AS author_last_seen, am.role AS author_role,
   c.name AS channel_name, c.slug AS channel_slug, c.type AS channel_type, c.id AS channel_id_raw
-  FROM posts p JOIN users u ON u.id = p.author_id JOIN channels c ON c.id = p.channel_id`
+  FROM posts p JOIN users u ON u.id = p.author_id JOIN channels c ON c.id = p.channel_id
+  LEFT JOIN memberships am ON am.user_id = p.author_id AND am.tenant_id = p.tenant_id`
 
 export async function channelBySlug(event: H3Event, tenantId: number, slug: string): Promise<ChannelRow | undefined> {
   const db = await dbFor(event)
