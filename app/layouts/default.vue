@@ -52,19 +52,11 @@ const userMenuItems = computed(() => [
     { label: 'Mis borradores', icon: 'i-lucide-file-edit', to: '/drafts' },
     { label: 'Ajustes de cuenta', icon: 'i-lucide-settings-2', onSelect: () => openUserSettings() },
     { label: 'Notificaciones', icon: 'i-lucide-bell', to: '/notifications' },
+    // Fase 12: el menú del avatar es personal y corto, como en la
+    // referencia. La administración tiene su consola dedicada (Fase
+    // 11): acá queda UNA sola entrada, no la lista de secciones.
     ...(user.value?.role === 'admin'
-      ? [
-          { label: 'Panel de administración', icon: 'i-lucide-settings', to: '/admin' },
-          { label: 'Ajustes de la comunidad', icon: 'i-lucide-settings-2', to: '/admin/settings' },
-          { label: 'Miembros', icon: 'i-lucide-users', to: '/admin/members' },
-          { label: 'Administrar canales', icon: 'i-lucide-hash', to: '/admin/channels' },
-          { label: 'Cursos', icon: 'i-lucide-graduation-cap', to: '/admin/courses' },
-          { label: 'Eventos', icon: 'i-lucide-calendar-days', to: '/admin/events' },
-          { label: 'Gamificación', icon: 'i-lucide-trophy', to: '/admin/gamification' },
-          { label: 'Planes y precios', icon: 'i-lucide-credit-card', to: '/admin/plans' },
-          { label: 'Dominio personalizado', icon: 'i-lucide-globe', to: '/admin/domains' },
-          { label: 'Correos', icon: 'i-lucide-mail', to: '/admin/emails' },
-        ]
+      ? [{ label: 'Panel de administración', icon: 'i-lucide-settings', to: '/admin' }]
       : []),
   ],
   [{ label: 'Cerrar sesión', icon: 'i-lucide-log-out', onSelect: doLogout }],
@@ -231,5 +223,6 @@ const isProfilePage = computed(() => route.path.startsWith('/profile/'))
     <MobileBottomBar v-if="user" :dm-unread="dmUnread" />
     <SearchDialog />
     <UserSettingsModal />
+    <ReportDialog />
   </div>
 </template>

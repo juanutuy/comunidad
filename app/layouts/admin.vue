@@ -26,6 +26,7 @@ const sections = [
   { label: 'Canales', icon: 'i-lucide-hash', to: '/admin/channels' },
   { label: 'Cursos', icon: 'i-lucide-graduation-cap', to: '/admin/courses' },
   { label: 'Eventos', icon: 'i-lucide-calendar-days', to: '/admin/events' },
+  { label: 'Moderación', icon: 'i-lucide-shield-alert', to: '/admin/moderation' },
   { label: 'Gamificación', icon: 'i-lucide-trophy', to: '/admin/gamification' },
   { label: 'Planes', icon: 'i-lucide-credit-card', to: '/admin/plans' },
   { label: 'Dominios', icon: 'i-lucide-globe', to: '/admin/domains' },

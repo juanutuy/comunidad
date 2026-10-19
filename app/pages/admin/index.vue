@@ -11,6 +11,7 @@ const api = useApi()
 interface Stats {
   totals: { members: number, onlineNow: number, channels: number, posts: number, comments: number, courses: number, events: number, activeSubscriptions: number, revenueCents: number }
   activity30: { newMembers: number, posts: number, comments: number }
+  moderation?: { pendingReports: number, inReview: number }
   postsWithoutComments: { id: number, title: string, slug: string, channelSlug: string, channelName: string, authorName: string, createdAt: string }[]
   recentMembers: { id: number, name: string, slug: string, avatarUrl: string, role: string, createdAt: string }[]
 }
@@ -43,6 +44,31 @@ const statCards = computed(() => {
     <UAlert v-if="user && user.role !== 'admin'" color="warning" variant="soft" title="Solo administradores" description="Tu cuenta no tiene rol de administrador en esta comunidad." />
     <UAlert v-else-if="!user" color="neutral" variant="soft" title="Iniciá sesión con una cuenta administradora" />
     <template v-else>
+      <!-- Fase 12: «Necesita tu atención», como el Dashboard de la
+           referencia. Decisión: el bloque se muestra SIEMPRE (también
+           en cero), para que la moderación tenga un lugar fijo en el
+           Panel y no «desaparezca» cuando la cola está limpia. -->
+      <UCard>
+        <h2 class="mb-3 flex items-center gap-2 font-bold"><UIcon name="i-lucide-bell-ring" /> Necesita tu atención</h2>
+        <div class="grid gap-3 sm:grid-cols-2">
+          <NuxtLink to="/admin/moderation" class="flex items-center gap-3 rounded-lg border border-default p-3 transition hover:bg-elevated">
+            <UIcon name="i-lucide-flag" class="shrink-0 text-xl text-warning" />
+            <span class="min-w-0 flex-1">
+              <span class="block font-semibold">{{ stats?.moderation?.pendingReports ?? 0 }} reportes por revisar</span>
+              <span class="block text-xs text-muted">Contenido reportado por los miembros</span>
+            </span>
+            <UIcon name="i-lucide-chevron-right" class="shrink-0 text-muted" />
+          </NuxtLink>
+          <NuxtLink to="/admin/moderation?tab=revision" class="flex items-center gap-3 rounded-lg border border-default p-3 transition hover:bg-elevated">
+            <UIcon name="i-lucide-eye" class="shrink-0 text-xl text-warning" />
+            <span class="min-w-0 flex-1">
+              <span class="block font-semibold">{{ stats?.moderation?.inReview ?? 0 }} publicaciones en revisión</span>
+              <span class="block text-xs text-muted">Esperando aprobación para publicarse</span>
+            </span>
+            <UIcon name="i-lucide-chevron-right" class="shrink-0 text-muted" />
+          </NuxtLink>
+        </div>
+      </UCard>
       <div class="grid grid-cols-2 gap-3 lg:grid-cols-3">
         <NuxtLink v-for="card in statCards" :key="card.label" :to="card.to">
           <UCard class="h-full transition hover:bg-elevated">

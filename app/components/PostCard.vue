@@ -15,6 +15,7 @@ export interface PostView {
   attachmentName?: string
   pinned: boolean
   kind?: string
+  status?: string
   allowComments?: boolean
   edited?: boolean
   createdAt: string
@@ -30,6 +31,7 @@ export interface PostView {
 const props = defineProps<{ post: PostView, linkable?: boolean }>()
 const emit = defineEmits<{ changed: [], deleted: [] }>()
 const { user } = useAuth()
+const { openReport } = useReportDialog()
 const { timeAgo, initials } = useFormat()
 const api = useApi()
 const toast = useToast()
@@ -119,12 +121,16 @@ const postMenuItems = computed(() => {
   const items: { label: string, icon: string, onSelect: () => void }[] = []
   // En un post anónimo el slug viene vacío: «es mío» lo dice la marca
   // `mine` del serializador, no la comparación de slugs.
-  if (user.value && !props.post.author.mine && user.value.slug !== props.post.author.slug)
+  const notMine = !!user.value && !props.post.author.mine && user.value.slug !== props.post.author.slug
+  if (notMine)
     items.push({ label: 'Ocultar publicación', icon: 'i-lucide-eye-off', onSelect: hidePost })
   if (user.value?.role === 'admin')
     items.push({ label: props.post.pinned ? 'Desfijar' : 'Fijar (anuncio)', icon: 'i-lucide-pin', onSelect: togglePin })
   if (canDelete.value)
     items.push({ label: 'Eliminar publicación', icon: 'i-lucide-trash-2', onSelect: () => { confirmDelete.value = true } })
+  // Fase 12: reportar contenido ajeno (el servidor también lo valida).
+  if (notMine)
+    items.push({ label: 'Reportar', icon: 'i-lucide-flag', onSelect: () => openReport({ type: 'post', id: props.post.id, label: props.post.title }) })
   return [items]
 })
 
@@ -181,6 +187,9 @@ async function deletePost() {
             </span>
             <UBadge v-if="post.pinned" color="warning" variant="subtle" icon="i-lucide-pin">
               Fijado
+            </UBadge>
+            <UBadge v-if="post.status === 'review'" color="warning" variant="subtle" icon="i-lucide-eye">
+              En revisión
             </UBadge>
             <UBadge v-if="post.kind === 'poll'" color="primary" variant="subtle" icon="i-lucide-bar-chart-3">
               Encuesta

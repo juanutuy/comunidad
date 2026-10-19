@@ -119,6 +119,9 @@ CREATE TABLE IF NOT EXISTS gamification_levels (id INTEGER PRIMARY KEY AUTOINCRE
 CREATE UNIQUE INDEX IF NOT EXISTS gamification_levels_tenant_min ON gamification_levels (tenant_id, min_points);
 CREATE TABLE IF NOT EXISTS gamification_points (id INTEGER PRIMARY KEY AUTOINCREMENT, tenant_id INTEGER NOT NULL, action TEXT NOT NULL, points INTEGER NOT NULL DEFAULT 0);
 CREATE UNIQUE INDEX IF NOT EXISTS gamification_points_tenant_action ON gamification_points (tenant_id, action);
+CREATE TABLE IF NOT EXISTS reports (id INTEGER PRIMARY KEY AUTOINCREMENT, tenant_id INTEGER NOT NULL, reporter_id INTEGER NOT NULL, target_type TEXT NOT NULL DEFAULT 'post', target_id INTEGER NOT NULL, reason TEXT NOT NULL DEFAULT 'otro', note TEXT NOT NULL DEFAULT '', status TEXT NOT NULL DEFAULT 'pending', action TEXT NOT NULL DEFAULT 'none', resolved_by INTEGER, resolved_at TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL);
+CREATE INDEX IF NOT EXISTS reports_tenant_status ON reports (tenant_id, status, created_at);
+CREATE INDEX IF NOT EXISTS reports_target ON reports (tenant_id, target_type, target_id, status);
 `
 
 // Migraciones aditivas (Fase 2) para bases creadas en la Fase 1 — ya hay
@@ -195,6 +198,11 @@ const MIGRATIONS = [
   `ALTER TABLE courses ADD COLUMN certificate_enabled INTEGER NOT NULL DEFAULT 1`,
   // Fase 8: descripción de eventos con el editor clásico.
   `ALTER TABLE events ADD COLUMN description_html TEXT NOT NULL DEFAULT ''`,
+  // Fase 12: revisión previa opcional de publicaciones por tenant
+  // (0 = apagada, como hoy; 1 = los posts de miembros nacen en
+  // 'review' hasta que un admin los aprueba). La tabla `reports` es
+  // nueva y vive en CREATE_SQL (IF NOT EXISTS): no necesita ALTER.
+  `ALTER TABLE tenants ADD COLUMN moderation_review INTEGER NOT NULL DEFAULT 0`,
 ]
 
 async function runMigrations(db: AsyncDb): Promise<void> {

@@ -17,6 +17,18 @@ export default defineEventHandler(async (event) => {
   const sort = getQuery(event).sort === 'asc' ? 'asc' : 'desc'
   const orderBy = sort === 'asc' ? 'p.created_at ASC' : 'p.pinned DESC, p.created_at DESC'
   const rows = await db.prepare(`${POST_SELECT} WHERE p.tenant_id = ? AND p.status = 'published'${hf.sql} ORDER BY ${orderBy} LIMIT 50`).all(tenant.id, ...hf.params) as Record<string, unknown>[]
+  // Fase 12: los posts en revisión SOLO aparecen en el feed de su
+  // autor y de los admins (con la insignia «En revisión» que pinta
+  // PostCard desde `status`). Para el resto no existen.
+  if (user) {
+    const reviewRows = role === 'admin'
+      ? await db.prepare(`${POST_SELECT} WHERE p.tenant_id = ? AND p.status = 'review'${hf.sql} ORDER BY p.created_at DESC LIMIT 50`).all(tenant.id, ...hf.params) as Record<string, unknown>[]
+      : await db.prepare(`${POST_SELECT} WHERE p.tenant_id = ? AND p.status = 'review' AND p.author_id = ?${hf.sql} ORDER BY p.created_at DESC LIMIT 50`).all(tenant.id, user.id, ...hf.params) as Record<string, unknown>[]
+    rows.push(...reviewRows)
+    rows.sort((a, b) => sort === 'asc'
+      ? String(a.created_at).localeCompare(String(b.created_at))
+      : (Number(b.pinned) - Number(a.pinned)) || String(b.created_at).localeCompare(String(a.created_at)))
+  }
   const followed = new Set(user
     ? (await db.prepare('SELECT channel_id FROM follows WHERE tenant_id = ? AND user_id = ?').all(tenant.id, user.id) as unknown as { channel_id: number }[]).map(f => f.channel_id)
     : [])

@@ -886,7 +886,8 @@ estudio sin perder datos (certificado sigue encendido en ellos);
   botones en pastilla. La **moderación** sigue sin sección propia a
   propósito: vive en contexto, en el menú de cada publicación
   (fijar/eliminar como admin), así que no se inventó una entrada de
-  menú sin página detrás.
+  menú sin página detrás. (En la Fase 12 la moderación ganó su
+  sección real en la consola: ver abajo.)
 - **Ajustes de cuenta como modal** (`UserSettingsModal.vue` + estado
   compartido en `useUserSettings.ts`), como el «Profile Settings» de
   la referencia: navegación vertical de secciones (Perfil,
@@ -900,6 +901,65 @@ estudio sin perder datos (certificado sigue encendido en ellos);
   mismos endpoints (una sola fuente de verdad). La ruta `/settings`
   queda como compatibilidad: abre el modal (acepta `?section=`) y
   vuelve a `/feeds`, para no romper enlaces guardados.
+
+## Fase 12 (hecha) — moderación completa y menú del avatar simplificado
+
+- **Reportes de contenido** (tabla `reports`, migración aditiva):
+  «Reportar» en el menú «…» de cada publicación y de cada comentario,
+  solo para contenido ajeno y con sesión (`ReportDialog.vue` +
+  `useReportDialog.ts`): categoría (spam/acoso/inapropiado/otro) y
+  nota opcional. `POST /api/reports` no duplica: un reporte
+  `pending` por persona y objetivo (repetir responde
+  `alreadyReported`). Al crearse avisa a los admins del tenant con la
+  notificación tipo `report` («Nuevo reporte de contenido»), sin
+  auto-notificar a un admin que reporta contenido de otro.
+- **Cola en la consola** (`/admin/moderation`, sección nueva del riel):
+  pestañas **Reportes** y **En revisión** con contadores. Los reportes
+  pendientes se agrupan por objetivo (tipo, extracto con enlace a su
+  contexto, autor del contenido, quién reportó, categoría, nota y
+  fecha) y se resuelven por objetivo: **Descartar**, **Resolver sin
+  acción** o **Eliminar contenido** (misma cascada de borrado que el
+  borrado normal, compartida en `utils/moderation.ts`; los reportes
+  quedan `resolved` con `action='content_removed'`). Si el contenido
+  ya no existe, el grupo se muestra como «ya eliminado» y solo permite
+  cerrar. Debajo, el historial de reportes cerrados.
+- **«Necesita tu atención» en el Panel**: bloque siempre visible
+  (decisión tomada: también en cero, como el «Needs your attention»
+  de la referencia, para que la moderación tenga un lugar fijo) con
+  los contadores reales de reportes pendientes y publicaciones en
+  revisión, enlazando a la pestaña que corresponde.
+- **Revisión previa opcional** (`tenants.moderation_review`, default
+  apagada; se edita en Ajustes de la comunidad → pestaña **Moderación**,
+  su propia subsección porque es un comportamiento con explicación):
+  encendida, las publicaciones de miembros NO administradores nacen
+  con `posts.status='review'` (también los programados al vencer, vía
+  `publishDuePosts()`, y los borradores re-publicados). Un post en
+  revisión no existe para el resto: feed, canal, detalle, búsqueda y
+  perfil lo excluyen; solo lo ven su autor y los admins, con la
+  insignia «En revisión». Reacciones y comentarios quedan limitados a
+  autor/admin, y **no suma puntos** hasta aprobarse (los puntos de
+  publicación salen de `memberStats`, que solo cuenta `published`).
+  En la cola, **Aprobar** publica con fecha actual (y notifica al
+  autor, tipo `moderation`: «Tu publicación fue aprobada») y
+  **Rechazar** lo devuelve a los borradores del autor con su aviso —
+  nunca se borra el contenido del autor.
+- **Notificaciones de moderación sin preferencia propia**: los tipos
+  `report` y `moderation` no aparecen en las preferencias de Ajustes
+  de cuenta a propósito — son avisos operativos, no sociales, y
+  siempre llegan (documentado también en `utils/notify.ts`).
+- **Diferencia documentada — «Edit Review» NO incluido**: en la
+  referencia, editar una publicación ya aprobada también pasa por
+  revisión. Acá las ediciones de posts publicados **no** pasan por
+  revisión en esta fase; solo las publicaciones nuevas. La pestaña no
+  se finge: la cola tiene solo Reportes y En revisión.
+- **Menú del avatar sin redundancia** (Parte C): con la consola
+  dedicada de la Fase 11, el menú del avatar dejó de repetir las
+  secciones de admin una por una. Queda personal (Mi perfil, Mis
+  borradores, Ajustes de cuenta, Notificaciones) + **una sola**
+  entrada de admin («Panel de administración» → `/admin`) + Cerrar
+  sesión. El panel móvil conserva igualmente su único «Panel de
+  administración» y el enlace del lateral de miembro (Enlaces) se
+  queda: son entradas únicas, no duplicaciones.
 
 ## Pendiente a propósito (fuera de esta fase)
 

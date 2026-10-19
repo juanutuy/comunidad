@@ -26,6 +26,10 @@ const typeIcons: Record<string, string> = {
   mention: 'i-lucide-at-sign',
   dm: 'i-lucide-mail',
   follow: 'i-lucide-user-plus',
+  // Fase 12: avisos de moderación (reportes a admins y resultado de
+  // la revisión previa para el autor).
+  report: 'i-lucide-flag',
+  moderation: 'i-lucide-shield-check',
 }
 
 // Fase 5: filtro por tipo con chips (valores reales de notifications.type).

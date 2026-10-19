@@ -4,6 +4,7 @@
 // borran por su enlace para no dejar enlaces muertos.
 import { currentAuth, requireUser, resolveTenant } from '../../utils/community'
 import { dbFor } from '../../utils/db'
+import { deletePostCascade } from '../../utils/moderation'
 
 export default defineEventHandler(async (event) => {
   const tenant = await resolveTenant(event)
@@ -15,12 +16,8 @@ export default defineEventHandler(async (event) => {
   if (!post) throw createError({ statusCode: 404, message: 'Publicación no encontrada.' })
   if (post.author_id !== user.id && role !== 'admin')
     throw createError({ statusCode: 403, message: 'Solo el autor o un administrador puede borrar esta publicación.' })
-  await db.prepare('DELETE FROM poll_votes WHERE post_id = ?').run(postId)
-  await db.prepare('DELETE FROM poll_options WHERE post_id = ?').run(postId)
-  await db.prepare('DELETE FROM reactions WHERE post_id = ?').run(postId)
-  await db.prepare('DELETE FROM comments WHERE post_id = ?').run(postId)
-  await db.prepare('DELETE FROM bookmarks WHERE post_id = ?').run(postId)
-  await db.prepare('DELETE FROM notifications WHERE tenant_id = ? AND link = ?').run(tenant.id, `/p/${post.channel_slug}/${post.slug}`)
-  await db.prepare('DELETE FROM posts WHERE id = ?').run(postId)
+  // Fase 12: la cascada vive en utils/moderation para que «Eliminar
+  // contenido» desde la cola de reportes borre exactamente igual.
+  await deletePostCascade(event, tenant.id, postId, post.channel_slug, post.slug)
   return { ok: true }
 })

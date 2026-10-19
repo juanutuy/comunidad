@@ -19,6 +19,14 @@ export default defineEventHandler(async (event) => {
 
   const hf = hiddenFilterSql(user?.id ?? null)
   const postRows = await db.prepare(`${POST_SELECT} WHERE p.tenant_id = ? AND p.status = 'published' AND (p.title LIKE ? OR p.body LIKE ?)${hf.sql} ORDER BY p.created_at DESC LIMIT 10`).all(tenant.id, like, like, ...hf.params) as Record<string, unknown>[]
+  // Fase 12: la búsqueda excluye los posts en revisión para todos,
+  // excepto su autor y los admins (misma regla que feed y perfil).
+  if (user) {
+    const reviewRows = role === 'admin'
+      ? await db.prepare(`${POST_SELECT} WHERE p.tenant_id = ? AND p.status = 'review' AND (p.title LIKE ? OR p.body LIKE ?)${hf.sql} ORDER BY p.created_at DESC LIMIT 10`).all(tenant.id, like, like, ...hf.params) as Record<string, unknown>[]
+      : await db.prepare(`${POST_SELECT} WHERE p.tenant_id = ? AND p.status = 'review' AND p.author_id = ? AND (p.title LIKE ? OR p.body LIKE ?)${hf.sql} ORDER BY p.created_at DESC LIMIT 10`).all(tenant.id, user.id, like, like, ...hf.params) as Record<string, unknown>[]
+    postRows.push(...reviewRows)
+  }
   const posts = []
   for (const r of postRows) {
     const ch = (await channelBySlug(event, tenant.id, r.channel_slug as string))!

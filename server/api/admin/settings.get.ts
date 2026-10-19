@@ -6,12 +6,14 @@ export default defineEventHandler(async (event) => {
   const tenant = await resolveTenant(event)
   await requireAdmin(event, tenant.id)
   const db = await dbFor(event)
-  const row = await db.prepare('SELECT terms, privacy FROM tenants WHERE id = ?').get(tenant.id).catch(() => undefined) as { terms: string, privacy: string } | undefined
+  const row = await db.prepare('SELECT terms, privacy, moderation_review FROM tenants WHERE id = ?').get(tenant.id).catch(() => undefined) as { terms: string, privacy: string, moderation_review?: number } | undefined
   return {
     settings: {
       name: tenant.name, tagline: tenant.tagline, brandColor: tenant.brand_color,
       guidelines: JSON.parse(tenant.guidelines || '[]') as string[],
       terms: row?.terms || '', privacy: row?.privacy || '',
+      // Fase 12: revisión previa opcional de publicaciones.
+      moderationReview: !!row?.moderation_review,
     },
   }
 })

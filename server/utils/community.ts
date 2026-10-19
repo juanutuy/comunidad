@@ -6,6 +6,7 @@ import type { H3Event } from 'h3'
 import { readSession } from './auth'
 import { isOnline } from './chat'
 import { dbFor } from './db'
+import { getReviewEnabled } from './moderation'
 import { sanitizeHtml } from './sanitize'
 
 export interface TenantRow { id: number, slug: string, name: string, tagline: string, brand_color: string, guidelines: string }
@@ -98,8 +99,20 @@ export async function canAccessChannel(event: H3Event, userId: number | null, ro
 export async function publishDuePosts(event: H3Event, tenantId: number): Promise<void> {
   try {
     const db = await dbFor(event)
+    const now = new Date().toISOString()
+    // Fase 12: con la revisión previa encendida, los programados de
+    // miembros NO administradores vencen a 'review' (no a 'published');
+    // los de admins publican directo, como al crear.
+    if (await getReviewEnabled(event, tenantId)) {
+      await db.prepare(`UPDATE posts SET status = 'published', created_at = scheduled_at WHERE tenant_id = ? AND status = 'scheduled' AND scheduled_at != '' AND scheduled_at <= ?
+        AND author_id IN (SELECT user_id FROM memberships WHERE tenant_id = ? AND role = 'admin')`)
+        .run(tenantId, now, tenantId)
+      await db.prepare("UPDATE posts SET status = 'review', created_at = scheduled_at WHERE tenant_id = ? AND status = 'scheduled' AND scheduled_at != '' AND scheduled_at <= ?")
+        .run(tenantId, now)
+      return
+    }
     await db.prepare("UPDATE posts SET status = 'published', created_at = scheduled_at WHERE tenant_id = ? AND status = 'scheduled' AND scheduled_at != '' AND scheduled_at <= ?")
-      .run(tenantId, new Date().toISOString())
+      .run(tenantId, now)
   }
   catch { /* bases anteriores sin la columna: nada que publicar */ }
 }

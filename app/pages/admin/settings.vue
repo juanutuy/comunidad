@@ -4,7 +4,10 @@
 // referencia, con sub-navegación real: «General» (nombre, lema, color
 // de marca y reglas) y «Textos legales» (términos y privacidad). Es un
 // solo formulario y un solo guardado contra PUT /api/admin/settings:
-// las pestañas solo reparten los campos en dos vistas.
+// las pestañas solo reparten los campos en las vistas.
+// Fase 12: tercera pestaña «Moderación» con la revisión previa
+// opcional de publicaciones (su propia subsección porque es un
+// comportamiento con explicación, no un dato de identidad).
 definePageMeta({ layout: 'admin' })
 const { user, tenant, fetchMe } = useAuth()
 const api = useApi()
@@ -13,10 +16,10 @@ const route = useRoute()
 
 const { data } = await useAsyncData('admin-settings', () =>
   user.value?.role === 'admin'
-    ? api<{ settings: { name: string, tagline: string, brandColor: string, guidelines: string[], terms: string, privacy: string } }>('/api/admin/settings')
+    ? api<{ settings: { name: string, tagline: string, brandColor: string, guidelines: string[], terms: string, privacy: string, moderationReview?: boolean } }>('/api/admin/settings')
     : Promise.resolve(null))
 
-const form = reactive({ name: '', tagline: '', brandColor: '#2563eb', guidelinesText: '', terms: '', privacy: '' })
+const form = reactive({ name: '', tagline: '', brandColor: '#2563eb', guidelinesText: '', terms: '', privacy: '', moderationReview: false })
 watchEffect(() => {
   if (data.value?.settings) {
     form.name = data.value.settings.name
@@ -25,14 +28,16 @@ watchEffect(() => {
     form.guidelinesText = data.value.settings.guidelines.join('\n')
     form.terms = data.value.settings.terms || ''
     form.privacy = data.value.settings.privacy || ''
+    form.moderationReview = !!data.value.settings.moderationReview
   }
 })
 
 const subItems = [
   { value: 'general', label: 'General', icon: 'i-lucide-settings' },
   { value: 'legales', label: 'Textos legales', icon: 'i-lucide-scale' },
+  { value: 'moderacion', label: 'Moderación', icon: 'i-lucide-shield-alert' },
 ]
-const tab = computed(() => (route.query.tab === 'legales' ? 'legales' : 'general'))
+const tab = computed(() => (route.query.tab === 'legales' ? 'legales' : route.query.tab === 'moderacion' ? 'moderacion' : 'general'))
 
 const saving = ref(false)
 async function save() {
@@ -47,6 +52,7 @@ async function save() {
         guidelines: form.guidelinesText.split('\n').map(g => g.trim()).filter(Boolean),
         terms: form.terms,
         privacy: form.privacy,
+        moderationReview: form.moderationReview,
       },
     })
     toast.add({ title: 'Ajustes guardados', color: 'success' })
@@ -92,7 +98,7 @@ async function save() {
         </div>
       </UCard>
 
-      <UCard v-else>
+      <UCard v-else-if="tab === 'legales'">
         <div class="space-y-4">
           <UFormField label="Términos y condiciones" description="Se muestran en /terms. Si queda vacío se usa un texto por defecto.">
             <UTextarea v-model="form.terms" :rows="10" class="w-full" placeholder="Texto de términos de tu comunidad…" />
@@ -100,6 +106,28 @@ async function save() {
           <UFormField label="Política de privacidad" description="Se muestra en /privacy. Si queda vacío se usa un texto por defecto.">
             <UTextarea v-model="form.privacy" :rows="10" class="w-full" placeholder="Texto de privacidad de tu comunidad…" />
           </UFormField>
+        </div>
+      </UCard>
+
+      <UCard v-else>
+        <div class="space-y-4">
+          <div class="flex items-start justify-between gap-4">
+            <div class="min-w-0">
+              <p class="font-semibold">Revisión previa de publicaciones</p>
+              <p class="mt-1 text-sm text-muted">
+                Las publicaciones de miembros quedan en revisión hasta que un administrador las apruebe.
+                Los administradores publican directamente. Las publicaciones en revisión no se ven en el
+                feed ni suman puntos hasta ser aprobadas, y se gestionan desde
+                <NuxtLink to="/admin/moderation?tab=revision" class="text-primary hover:underline">Moderación → En revisión</NuxtLink>.
+              </p>
+            </div>
+            <USwitch v-model="form.moderationReview" aria-label="Activar la revisión previa de publicaciones" />
+          </div>
+          <UAlert
+            color="neutral" variant="soft" icon="i-lucide-info"
+            title="Las ediciones no pasan por revisión"
+            description="La revisión previa aplica solo a publicaciones nuevas. Editar una publicación ya aprobada no la vuelve a mandar a la cola."
+          />
         </div>
       </UCard>
 

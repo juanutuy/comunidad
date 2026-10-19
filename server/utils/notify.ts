@@ -9,7 +9,7 @@ export interface NotifyInput {
   tenantId: number
   userId: number // destinatario
   actorId: number | null
-  type: 'reaction' | 'comment' | 'new_post' | 'mention' | 'dm' | 'follow'
+  type: 'reaction' | 'comment' | 'new_post' | 'mention' | 'dm' | 'follow' | 'report' | 'moderation'
   title: string
   link: string
 }
@@ -18,7 +18,11 @@ export interface NotifyInput {
 // Clave en user_prefs por tipo; por defecto todo activado (sin fila).
 // 'follow' (Fase 6) tiene su propia categoría de preferencia
 // (notify_follow), no se mezcla con menciones: son avisos distintos.
-const PREF_BY_TYPE: Record<NotifyInput['type'], string> = {
+// Fase 12: 'report' (aviso a admins de un reporte nuevo) y
+// 'moderation' (aprobación/rechazo de una publicación en revisión) NO
+// tienen preferencia propia a propósito: son avisos operativos de
+// moderación, no sociales, y siempre llegan.
+const PREF_BY_TYPE: Partial<Record<NotifyInput['type'], string>> = {
   reaction: 'notify_reaction',
   comment: 'notify_comment',
   mention: 'notify_mention',
@@ -30,10 +34,13 @@ const PREF_BY_TYPE: Record<NotifyInput['type'], string> = {
 export async function notify(event: H3Event, n: NotifyInput): Promise<void> {
   if (n.actorId && n.userId === n.actorId) return
   const db = await dbFor(event)
+  const prefKey = PREF_BY_TYPE[n.type]
   try {
-    const pref = await db.prepare('SELECT value FROM user_prefs WHERE tenant_id = ? AND user_id = ? AND key = ?')
-      .get(n.tenantId, n.userId, PREF_BY_TYPE[n.type]) as { value: string } | undefined
-    if (pref && pref.value === '0') return // el destinatario apagó este tipo
+    if (prefKey) {
+      const pref = await db.prepare('SELECT value FROM user_prefs WHERE tenant_id = ? AND user_id = ? AND key = ?')
+        .get(n.tenantId, n.userId, prefKey) as { value: string } | undefined
+      if (pref && pref.value === '0') return // el destinatario apagó este tipo
+    }
   }
   catch { /* bases sin la tabla: se notifica como siempre */ }
   await db.prepare('INSERT INTO notifications (tenant_id, user_id, actor_id, type, title, link, is_read, created_at) VALUES (?, ?, ?, ?, ?, ?, 0, ?)')

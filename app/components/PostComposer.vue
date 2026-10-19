@@ -195,9 +195,12 @@ async function submit(mode: 'now' | 'draft' | 'schedule') {
       payload.mediaUrl = attachedFile.value.url
       payload.attachmentName = attachedFile.value.name
     }
-    await api('/api/posts', { method: 'POST', body: payload })
+    const created = await api<{ status?: string }>('/api/posts', { method: 'POST', body: payload })
     if (mode === 'draft') toast.add({ title: 'Borrador guardado', description: 'Lo encontrás en «Mis borradores».', color: 'success' })
     else if (mode === 'schedule') toast.add({ title: 'Publicación programada', description: `Se publica el ${new Date(scheduledAt.value).toLocaleString('es', { dateStyle: 'medium', timeStyle: 'short' })}.`, color: 'success' })
+    // Fase 12: con la revisión previa encendida, el servidor devuelve
+    // status 'review': el post no se publica todavía.
+    else if (created.status === 'review') toast.add({ title: 'Publicación enviada a revisión', description: 'Un administrador la va a revisar antes de que aparezca en el feed.', color: 'success' })
     else toast.add({ title: 'Publicación creada', color: 'success' })
     confirmDiscard.value = false
     open.value = false

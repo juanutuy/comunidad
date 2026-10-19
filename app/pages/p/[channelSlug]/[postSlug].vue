@@ -43,6 +43,12 @@ async function deleteComment(id: number) {
   }
   catch { toast.add({ title: 'No se pudo eliminar el comentario', color: 'error' }) }
 }
+
+// Fase 12: reportar un comentario ajeno desde su menú «…».
+const { openReport } = useReportDialog()
+function commentMenuItems(c: CommentView) {
+  return [[{ label: 'Reportar', icon: 'i-lucide-flag', onSelect: () => openReport({ type: 'comment', id: c.id, label: c.body.slice(0, 80) }) }]]
+}
 </script>
 
 <template>
@@ -63,6 +69,9 @@ async function deleteComment(id: number) {
               <span class="text-xs text-muted">{{ fmtDateTime(c.createdAt) }}</span>
               <span class="flex-1" />
               <UButton v-if="user && (user.role === 'admin' || user.slug === c.author.slug)" size="xs" color="error" variant="ghost" icon="i-lucide-trash-2" title="Eliminar comentario" @click="deleteComment(c.id)" />
+              <UDropdownMenu v-if="user && user.slug !== c.author.slug" :items="commentMenuItems(c)">
+                <UButton size="xs" color="neutral" variant="ghost" icon="i-lucide-more-horizontal" title="Más acciones del comentario" />
+              </UDropdownMenu>
             </p>
             <p class="mt-1 whitespace-pre-line text-sm">{{ c.body }}</p>
           </div>

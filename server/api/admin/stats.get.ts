@@ -35,8 +35,14 @@ export default defineEventHandler(async (event) => {
     FROM posts p JOIN channels c ON c.id = p.channel_id JOIN users u ON u.id = p.author_id
     WHERE p.tenant_id = ? AND p.status = 'published' AND NOT EXISTS (SELECT 1 FROM comments cm WHERE cm.post_id = p.id)
     ORDER BY p.created_at DESC LIMIT 5`).all(tenant.id) as Record<string, unknown>[]
+  // Fase 12: contadores de moderación para el bloque «Necesita tu
+  // atención» del Panel (reportes pendientes + posts en revisión).
+  const moderation = {
+    pendingReports: await one("SELECT COUNT(*) AS n FROM reports WHERE tenant_id = ? AND status = 'pending'", tenant.id).catch(() => 0),
+    inReview: await one("SELECT COUNT(*) AS n FROM posts WHERE tenant_id = ? AND status = 'review'", tenant.id),
+  }
   return {
-    totals, activity30,
+    totals, activity30, moderation,
     postsWithoutComments: quietPosts.map(p => ({ id: p.id, title: p.title, slug: p.slug, channelSlug: p.channel_slug, channelName: p.channel_name, authorName: p.author_name, createdAt: p.created_at })),
     recentMembers: memberRows.slice(0, 5).map(r => ({ id: r.id, name: r.name, slug: r.slug, avatarUrl: r.avatar_url || '', role: r.role, createdAt: r.created_at })),
   }

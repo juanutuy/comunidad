@@ -14,7 +14,9 @@ export default defineEventHandler(async (event) => {
   if (!row) throw createError({ statusCode: 404, message: 'Publicación no encontrada.' })
   const { user, role } = await currentAuth(event, tenant.id)
   // Fase 5: borradores y programados SOLO los abre su autor.
-  if (row.status && row.status !== 'published' && user?.id !== row.author_id)
+  // Fase 12: un post en revisión también lo pueden abrir los admins
+  // (para evaluarlo desde su contexto, además de la cola).
+  if (row.status && row.status !== 'published' && user?.id !== row.author_id && !(row.status === 'review' && role === 'admin'))
     throw createError({ statusCode: 404, message: 'Publicación no encontrada.' })
   const access = await canAccessChannel(event, user?.id ?? null, role, channel)
   const blocked = await blockedByMe(event, tenant.id, user?.id ?? null)

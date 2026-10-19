@@ -44,6 +44,9 @@ CREATE TABLE IF NOT EXISTS user_hidden_posts (id INTEGER PRIMARY KEY AUTOINCREME
 CREATE TABLE IF NOT EXISTS user_follows (id INTEGER PRIMARY KEY AUTOINCREMENT, tenant_id INTEGER NOT NULL, follower_id INTEGER NOT NULL, followee_id INTEGER NOT NULL, created_at TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS gamification_levels (id INTEGER PRIMARY KEY AUTOINCREMENT, tenant_id INTEGER NOT NULL, name TEXT NOT NULL, min_points INTEGER NOT NULL DEFAULT 0, icon TEXT NOT NULL DEFAULT 'i-lucide-award', position INTEGER NOT NULL DEFAULT 0);
 CREATE TABLE IF NOT EXISTS gamification_points (id INTEGER PRIMARY KEY AUTOINCREMENT, tenant_id INTEGER NOT NULL, action TEXT NOT NULL, points INTEGER NOT NULL DEFAULT 0);
+CREATE TABLE IF NOT EXISTS reports (id INTEGER PRIMARY KEY AUTOINCREMENT, tenant_id INTEGER NOT NULL, reporter_id INTEGER NOT NULL, target_type TEXT NOT NULL DEFAULT 'post', target_id INTEGER NOT NULL, reason TEXT NOT NULL DEFAULT 'otro', note TEXT NOT NULL DEFAULT '', status TEXT NOT NULL DEFAULT 'pending', action TEXT NOT NULL DEFAULT 'none', resolved_by INTEGER, resolved_at TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL);
+CREATE INDEX IF NOT EXISTS reports_tenant_status ON reports (tenant_id, status, created_at);
+CREATE INDEX IF NOT EXISTS reports_target ON reports (tenant_id, target_type, target_id, status);
 CREATE UNIQUE INDEX IF NOT EXISTS bookmarks_unique ON bookmarks (tenant_id, post_id, user_id);
 CREATE UNIQUE INDEX IF NOT EXISTS channel_access_unique ON channel_access (tenant_id, user_id, channel_id);
 CREATE UNIQUE INDEX IF NOT EXISTS channels_tenant_slug ON channels (tenant_id, slug);

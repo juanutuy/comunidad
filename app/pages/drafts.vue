@@ -71,8 +71,13 @@ async function saveEdit() {
 
 async function publishNow(d: DraftView) {
   try {
-    await api(`/api/posts/${d.id}/publish`, { method: 'POST' })
-    toast.add({ title: 'Publicado', description: 'Tu publicación ya se ve en el canal.', color: 'success' })
+    const res = await api<{ review?: boolean }>(`/api/posts/${d.id}/publish`, { method: 'POST' })
+    // Fase 12: con la revisión previa encendida, «publicar» un
+    // borrador de un miembro lo manda a la cola de revisión.
+    if (res.review)
+      toast.add({ title: 'Enviado a revisión', description: 'Un administrador lo va a revisar antes de que aparezca en el feed.', color: 'success' })
+    else
+      toast.add({ title: 'Publicado', description: 'Tu publicación ya se ve en el canal.', color: 'success' })
     await refresh()
   }
   catch (e) {

@@ -29,6 +29,14 @@ export default defineEventHandler(async (event) => {
     return out
   }
   const postRows = iBlockedThem ? [] : await db.prepare(`${POST_SELECT} WHERE p.author_id = ? AND p.tenant_id = ? AND p.status = 'published' ORDER BY p.created_at DESC`).all(user.id, tenant.id) as Record<string, unknown>[]
+  // Fase 12: los posts en revisión del dueño del perfil solo se suman
+  // cuando quien mira es el propio dueño o un admin (insignia
+  // «En revisión» en la tarjeta); para cualquier otro no existen.
+  if (!iBlockedThem && ((!!me && me.id === Number(user.id)) || role === 'admin')) {
+    const reviewRows = await db.prepare(`${POST_SELECT} WHERE p.author_id = ? AND p.tenant_id = ? AND p.status = 'review' ORDER BY p.created_at DESC`).all(user.id, tenant.id) as Record<string, unknown>[]
+    postRows.push(...reviewRows)
+    postRows.sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)))
+  }
   const posts = await serializeVisible(postRows)
   const comments = iBlockedThem ? [] : await db.prepare(`SELECT c.body, c.created_at, p.title AS post_title, p.slug AS post_slug, ch.slug AS channel_slug
     FROM comments c JOIN posts p ON p.id = c.post_id JOIN channels ch ON ch.id = p.channel_id

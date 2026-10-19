@@ -42,6 +42,9 @@ const typeIcons: Record<string, string> = {
   mention: 'i-lucide-at-sign',
   dm: 'i-lucide-mail',
   follow: 'i-lucide-user-plus',
+  // Fase 12: avisos de moderación.
+  report: 'i-lucide-flag',
+  moderation: 'i-lucide-shield-check',
 }
 
 async function load() {

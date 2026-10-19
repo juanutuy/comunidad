@@ -1,19 +1,24 @@
 // Comentar una publicación (solo miembros con sesión).
 // Se notifica al autor de la publicación y a quienes sean mencionados.
-import { requireUser, resolveTenant } from '../../../utils/community'
+import { currentAuth, requireUser, resolveTenant } from '../../../utils/community'
 import { nowIso, dbFor } from '../../../utils/db'
 import { notify, notifyMentions } from '../../../utils/notify'
 
 export default defineEventHandler(async (event) => {
   const tenant = await resolveTenant(event)
   const user = await requireUser(event, tenant.id)
+  const { role } = await currentAuth(event, tenant.id)
   const postId = Number(getRouterParam(event, 'id'))
   const body = await readBody<{ body?: string }>(event)
   const text = (body.body || '').trim()
   if (!text) throw createError({ statusCode: 400, message: 'El comentario no puede estar vacío.' })
   const db = await dbFor(event)
-  const post = await db.prepare(`SELECT p.author_id, p.title, p.slug, p.allow_comments, c.slug AS channel_slug FROM posts p JOIN channels c ON c.id = p.channel_id WHERE p.id = ? AND p.tenant_id = ? AND p.status = 'published'`).get(postId, tenant.id) as { author_id: number, title: string, slug: string, allow_comments: number, channel_slug: string } | undefined
+  const post = await db.prepare(`SELECT p.author_id, p.title, p.slug, p.status, p.allow_comments, c.slug AS channel_slug FROM posts p JOIN channels c ON c.id = p.channel_id WHERE p.id = ? AND p.tenant_id = ?`).get(postId, tenant.id) as { author_id: number, title: string, slug: string, status: string, allow_comments: number, channel_slug: string } | undefined
   if (!post) throw createError({ statusCode: 404, message: 'Publicación no encontrada.' })
+  // Fase 12: en un post que no está publicado (p. ej. en revisión)
+  // solo pueden comentar su autor y los admins; para el resto no existe.
+  if (post.status !== 'published' && post.author_id !== user.id && role !== 'admin')
+    throw createError({ statusCode: 404, message: 'Publicación no encontrada.' })
   // Fase 7: el autor pudo desactivar los comentarios al publicar.
   if (post.allow_comments === 0)
     throw createError({ statusCode: 403, message: 'Los comentarios están desactivados en esta publicación.' })

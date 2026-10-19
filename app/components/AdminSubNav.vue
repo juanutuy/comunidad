@@ -5,7 +5,7 @@
 // sin parámetro vale la primera. Solo se usa donde la sección tiene
 // subsecciones reales — no es decoración.
 const props = defineProps<{
-  items: { value: string, label: string, icon?: string }[]
+  items: { value: string, label: string, icon?: string, badge?: number }[]
 }>()
 const route = useRoute()
 const active = computed(() => {
@@ -26,6 +26,7 @@ const active = computed(() => {
       role="tab" :aria-selected="active === item.value"
     >
       <UIcon v-if="item.icon" :name="item.icon" /> {{ item.label }}
+      <UBadge v-if="item.badge" color="warning" variant="subtle" size="sm">{{ item.badge }}</UBadge>
     </NuxtLink>
   </div>
 </template>

@@ -8,6 +8,7 @@
 // canal y a los mencionados.
 import { canAccessChannel, channelBySlug, currentAuth, requireUser, resolveTenant } from '../utils/community'
 import { nowIso, dbFor, slugify } from '../utils/db'
+import { getReviewEnabled } from '../utils/moderation'
 import { notifyNewPost } from '../utils/notify'
 import { htmlToText, sanitizeHtml } from '../utils/sanitize'
 
@@ -69,7 +70,15 @@ export default defineEventHandler(async (event) => {
       throw createError({ statusCode: 400, message: 'Cada opción puede tener hasta 80 caracteres.' })
   }
 
-  const status = body.status === 'draft' ? 'draft' : body.status === 'scheduled' ? 'scheduled' : 'published'
+  let status = body.status === 'draft' ? 'draft' : body.status === 'scheduled' ? 'scheduled' : 'published'
+  // Fase 12: revisión previa opcional — con el ajuste del tenant
+  // encendido, un post de un miembro NO admin nace en 'review' y no se
+  // ve (ni suma puntos: memberStats solo cuenta 'published') hasta que
+  // un admin lo aprueba. Los admins publican directo. Borradores y
+  // programados conservan su flujo (el programado pasa por
+  // publishDuePosts, que aplica la misma regla al vencer).
+  if (status === 'published' && role !== 'admin' && await getReviewEnabled(event, tenant.id))
+    status = 'review'
   let scheduledAt = ''
   if (status === 'scheduled') {
     const when = new Date(body.scheduledAt || '')
