@@ -895,10 +895,8 @@ estudio sin perder datos (certificado sigue encendido en ellos);
   misma lógica/endpoints que tenía la página (`/api/settings*`,
   `/api/uploads`), guardando sin salir de donde estás. Se abre desde
   el menú del avatar, desde el panel móvil y desde la barra de la
-  consola; en teléfono va a pantalla completa. Convive con el modal
-  «Editar perfil» de la Fase 9: ese queda para la edición rápida de
-  los datos públicos desde el perfil; ambos escriben contra los
-  mismos endpoints (una sola fuente de verdad). La ruta `/settings`
+  consola; en teléfono va a pantalla completa. Es el único editor de
+  perfil (ver la nota de unificación al final de la Fase 12). La ruta `/settings`
   queda como compatibilidad: abre el modal (acepta `?section=`) y
   vuelve a `/feeds`, para no romper enlaces guardados.
 
@@ -960,6 +958,14 @@ estudio sin perder datos (certificado sigue encendido en ellos);
   sesión. El panel móvil conserva igualmente su único «Panel de
   administración» y el enlace del lateral de miembro (Enlaces) se
   queda: son entradas únicas, no duplicaciones.
+- **Un solo editor de perfil** (corrección posterior, detectada por
+  el dueño): el perfil tenía dos editores de los mismos datos — la
+  sección «Perfil» de este modal de Ajustes y los modales propios de
+  la página de perfil de la Fase 9 («Editar perfil» y el de portada).
+  Esos modales se retiraron: el botón «Editar perfil» y el botón de
+  portada del perfil propio solo abren el modal de Ajustes en su
+  sección «Perfil» (que ya incluye avatar y portada), y al cerrarlo
+  la página de perfil recarga sus datos para reflejar los cambios.
 
 ## Pendiente a propósito (fuera de esta fase)
 

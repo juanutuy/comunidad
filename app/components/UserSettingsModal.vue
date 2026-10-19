@@ -7,12 +7,12 @@
 // /api/uploads): la lógica es la que vivía en la página /settings,
 // que desde esta fase redirige a este modal.
 //
-// Convivencia con el modal «Editar perfil» de la Fase 9 (en la
-// cabecera del perfil): ese sigue existiendo para la edición rápida
-// de los datos públicos (nombre/bio/portada) sin salir del perfil;
-// este modal es el completo (perfil + notificaciones + privacidad +
-// bloqueos + seguridad). Ambos escriben contra los mismos endpoints,
-// así que no hay dos fuentes de verdad: solo dos entradas.
+// Este es el ÚNICO editor de perfil: su sección «Perfil» edita
+// nombre, bio, ubicación, sitio web y las fotos de avatar y portada.
+// El botón «Editar perfil» y el botón de portada de la página de
+// perfil solo abren este modal en esa sección (los modales propios
+// que el perfil tenía desde la Fase 9 se retiraron para no duplicar
+// la edición de los mismos datos).
 const { open, section, closeSettings } = useUserSettings()
 const { user, fetchMe } = useAuth()
 const api = useApi()

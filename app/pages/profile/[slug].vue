@@ -5,7 +5,7 @@ const route = useRoute()
 const slug = computed(() => String(route.params.slug))
 const api = useApi()
 const toast = useToast()
-const { user, fetchMe } = useAuth()
+const { user } = useAuth()
 const { fmtDate, fmtDateTime, timeAgo, initials } = useFormat()
 
 interface Badge { id: string, name: string, description: string, icon: string, earned: boolean }
@@ -32,86 +32,18 @@ const { data, refresh } = await useAsyncData(() => `profile-${slug.value}`, () =
 
 const isOwn = computed(() => !!user.value && user.value.slug === slug.value)
 
-// Subida de imágenes: avatar y portada reutilizan /api/uploads
-// (kind 'avatar' | 'cover'), tanto desde la cabecera como desde los
-// modales de personalización (Fase 9).
-const uploadingAvatar = ref(false)
-async function onAvatarChange(e: Event) {
-  const file = (e.target as HTMLInputElement).files?.[0]
-  if (!file) return
-  uploadingAvatar.value = true
-  try {
-    const fd = new FormData()
-    fd.append('file', file)
-    fd.append('kind', 'avatar')
-    await api('/api/uploads', { method: 'POST', body: fd })
-    toast.add({ title: 'Foto de perfil actualizada', color: 'success' })
-    await fetchMe()
-    await refresh()
-  }
-  catch (err) {
-    toast.add({ title: 'No se pudo subir la foto', description: (err as { data?: { message?: string } }).data?.message || 'Probá con otra imagen.', color: 'error' })
-  }
-  finally { uploadingAvatar.value = false }
-}
-const uploadingCover = ref(false)
-async function onCoverChange(e: Event) {
-  const file = (e.target as HTMLInputElement).files?.[0]
-  if (!file) return
-  uploadingCover.value = true
-  try {
-    const fd = new FormData()
-    fd.append('file', file)
-    fd.append('kind', 'cover')
-    await api('/api/uploads', { method: 'POST', body: fd })
-    toast.add({ title: 'Foto de portada actualizada', color: 'success' })
-    await refresh()
-  }
-  catch (err) {
-    toast.add({ title: 'No se pudo subir la portada', description: (err as { data?: { message?: string } }).data?.message || 'Probá con otra imagen.', color: 'error' })
-  }
-  finally { uploadingCover.value = false }
-}
-async function removeCover() {
-  if (!data.value) return
-  try {
-    await api('/api/settings/profile', {
-      method: 'PUT',
-      body: { name: data.value.profile.name, bio: data.value.profile.bio, location: data.value.profile.location, website: data.value.profile.website, coverUrl: '' },
-    })
-    toast.add({ title: 'Portada eliminada', description: 'Tu perfil vuelve al fondo de color por defecto.', color: 'success' })
-    await refresh()
-  }
-  catch { toast.add({ title: 'No se pudo quitar la portada', color: 'error' }) }
-}
-
-// Fase 9: modales de personalización del perfil propio.
-const coverOpen = ref(false)
-const editOpen = ref(false)
-const editForm = reactive({ name: '', bio: '', location: '', website: '' })
-watch(editOpen, (open) => {
-  if (open && data.value) {
-    editForm.name = data.value.profile.name
-    editForm.bio = data.value.profile.bio
-    editForm.location = data.value.profile.location
-    editForm.website = data.value.profile.website
-  }
+// Edición del perfil propio: UN solo editor, el modal de Ajustes
+// (Fase 11). El botón «Editar perfil» y el botón de portada de la
+// cabecera solo abren ese modal en su sección «Perfil» — que ya
+// incluye nombre, bio, ubicación, sitio web y las subidas de avatar
+// y portada contra los mismos endpoints. Los modales propios que
+// esta página tenía desde la Fase 9 se retiraron para no duplicar
+// la edición de los mismos datos. Al cerrar el modal, si este es el
+// perfil propio, se recargan los datos para reflejar los cambios.
+const { openSettings, open: settingsOpen } = useUserSettings()
+watch(settingsOpen, (isOpen, wasOpen) => {
+  if (!isOpen && wasOpen && isOwn.value) refresh()
 })
-const savingEdit = ref(false)
-async function saveEdit() {
-  savingEdit.value = true
-  try {
-    await api('/api/settings/profile', { method: 'PUT', body: { ...editForm } })
-    toast.add({ title: 'Perfil guardado', color: 'success' })
-    editOpen.value = false
-    await fetchMe()
-    await refresh()
-  }
-  catch (e) {
-    toast.add({ title: 'No se pudo guardar', description: (e as { data?: { message?: string } }).data?.message || '', color: 'error' })
-  }
-  finally { savingEdit.value = false }
-}
 
 // Fase 6: seguir / dejar de seguir a este miembro.
 const followBusy = ref(false)
@@ -221,7 +153,7 @@ const navItems = computed(() => {
         <button
           v-if="isOwn" type="button"
           class="absolute right-3 bottom-3 inline-flex cursor-pointer items-center gap-2 rounded-lg bg-black/55 px-3 py-1.5 text-sm font-medium text-white backdrop-blur transition hover:bg-black/70"
-          @click="coverOpen = true"
+          @click="openSettings('perfil')"
         >
           <UIcon name="i-lucide-camera" />
           {{ data.profile.coverUrl ? 'Cambiar portada' : 'Agregar portada' }}
@@ -252,7 +184,7 @@ const navItems = computed(() => {
         </div>
         <div class="flex flex-wrap items-center gap-2 pt-1">
           <template v-if="isOwn">
-            <UButton size="sm" icon="i-lucide-pencil" label="Editar perfil" @click="editOpen = true" />
+            <UButton size="sm" icon="i-lucide-pencil" label="Editar perfil" @click="openSettings('perfil')" />
           </template>
           <template v-else-if="user">
             <UButton
@@ -427,80 +359,6 @@ const navItems = computed(() => {
         </UCard>
       </div>
     </div>
-
-    <!-- Modal: foto de portada -->
-    <UModal v-model:open="coverOpen" title="Foto de portada" description="Es la imagen ancha que se ve arriba de tu perfil.">
-      <template #body>
-        <div class="space-y-4">
-          <div class="h-40 overflow-hidden rounded-lg bg-gradient-to-r from-primary/60 to-primary/20">
-            <img v-if="data.profile.coverUrl" :src="data.profile.coverUrl" alt="Tu foto de portada" class="h-full w-full object-cover">
-            <div v-else class="flex h-full items-center justify-center text-sm text-muted">Sin portada: se muestra el color de la comunidad</div>
-          </div>
-          <div class="flex flex-wrap items-center gap-3">
-            <label class="inline-flex cursor-pointer items-center gap-2 text-sm font-medium text-primary hover:underline">
-              <UIcon name="i-lucide-upload" />
-              {{ uploadingCover ? 'Subiendo…' : 'Subir una portada nueva' }}
-              <input type="file" accept="image/png,image/jpeg,image/webp,image/gif" class="hidden" :disabled="uploadingCover" @change="onCoverChange">
-            </label>
-            <UButton v-if="data.profile.coverUrl" size="sm" color="error" variant="ghost" icon="i-lucide-trash-2" label="Quitar portada" @click="removeCover" />
-          </div>
-          <p class="text-xs text-muted">PNG, JPG, WebP o GIF, hasta 2 MB. Se ve mejor una imagen ancha (por ejemplo 1200 × 400).</p>
-        </div>
-      </template>
-      <template #footer>
-        <div class="flex justify-end">
-          <UButton color="neutral" variant="soft" label="Cerrar" @click="coverOpen = false" />
-        </div>
-      </template>
-    </UModal>
-
-    <!-- Modal: editar perfil -->
-    <UModal v-model:open="editOpen" title="Editar perfil" description="Así te ve el resto de la comunidad.">
-      <template #body>
-        <div class="space-y-4">
-          <div class="flex items-center gap-3">
-            <UAvatar :src="data.profile.avatarUrl || undefined" :text="initials(data.profile.name)" size="lg" />
-            <label class="inline-flex cursor-pointer items-center gap-2 text-sm font-medium text-primary hover:underline">
-              <UIcon name="i-lucide-camera" />
-              {{ uploadingAvatar ? 'Subiendo…' : 'Cambiar foto de perfil' }}
-              <input type="file" accept="image/png,image/jpeg,image/webp,image/gif" class="hidden" :disabled="uploadingAvatar" @change="onAvatarChange">
-            </label>
-          </div>
-          <div>
-            <p class="mb-2 text-sm font-medium">Foto de portada</p>
-            <div class="h-24 overflow-hidden rounded-lg bg-gradient-to-r from-primary/60 to-primary/20">
-              <img v-if="data.profile.coverUrl" :src="data.profile.coverUrl" alt="" class="h-full w-full object-cover">
-            </div>
-            <div class="mt-2 flex flex-wrap items-center gap-3">
-              <label class="inline-flex cursor-pointer items-center gap-2 text-sm font-medium text-primary hover:underline">
-                <UIcon name="i-lucide-image" />
-                {{ uploadingCover ? 'Subiendo…' : 'Cambiar portada' }}
-                <input type="file" accept="image/png,image/jpeg,image/webp,image/gif" class="hidden" :disabled="uploadingCover" @change="onCoverChange">
-              </label>
-              <UButton v-if="data.profile.coverUrl" size="sm" color="neutral" variant="ghost" icon="i-lucide-trash-2" label="Quitar portada" @click="removeCover" />
-            </div>
-          </div>
-          <UFormField label="Nombre">
-            <UInput v-model="editForm.name" class="w-full" />
-          </UFormField>
-          <UFormField label="Bio">
-            <UTextarea v-model="editForm.bio" :rows="3" maxlength="500" class="w-full" />
-          </UFormField>
-          <UFormField label="Ubicación">
-            <UInput v-model="editForm.location" class="w-full" />
-          </UFormField>
-          <UFormField label="Sitio web" hint="Se muestra como enlace en tu perfil. Podés escribirlo sin https://">
-            <UInput v-model="editForm.website" class="w-full" placeholder="tusitioweb.com" icon="i-lucide-globe" />
-          </UFormField>
-        </div>
-      </template>
-      <template #footer>
-        <div class="flex justify-end gap-2">
-          <UButton color="neutral" variant="ghost" label="Cancelar" @click="editOpen = false" />
-          <UButton label="Guardar cambios" icon="i-lucide-save" :loading="savingEdit" :disabled="!editForm.name.trim()" @click="saveEdit" />
-        </div>
-      </template>
-    </UModal>
 
     <UModal v-model:open="confirmBlock" title="Bloquear a este miembro" :description="`Si bloqueás a ${data.profile.name}, dejás de ver sus publicaciones y comentarios, y ninguno de los dos podrá enviarse mensajes directos. La otra persona no recibe ningún aviso.`">
       <template #footer>
