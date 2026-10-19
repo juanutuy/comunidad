@@ -5,12 +5,15 @@ import { isOnline } from '../utils/chat'
 import { levelFor } from '../utils/levels'
 import { getGamification } from '../utils/gamification'
 import { dbFor } from '../utils/db'
-import { getPrivacySettings } from '../utils/privacy'
+import { getPrivacySettings, requireSessionUnlessPublic } from '../utils/privacy'
 import { hiddenFilterSql } from '../utils/blocks'
 
 export default defineEventHandler(async (event) => {
   const tenant = await resolveTenant(event)
   const { user } = await currentAuth(event, tenant.id)
+  // Endurecimiento Fase 15: comunidad privada = el riel (líderes,
+  // presencia, miembros) no se lee sin sesión.
+  await requireSessionUnlessPublic(event, tenant.id, user)
   const db = await dbFor(event)
   // Fase 15: el riel se renderiza según la config del tenant (orden,
   // visibilidad y audiencia por bloque). Para el visitante del modo

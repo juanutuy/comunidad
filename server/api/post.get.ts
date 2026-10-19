@@ -4,7 +4,7 @@
 // existe: ni su nombre ni sus publicaciones salen por esta ruta.
 import { POST_SELECT, canAccessChannel, channelBySlug, currentAuth, resolveTenant, serializePost } from '../utils/community'
 import { dbFor } from '../utils/db'
-import { getPrivacySettings } from '../utils/privacy'
+import { getPrivacySettings, requireSessionUnlessPublic } from '../utils/privacy'
 import { blockedByMe } from '../utils/blocks'
 
 export default defineEventHandler(async (event) => {
@@ -16,6 +16,8 @@ export default defineEventHandler(async (event) => {
   const row = await db.prepare(`${POST_SELECT} WHERE p.channel_id = ? AND p.slug = ?`).get(channel.id, String(q.post || '')) as Record<string, unknown> | undefined
   if (!row) throw createError({ statusCode: 404, message: 'Publicación no encontrada.' })
   const { user, role } = await currentAuth(event, tenant.id)
+  // Endurecimiento Fase 15: comunidad privada = el detalle no se lee sin sesión.
+  await requireSessionUnlessPublic(event, tenant.id, user)
   // Fase 5: borradores y programados SOLO los abre su autor.
   // Fase 12: un post en revisión también lo pueden abrir los admins
   // (para evaluarlo desde su contexto, además de la cola).

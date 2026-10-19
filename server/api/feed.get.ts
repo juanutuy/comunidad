@@ -2,12 +2,14 @@
 // usuario. Las de canales pagos/privados sin acceso van como teaser.
 import { POST_SELECT, canAccessChannel, channelBySlug, currentAuth, publishDuePosts, resolveTenant, serializePost } from '../utils/community'
 import { dbFor } from '../utils/db'
-import { getPrivacySettings } from '../utils/privacy'
+import { getPrivacySettings, requireSessionUnlessPublic } from '../utils/privacy'
 import { hiddenFilterSql } from '../utils/blocks'
 
 export default defineEventHandler(async (event) => {
   const tenant = await resolveTenant(event)
   const { user, role } = await currentAuth(event, tenant.id)
+  // Endurecimiento Fase 15: comunidad privada = el feed no se lee sin sesión.
+  await requireSessionUnlessPublic(event, tenant.id, user)
   const db = await dbFor(event)
   await publishDuePosts(event, tenant.id)
   const hf = hiddenFilterSql(user?.id ?? null)

@@ -1,5 +1,6 @@
 // Detalle de evento con asistentes.
 import { currentAuth, resolveTenant } from '../../utils/community'
+import { requireSessionUnlessPublic } from '../../utils/privacy'
 import { dbFor } from '../../utils/db'
 import { sanitizeHtml } from '../../utils/sanitize'
 
@@ -10,6 +11,9 @@ export default defineEventHandler(async (event) => {
     .get(tenant.id, getRouterParam(event, 'slug')!) as Record<string, unknown> | undefined
   if (!row) throw createError({ statusCode: 404, message: 'Evento no encontrado.' })
   const { user } = await currentAuth(event, tenant.id)
+  // Endurecimiento Fase 15: comunidad privada = el detalle del evento
+  // (asistentes incluidos) no se lee sin sesión.
+  await requireSessionUnlessPublic(event, tenant.id, user)
   const attendees = await db.prepare(`SELECT u.name, u.slug FROM rsvps r JOIN users u ON u.id = r.user_id WHERE r.event_id = ?`).all(row.id)
   return {
     event: {

@@ -4,6 +4,7 @@
 // prerrequisito. Sin acceso devuelve los datos básicos y el motivo
 // del candado, nunca el contenido.
 import { currentAuth, resolveTenant } from '../../../../utils/community'
+import { requireSessionUnlessPublic } from '../../../../utils/privacy'
 import { completedLessonIds, courseAccessible, courseCurriculum, enrollmentOf, flattenLessons, lessonAvailability, serializeLessonForViewer } from '../../../../utils/courses'
 import type { CourseRow, LessonRow } from '../../../../utils/courses'
 import { dbFor } from '../../../../utils/db'
@@ -16,6 +17,9 @@ export default defineEventHandler(async (event) => {
   const course = await db.prepare('SELECT * FROM courses WHERE tenant_id = ? AND slug = ?').get(tenant.id, slug) as unknown as CourseRow | undefined
   if (!course) throw createError({ statusCode: 404, message: 'Curso no encontrado.' })
   const { user, role } = await currentAuth(event, tenant.id)
+  // Endurecimiento Fase 15: comunidad privada = ni la lección gratuita
+  // de muestra se abre sin sesión (en público sigue como siempre).
+  await requireSessionUnlessPublic(event, tenant.id, user)
   const isAdmin = role === 'admin'
   const enrollment = await enrollmentOf(event, tenant.id, Number(course.id), user?.id ?? null)
   const enrolled = !!enrollment

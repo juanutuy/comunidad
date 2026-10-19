@@ -1,10 +1,13 @@
 // Lista de eventos con conteo de asistentes y mi RSVP.
 import { currentAuth, resolveTenant } from '../utils/community'
+import { requireSessionUnlessPublic } from '../utils/privacy'
 import { dbFor } from '../utils/db'
 
 export default defineEventHandler(async (event) => {
   const tenant = await resolveTenant(event)
   const { user } = await currentAuth(event, tenant.id)
+  // Endurecimiento Fase 15: comunidad privada = los eventos no se leen sin sesión.
+  await requireSessionUnlessPublic(event, tenant.id, user)
   const db = await dbFor(event)
   const rows = await db.prepare(`SELECT e.*, u.name AS host_name, u.slug AS host_slug FROM events e LEFT JOIN users u ON u.id = e.host_id WHERE e.tenant_id = ? ORDER BY e.starts_at`).all(tenant.id) as Record<string, unknown>[]
   const events = await Promise.all(rows.map(async e => ({

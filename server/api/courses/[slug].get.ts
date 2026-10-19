@@ -4,6 +4,7 @@
 // y cada lección con su tipo y su estado de disponibilidad (drip y
 // prerrequisito) para que la lista muestre los candados correctos.
 import { currentAuth, resolveTenant } from '../../utils/community'
+import { requireSessionUnlessPublic } from '../../utils/privacy'
 import { completedLessonIds, courseAccessible, courseCurriculum, enrollmentOf, flattenLessons, lessonAvailability } from '../../utils/courses'
 import type { CourseRow } from '../../utils/courses'
 import { dbFor } from '../../utils/db'
@@ -16,6 +17,8 @@ export default defineEventHandler(async (event) => {
   const course = await db.prepare('SELECT * FROM courses WHERE tenant_id = ? AND slug = ?').get(tenant.id, slug) as unknown as CourseRow | undefined
   if (!course) throw createError({ statusCode: 404, message: 'Curso no encontrado.' })
   const { user, role } = await currentAuth(event, tenant.id)
+  // Endurecimiento Fase 15: comunidad privada = el curso no se abre sin sesión.
+  await requireSessionUnlessPublic(event, tenant.id, user)
   const isAdmin = role === 'admin'
   const enrollment = await enrollmentOf(event, tenant.id, Number(course.id), user?.id ?? null)
   const enrolled = !!enrollment

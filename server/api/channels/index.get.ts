@@ -1,11 +1,14 @@
 // Grupos y canales del tenant, con estado de seguimiento del usuario.
 import { currentAuth, resolveTenant } from '../../utils/community'
 import { dbFor } from '../../utils/db'
-import { getPrivacySettings } from '../../utils/privacy'
+import { getPrivacySettings, requireSessionUnlessPublic } from '../../utils/privacy'
 
 export default defineEventHandler(async (event) => {
   const tenant = await resolveTenant(event)
   const { user } = await currentAuth(event, tenant.id)
+  // Endurecimiento Fase 15: comunidad privada = el listado de canales
+  // (nombres incluidos) no se lee sin sesión.
+  await requireSessionUnlessPublic(event, tenant.id, user)
   // Fase 15: en el modo público, el visitante no ve los canales
   // privados en el listado (ni el nombre): para él no existen. Con
   // sesión, o en el modo privado de siempre, el listado no cambia.

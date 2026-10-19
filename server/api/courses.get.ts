@@ -3,6 +3,7 @@
 // listan y los privados solo aparecen con sesión iniciada (ver
 // utils/courses.courseListed). Las lecciones en borrador no cuentan.
 import { currentAuth, resolveTenant } from '../utils/community'
+import { requireSessionUnlessPublic } from '../utils/privacy'
 import { courseListed } from '../utils/courses'
 import type { CourseRow } from '../utils/courses'
 import { dbFor } from '../utils/db'
@@ -10,6 +11,8 @@ import { dbFor } from '../utils/db'
 export default defineEventHandler(async (event) => {
   const tenant = await resolveTenant(event)
   const { user, role } = await currentAuth(event, tenant.id)
+  // Endurecimiento Fase 15: comunidad privada = el catálogo no se lee sin sesión.
+  await requireSessionUnlessPublic(event, tenant.id, user)
   const q = String(getQuery(event).q || '').trim()
   const db = await dbFor(event)
   const rows = (q

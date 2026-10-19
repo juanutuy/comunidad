@@ -251,6 +251,27 @@ export function truncateTitle(title: string, mode: string): string {
 // ¿El miembro tiene un entitlement pago vivo? Compra de acceso a un
 // canal pago o suscripción activa (las dos vías que ya dan acceso a
 // los canales pagos en canAccessChannel). El admin siempre cuenta.
+// ---------- Lectura anónima según visibilidad ----------
+
+// Endurecimiento de la Fase 15: el ajuste «Privacidad» promete que
+// con la comunidad en privado hay que iniciar sesión para VER
+// contenido — pero las superficies de lectura (feed, detalle de post,
+// canales, videos, cursos, eventos, perfiles, ranking, riel) nacieron
+// sin exigir sesión y la privacidad vivía solo en las páginas: sin
+// sesión devolvían el contenido abierto igual. Este corte lo llaman
+// apenas resuelven la sesión: sin usuario y con
+// visibility != 'public' → 401, con el mismo mensaje que usa el
+// resto de la API para no autenticados. Con 'public' no cambia nada:
+// cada superficie sigue aplicando sus reglas de la Fase 15 (abiertos
+// completos, pagos solo anticipo, privados invisibles). Con sesión
+// tampoco: los estados de membresía los gobierna el middleware.
+export async function requireSessionUnlessPublic(event: H3Event, tenantId: number, user: { id?: number } | null | undefined): Promise<void> {
+  if (user) return
+  const priv = await getPrivacySettings(event, tenantId)
+  if (priv.visibility !== 'public')
+    throw createError({ statusCode: 401, message: 'Iniciá sesión para continuar.' })
+}
+
 export async function hasPaidEntitlement(event: H3Event, tenantId: number, userId: number, role: string | null): Promise<boolean> {
   if (role === 'admin') return true
   const db = await dbFor(event)

@@ -9,6 +9,7 @@ import { getGamification, levelBadgesFor } from '../../utils/gamification'
 import { isOnline } from '../../utils/chat'
 import { dbFor } from '../../utils/db'
 import { blockedByMe } from '../../utils/blocks'
+import { requireSessionUnlessPublic } from '../../utils/privacy'
 
 export default defineEventHandler(async (event) => {
   const tenant = await resolveTenant(event)
@@ -17,6 +18,9 @@ export default defineEventHandler(async (event) => {
   const user = await db.prepare('SELECT * FROM users WHERE slug = ?').get(slug) as Record<string, unknown> | undefined
   if (!user) throw createError({ statusCode: 404, message: 'Miembro no encontrado.' })
   const { user: me, role } = await currentAuth(event, tenant.id)
+  // Endurecimiento Fase 15: comunidad privada = el perfil (datos,
+  // publicaciones, presencia) no se lee sin sesión.
+  await requireSessionUnlessPublic(event, tenant.id, me)
   // Fase 5: si bloqueé a esta persona, su contenido no se me muestra.
   const iBlockedThem = (await blockedByMe(event, tenant.id, me?.id ?? null)).has(Number(user.id))
   const serializeVisible = async (rows: Record<string, unknown>[]) => {

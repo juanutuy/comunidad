@@ -2,13 +2,18 @@
 // Desde la Fase 2 cada fila incluye avatar y nivel (utils/levels.ts).
 // Desde la Fase 9 los valores por acción y los umbrales de nivel salen
 // de la configuración de gamificación del tenant.
-import { resolveTenant } from '../utils/community'
+import { currentAuth, resolveTenant } from '../utils/community'
+import { requireSessionUnlessPublic } from '../utils/privacy'
 import { levelFor } from '../utils/levels'
 import { getGamification } from '../utils/gamification'
 import { dbFor } from '../utils/db'
 
 export default defineEventHandler(async (event) => {
   const tenant = await resolveTenant(event)
+  // Endurecimiento Fase 15: esta ruta no resolvía sesión — con la
+  // comunidad en privado el ranking no se lee sin sesión.
+  const { user } = await currentAuth(event, tenant.id)
+  await requireSessionUnlessPublic(event, tenant.id, user)
   const db = await dbFor(event)
   const gam = await getGamification(event, tenant.id)
   const rows = await db.prepare(`

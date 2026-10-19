@@ -5,6 +5,7 @@
 // Cuenta la descarga en la base antes de entregar el archivo.
 import { currentAuth, resolveTenant } from '../../../utils/community'
 import { hasPremiumAccess } from '../../../utils/levels'
+import { getPrivacySettings } from '../../../utils/privacy'
 import { readFile } from '../../../utils/storage'
 import { dbFor } from '../../../utils/db'
 
@@ -15,9 +16,17 @@ export default defineEventHandler(async (event) => {
   const item = await db.prepare('SELECT * FROM library_items WHERE id = ? AND tenant_id = ?').get(id, tenant.id) as Record<string, unknown> | undefined
   if (!item) throw createError({ statusCode: 404, message: 'Recurso no encontrado.' })
   if (!item.file_key) throw createError({ statusCode: 404, message: 'Este recurso es un registro de referencia y no tiene archivo descargable.' })
-  if (item.locked) {
-    const { user, role } = await currentAuth(event, tenant.id)
-    if (!user) throw createError({ statusCode: 401, message: 'Iniciá sesión para descargar este recurso.' })
+  const { user, role } = await currentAuth(event, tenant.id)
+  if (!user) {
+    // Endurecimiento Fase 15: sin sesión, la descarga anónima solo
+    // subsiste donde el listado ya era visible para el visitante —
+    // comunidad pública con la biblioteca en audiencia 'everyone' —
+    // y nunca para un recurso con candado.
+    const priv = await getPrivacySettings(event, tenant.id)
+    if (item.locked || priv.visibility !== 'public' || priv.libraryAudience !== 'everyone')
+      throw createError({ statusCode: 401, message: 'Iniciá sesión para descargar este recurso.' })
+  }
+  else if (item.locked) {
     if (!(await hasPremiumAccess(event, tenant.id, user.id, role)))
       throw createError({ statusCode: 403, message: 'Este recurso es solo para miembros con acceso premium.' })
   }

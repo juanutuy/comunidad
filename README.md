@@ -1184,6 +1184,37 @@ servido. Build 0, typecheck 0, suite `test-realtime.mjs` 5/5 PASS.
 Datos de prueba eliminados y ajustes locales restaurados a los
 defaults.
 
+**Endurecimiento posterior (verificado en producción tras el
+despliegue de la fase)**: el `GET /api/feed` sin sesión devolvía los
+posts de canales abiertos con el cuerpo completo aunque el tenant
+estuviera en `visibility='private'` — el endpoint nunca exigió
+sesión y la «privacidad» vivía solo en las páginas. Corte único en
+el servidor (`requireSessionUnlessPublic` en `server/utils/privacy.ts`):
+sin sesión y con la comunidad NO pública, TODAS las superficies de
+lectura de contenido responden **401** («Iniciá sesión para
+continuar.»): feed, detalle de post, listado y detalle de canales,
+videos, catálogo y detalle de cursos, visor de lecciones, lista y
+detalle de eventos, perfiles, ranking y riel lateral. La búsqueda
+anónima también quedó cerrada en modo privado (solo cortaba en
+público) y la biblioteca alineó su regla: listado y descarga de
+archivos exigen sesión salvo comunidad pública con audiencia
+`everyone` (y la descarga con candado, sesión siempre). Siguen
+abiertas a propósito, como antes: `/api/tenant` (marca para
+login/registro), las rutas de auth e invitación/acceso, los textos
+legales, la página pública de precios (`/api/billing/plans`, vitrina
+comercial sin contenido de la comunidad) y el servidor de archivos
+públicos `/api/files` (imágenes y marca; los archivos de biblioteca
+no pasan por ahí). Con `visibility='public'` la lectura anónima
+acotada de esta fase no cambió en nada, y con sesión válida tampoco
+cambia nada. Verificación local por contenido: batería anónima en
+ambos modos (17 rutas de contenido en 401 con la comunidad privada;
+en pública, abiertos completos, premium solo anticipo medido,
+privado invisible y detalle 404, comentarios retenidos), sesión de
+miembro con todo 200 y cuerpos completos, y descarga real de
+biblioteca en las tres combinaciones de audiencia. Build 0,
+typecheck 0, suite 5/5 PASS; tenant local restaurado a privado y
+datos de prueba eliminados.
+
 ## Pendiente a propósito (fuera de esta fase)
 
 - Migraciones versionadas con `drizzle-kit` para D1 (hoy: esquema

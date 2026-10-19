@@ -16,7 +16,12 @@ export default defineEventHandler(async (event) => {
   const { user: earlyUser } = await currentAuth(event, tenant.id)
   if (!earlyUser) {
     const priv = await getPrivacySettings(event, tenant.id)
-    if (priv.visibility === 'public' && priv.libraryAudience !== 'everyone')
+    // Endurecimiento Fase 15: con la comunidad en privado la
+    // biblioteca tampoco se lee sin sesión (la condición original
+    // solo cortaba en el modo público y el listado salía anónimo).
+    // En público sigue la audiencia: solo 'everyone' abre a
+    // visitantes.
+    if (priv.visibility !== 'public' || priv.libraryAudience !== 'everyone')
       throw createError({ statusCode: 401, message: 'Iniciá sesión para ver la biblioteca.' })
   }
   const kind = String(getQuery(event).kind || 'all')

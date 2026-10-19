@@ -3,7 +3,7 @@
 // publicaciones se devuelven bloqueadas (solo teaser).
 import { POST_SELECT, canAccessChannel, channelBySlug, currentAuth, publishDuePosts, resolveTenant, serializePost } from '../../utils/community'
 import { dbFor } from '../../utils/db'
-import { getPrivacySettings } from '../../utils/privacy'
+import { getPrivacySettings, requireSessionUnlessPublic } from '../../utils/privacy'
 import { hiddenFilterSql } from '../../utils/blocks'
 
 export default defineEventHandler(async (event) => {
@@ -12,6 +12,9 @@ export default defineEventHandler(async (event) => {
   const channel = await channelBySlug(event, tenant.id, slug)
   if (!channel) throw createError({ statusCode: 404, message: 'Canal no encontrado.' })
   const { user, role } = await currentAuth(event, tenant.id)
+  // Endurecimiento Fase 15: comunidad privada = el detalle del canal
+  // no se lee sin sesión.
+  await requireSessionUnlessPublic(event, tenant.id, user)
   const access = await canAccessChannel(event, user?.id ?? null, role, channel)
   // Fase 15: un canal privado, para quien no tiene acceso, no existe
   // (404 también acá: ni el nombre ni sus publicaciones se filtran).

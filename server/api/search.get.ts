@@ -18,10 +18,11 @@ export default defineEventHandler(async (event) => {
   const db = await dbFor(event)
   const { user, role } = await currentAuth(event, tenant.id)
   const priv = await getPrivacySettings(event, tenant.id)
-  // Fase 15: la búsqueda NO se abre a visitantes en el modo público
-  // (buscar miembros y contenido sigue siendo cosa de la sesión). En
-  // el modo privado queda como siempre.
-  if (!user && priv.visibility === 'public')
+  // Fase 15: la búsqueda NO se abre a visitantes (buscar miembros y
+  // contenido es cosa de la sesión). Endurecimiento: la condición
+  // original solo cortaba en el modo público; en el privado el
+  // anónimo buscaba igual que un miembro. Ahora corta en ambos modos.
+  if (!user)
     throw createError({ statusCode: 401, message: 'Iniciá sesión para buscar en la comunidad.' })
 
   const hf = hiddenFilterSql(user?.id ?? null)
