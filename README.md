@@ -1215,6 +1215,136 @@ biblioteca en las tres combinaciones de audiencia. Build 0,
 typecheck 0, suite 5/5 PASS; tenant local restaurado a privado y
 datos de prueba eliminados.
 
+## Fase 16 (hecha) — contenido central y certificados
+
+La consola suma la sección **Contenido** (entrada en el riel, admin
+y moderator) con tres subsecciones por ruta — Publicaciones,
+Archivos y Canales — y el área de Cursos gana los **diseños de
+certificado** (blueprints) con **verificación pública**, como
+Content y Course tools de la referencia (auditoría profunda, ronda
+2). Todo con código y textos propios; migración aditiva de siempre.
+
+- **Contenido → Publicaciones** (`/admin/content`): tabla con TODOS
+  los posts del tenant: buscador por título/autor, chips de estado
+  con conteos (**Todos, Publicados, Borradores, Programados, En
+  revisión** — los estados reales de esta plataforma), columnas
+  Título (con chip «Editado» si el post fue editado, además de
+  Encuesta y Anónimo), Estado, Autor, Canal, Reacciones,
+  Comentarios y fecha. Menú por fila según estado: Ver, Editar (al
+  editor que ya existe: «Mis borradores» para borradores y
+  programados; Moderación para los que están en revisión),
+  **Publicar** (borrador/programado → publicado al instante por el
+  staff) y **Eliminar** con la cascada compartida
+  `deletePostCascade`. Sin acciones en lote (la referencia tampoco
+  tiene). API `GET /api/admin/content/posts` (paginación
+  limit/offset, filtro por estado y texto) +
+  `POST .../posts/[id]/publish` y `DELETE .../posts/[id]`, con
+  `requireModerator`.
+- **Contenido → Archivos** (`/admin/content/media`, solo admin): el
+  gestor de medios con TODAS las subidas del tenant (tabla
+  `uploads`): nombre, tipo derivado del MIME (Imagen/Video/Audio/
+  Archivo, con pestañas y conteos), subido por, tamaño, fecha y
+  **Ubicación** — dónde se usa el archivo, resuelta en el mejor
+  esfuerzo contra las referencias reales del esquema (avatar y
+  portada de perfil, adjunto o contenido de un post, miniatura y
+  banner de curso, archivo de lección, ítem de biblioteca por su
+  `file_key`, marca del tenant); sin referencia, «—». El **total
+  usado** es la suma real de tamaños: no se muestra ninguna cuota
+  (ver Diferencias). Panel de detalles (USlideover) con vista
+  previa si es imagen, metadatos, **Descargar** y **Copiar URL**.
+  **Eliminar** borra el objeto de R2 (o el archivo local) y la
+  fila; si el archivo está referenciado, la confirmación lo
+  advierte NOMBRANDO cada ubicación y exige tildar «entiendo que
+  está en uso» antes de proceder.
+- **Contenido → Canales** (`/admin/content/channels`, solo admin):
+  tabla con Nombre, Tipo, Seguidores (el conteo real de `follows`),
+  Acceso, **Quién puede publicar**, Grupo y menú (Ver, Editar — a
+  la gestión de canales de siempre —, Copiar ID, Archivar/
+  Desarchivar, Eliminar). Dos piezas nuevas de esquema (aditivas):
+  `channels.archived_at` y `channels.post_permission`. **Archivar**
+  un canal lo hace desaparecer para los miembros de la navegación
+  (`/api/channels` lo excluye para todos; solo la gestión del
+  admin lo pide con `?includeArchived=1`), del feed, de la
+  búsqueda y del chat, y su detalle y sus posts responden 404 por
+  enlace directo; el contenido queda guardado y el admin lo sigue
+  viendo en la consola y en la página del canal (con aviso de
+  archivado). **`post_permission = 'staff'`** («Solo el equipo»):
+  los miembros sin rol de staff reciben 403 al crear posts en ese
+  canal («Solo el equipo puede publicar en este canal.») y el
+  compositor se reemplaza por ese aviso dentro del canal; comentar
+  y reaccionar NO se bloquean. El PUT de canales acepta
+  `postPermission` y `archived` opcionales sin tocar el resto.
+- **Diseños de certificado** (`certificate_blueprints`, CRUD en
+  Cursos → Certificados, `/admin/courses/blueprints`, admin y
+  course_manager): nombre, color de acento, texto de encabezado,
+  texto del cuerpo con marcadores **{nombre}**, **{curso}** y
+  **{fecha}**, nombre y cargo del firmante, y mostrar el logo de
+  la comunidad. Vista previa con datos de ejemplo al editar. El
+  estudio del curso suma el selector «Diseño del certificado»
+  junto al interruptor de la Fase 8 (`courses.certificate_blueprint_id`;
+  sin elección vale el **diseño por defecto del sistema**, con el
+  color de marca del tenant). Borrar un diseño con certificados
+  emitidos responde **409**: la salida es desactivarlo (los cursos
+  que lo usaban vuelven al diseño por defecto al borrar uno sin
+  emisiones).
+- **Emisión con foto del diseño** (`certificates`): la primera vez
+  que un miembro elegible (100% del curso, certificado encendido)
+  abre su certificado, se EMITE un registro con **código único**
+  (`CERT-XXXXX-XXXXX`) y una copia congelada del diseño vigente
+  con los marcadores ya reemplazados, más nombre del miembro,
+  título del curso, comunidad y fecha de finalización. Editar el
+  blueprint después NO altera los certificados emitidos
+  (verificado). La página del certificado del miembro pinta esa
+  foto: borde y encabezado en el color de acento, logo si el
+  diseño lo pide y la marca cargada, firmante con línea, y al pie
+  el código con el aviso de verificación.
+- **Verificación pública**: `/verify` (buscador por código) y
+  `/verify/[code]`, sin sesión, respaldados por
+  `GET /api/verify/[code]`: válido muestra miembro, curso,
+  comunidad y fecha de finalización; código inexistente,
+  «No encontramos un certificado con ese código.» Sin correos ni
+  ningún dato extra.
+
+**Diferencias con la referencia (honestas)**:
+
+- La tabla de posts NO tiene chip «Edit Review»: esa revisión de
+  ediciones quedó fuera en la Fase 12 y no se inventó para esta
+  tabla. Los estados son los cuatro reales.
+- El gestor de medios no muestra cuota («de 500 GB» en la
+  referencia): acá no hay un límite contratado que mostrar, así
+  que solo va el total usado real. Nada de números inventados.
+- La columna de canales dice «Seguidores» y no «Miembros»: en
+  esta plataforma los canales no tienen lista de miembros propia;
+  el conteo real equivalente es el de seguidores (`follows`).
+- La verificación pública NO busca por correo (la referencia lo
+  trae como interruptor apagado por defecto, con advertencia de
+  privacidad): queda fuera a propósito; solo por código.
+- **Blogs** no se construyó: en la referencia pertenece a su
+  Website, excluido del alcance por decisión de Juan.
+
+**Verificación (local, por contenido)**: build 0, typecheck 0,
+suite `test-realtime.mjs` 5/5 PASS. Batería propia de 69 chequeos
+contra `wrangler dev`, todos PASS: conteos de la tabla coherentes
+y de vuelta al estado inicial tras publicar/eliminar con cascada
+(el detalle responde 404 y el comentario desaparece con el post);
+la suma de tamaños del gestor == total usado (140 B exactos en la
+prueba) y la ubicación del avatar se detecta («Foto de perfil
+de…») mientras una imagen sin uso muestra «—»; borrar un archivo
+sin uso hace que su URL pública responda 404; canal archivado
+fuera de listado/feed/búsqueda/chat (404) y visible en la consola,
+desarchivar lo restaura; con «solo el equipo», el miembro recibe
+el 403 con el mensaje y ve el aviso en la página del canal, el
+staff publica y el miembro sigue pudiendo comentar; roles por
+sección (moderator: tabla sí, medios y canales no; course_manager:
+tabla no, diseños sí); certificado emitido con el diseño del
+blueprint (color, encabezado, firmante, marcadores reemplazados),
+invariable tras editar el blueprint, borrado del blueprint en uso
+con 409, y verificación pública sin sesión (válido con los datos
+correctos y sin correos; inventado con su mensaje). Datos de
+prueba eliminados por completo (conteos de vuelta a la semilla) y
+snapshot `scripts/d1-init.sql` regenerado con las tablas y
+columnas nuevas.
+
 ## Pendiente a propósito (fuera de esta fase)
 
 - Migraciones versionadas con `drizzle-kit` para D1 (hoy: esquema
