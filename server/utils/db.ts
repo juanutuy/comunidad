@@ -94,6 +94,24 @@ CREATE TABLE IF NOT EXISTS email_log (id INTEGER PRIMARY KEY AUTOINCREMENT, tena
 CREATE INDEX IF NOT EXISTS email_log_tenant ON email_log (tenant_id, created_at);
 CREATE TABLE IF NOT EXISTS tenant_domains (id INTEGER PRIMARY KEY AUTOINCREMENT, tenant_id INTEGER NOT NULL, domain TEXT NOT NULL, created_at TEXT NOT NULL);
 CREATE UNIQUE INDEX IF NOT EXISTS tenant_domains_unique ON tenant_domains (domain);
+CREATE TABLE IF NOT EXISTS poll_options (id INTEGER PRIMARY KEY AUTOINCREMENT, tenant_id INTEGER NOT NULL, post_id INTEGER NOT NULL, label TEXT NOT NULL, sort INTEGER NOT NULL DEFAULT 0);
+CREATE INDEX IF NOT EXISTS poll_options_post ON poll_options (post_id, sort);
+CREATE TABLE IF NOT EXISTS poll_votes (id INTEGER PRIMARY KEY AUTOINCREMENT, tenant_id INTEGER NOT NULL, post_id INTEGER NOT NULL, option_id INTEGER NOT NULL, user_id INTEGER NOT NULL, created_at TEXT NOT NULL);
+CREATE UNIQUE INDEX IF NOT EXISTS poll_votes_unique ON poll_votes (post_id, user_id);
+CREATE TABLE IF NOT EXISTS user_prefs (id INTEGER PRIMARY KEY AUTOINCREMENT, tenant_id INTEGER NOT NULL, user_id INTEGER NOT NULL, key TEXT NOT NULL, value TEXT NOT NULL DEFAULT '');
+CREATE UNIQUE INDEX IF NOT EXISTS user_prefs_unique ON user_prefs (tenant_id, user_id, key);
+CREATE TABLE IF NOT EXISTS point_events (id INTEGER PRIMARY KEY AUTOINCREMENT, tenant_id INTEGER NOT NULL, user_id INTEGER NOT NULL, kind TEXT NOT NULL, ref_id INTEGER NOT NULL DEFAULT 0, points INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL);
+CREATE UNIQUE INDEX IF NOT EXISTS point_events_unique ON point_events (tenant_id, user_id, kind, ref_id);
+CREATE INDEX IF NOT EXISTS point_events_user ON point_events (tenant_id, user_id);
+CREATE TABLE IF NOT EXISTS chat_rooms (id INTEGER PRIMARY KEY AUTOINCREMENT, tenant_id INTEGER NOT NULL, name TEXT NOT NULL, created_by INTEGER NOT NULL, created_at TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS chat_room_members (id INTEGER PRIMARY KEY AUTOINCREMENT, tenant_id INTEGER NOT NULL, room_id INTEGER NOT NULL, user_id INTEGER NOT NULL);
+CREATE UNIQUE INDEX IF NOT EXISTS chat_room_members_unique ON chat_room_members (room_id, user_id);
+CREATE TABLE IF NOT EXISTS chat_room_messages (id INTEGER PRIMARY KEY AUTOINCREMENT, tenant_id INTEGER NOT NULL, room_id INTEGER NOT NULL, author_id INTEGER NOT NULL, body TEXT NOT NULL, created_at TEXT NOT NULL);
+CREATE INDEX IF NOT EXISTS chat_room_messages_room ON chat_room_messages (room_id, id);
+CREATE TABLE IF NOT EXISTS user_blocks (id INTEGER PRIMARY KEY AUTOINCREMENT, tenant_id INTEGER NOT NULL, blocker_id INTEGER NOT NULL, blocked_id INTEGER NOT NULL, created_at TEXT NOT NULL);
+CREATE UNIQUE INDEX IF NOT EXISTS user_blocks_unique ON user_blocks (tenant_id, blocker_id, blocked_id);
+CREATE TABLE IF NOT EXISTS user_hidden_posts (id INTEGER PRIMARY KEY AUTOINCREMENT, tenant_id INTEGER NOT NULL, user_id INTEGER NOT NULL, post_id INTEGER NOT NULL, created_at TEXT NOT NULL);
+CREATE UNIQUE INDEX IF NOT EXISTS user_hidden_posts_unique ON user_hidden_posts (tenant_id, user_id, post_id);
 `
 
 // Migraciones aditivas (Fase 2) para bases creadas en la Fase 1 — ya hay
@@ -109,6 +127,23 @@ const MIGRATIONS = [
   // Fase 3: última conexión registrada al abrir un WebSocket de tiempo
   // real (presencia aproximada en perfiles y lista de miembros).
   `ALTER TABLE users ADD COLUMN last_seen_at TEXT NOT NULL DEFAULT ''`,
+  // Fase 5: estado de publicación (published|draft|scheduled), hora
+  // programada y tipo de post (post|poll) para encuestas.
+  `ALTER TABLE posts ADD COLUMN status TEXT NOT NULL DEFAULT 'published'`,
+  `ALTER TABLE posts ADD COLUMN scheduled_at TEXT NOT NULL DEFAULT ''`,
+  `ALTER TABLE posts ADD COLUMN kind TEXT NOT NULL DEFAULT 'post'`,
+  // Fase 5: versión de sesión — al cambiar la contraseña se incrementa
+  // y todas las sesiones anteriores (sin ese número) dejan de valer.
+  `ALTER TABLE users ADD COLUMN token_version INTEGER NOT NULL DEFAULT 0`,
+  // Fase 5: textos legales editables por tenant.
+  `ALTER TABLE tenants ADD COLUMN terms TEXT NOT NULL DEFAULT ''`,
+  `ALTER TABLE tenants ADD COLUMN privacy TEXT NOT NULL DEFAULT ''`,
+  // Fase 5 (gestión admin): cursos con estado e imagen, lecciones con video.
+  `ALTER TABLE courses ADD COLUMN status TEXT NOT NULL DEFAULT 'published'`,
+  `ALTER TABLE courses ADD COLUMN image_url TEXT NOT NULL DEFAULT ''`,
+  `ALTER TABLE lessons ADD COLUMN video_url TEXT NOT NULL DEFAULT ''`,
+  // Fase 5: agenda por sesiones del evento (texto, una sesión por línea).
+  `ALTER TABLE events ADD COLUMN agenda TEXT NOT NULL DEFAULT ''`,
 ]
 
 async function runMigrations(db: AsyncDb): Promise<void> {

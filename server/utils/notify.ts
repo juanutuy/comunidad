@@ -14,9 +14,25 @@ export interface NotifyInput {
   link: string
 }
 
+// Fase 5: preferencias de notificación por tipo (Ajustes de cuenta).
+// Clave en user_prefs por tipo; por defecto todo activado (sin fila).
+const PREF_BY_TYPE: Record<NotifyInput['type'], string> = {
+  reaction: 'notify_reaction',
+  comment: 'notify_comment',
+  mention: 'notify_mention',
+  new_post: 'notify_new_post',
+  dm: 'notify_dm',
+}
+
 export async function notify(event: H3Event, n: NotifyInput): Promise<void> {
   if (n.actorId && n.userId === n.actorId) return
   const db = await dbFor(event)
+  try {
+    const pref = await db.prepare('SELECT value FROM user_prefs WHERE tenant_id = ? AND user_id = ? AND key = ?')
+      .get(n.tenantId, n.userId, PREF_BY_TYPE[n.type]) as { value: string } | undefined
+    if (pref && pref.value === '0') return // el destinatario apagó este tipo
+  }
+  catch { /* bases sin la tabla: se notifica como siempre */ }
   await db.prepare('INSERT INTO notifications (tenant_id, user_id, actor_id, type, title, link, is_read, created_at) VALUES (?, ?, ?, ?, ?, ?, 0, ?)')
     .run(n.tenantId, n.userId, n.actorId, n.type, n.title, n.link, nowIso())
   // Fase 3: empuje en vivo a la sala personal del destinatario para que
@@ -25,6 +41,29 @@ export async function notify(event: H3Event, n: NotifyInput): Promise<void> {
   await publishRealtime(event, roomUser(n.tenantId, n.userId), {
     type: 'notification', title: n.title, link: n.link, kind: n.type, unread,
   })
+}
+
+// Aviso de publicación nueva: seguidores del canal + menciones. Lo
+// usan tanto la creación directa (posts.post) como la publicación de
+// un borrador/programado (posts/[id]/publish).
+export async function notifyNewPost(
+  event: H3Event,
+  tenantId: number,
+  author: { id: number, name: string },
+  channel: { id: number, name: string },
+  post: { title: string, body: string, slug: string },
+  channelSlug: string,
+): Promise<void> {
+  const db = await dbFor(event)
+  const link = `/p/${channelSlug}/${post.slug}`
+  const followers = await db.prepare('SELECT user_id FROM follows WHERE tenant_id = ? AND channel_id = ?').all(tenantId, channel.id) as { user_id: number }[]
+  for (const f of followers) {
+    await notify(event, {
+      tenantId, userId: f.user_id, actorId: author.id, type: 'new_post',
+      title: `${author.name} publicó «${post.title}» en ${channel.name}`, link,
+    })
+  }
+  await notifyMentions(event, tenantId, author, `${post.title}\n${post.body}`, link)
 }
 
 // Menciones simples: cualquier `@slug` de un miembro del tenant que

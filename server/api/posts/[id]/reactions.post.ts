@@ -13,7 +13,7 @@ export default defineEventHandler(async (event) => {
   const body = await readBody<{ type?: string }>(event)
   if (!TYPES.includes(body.type || '')) throw createError({ statusCode: 400, message: 'Tipo de reacción inválido.' })
   const db = await dbFor(event)
-  const post = await db.prepare(`SELECT p.author_id, p.title, p.slug, c.slug AS channel_slug FROM posts p JOIN channels c ON c.id = p.channel_id WHERE p.id = ? AND p.tenant_id = ?`).get(postId, tenant.id) as { author_id: number, title: string, slug: string, channel_slug: string } | undefined
+  const post = await db.prepare(`SELECT p.author_id, p.title, p.slug, c.slug AS channel_slug FROM posts p JOIN channels c ON c.id = p.channel_id WHERE p.id = ? AND p.tenant_id = ? AND p.status = 'published'`).get(postId, tenant.id) as { author_id: number, title: string, slug: string, channel_slug: string } | undefined
   if (!post) throw createError({ statusCode: 404, message: 'Publicación no encontrada.' })
   const existing = await db.prepare('SELECT id FROM reactions WHERE post_id = ? AND user_id = ? AND type = ?').get(postId, user.id, body.type)
   if (existing) await db.prepare('DELETE FROM reactions WHERE id = ?').run((existing as { id: number }).id)

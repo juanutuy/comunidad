@@ -383,6 +383,109 @@ código. Remitente: `NUXT_EMAIL_FROM`.
   correcto en `npm run dev` y en `wrangler dev`, link al manifest en el
   HTML, SW accesible.
 
+## Fase 5 (hecha) — ajustes del interior (comparado con EzyCommunity)
+
+- **Encuestas en posts** (`poll_options` / `poll_votes`): el compositor
+  del feed crea posts tipo encuesta (pregunta en el cuerpo + 2 a 4
+  opciones). Un voto por usuario, con cambio de voto sin duplicar; el
+  feed y el detalle muestran porcentajes, total y la opción votada.
+  Solo vota quien puede ver el post (sesión + acceso al canal:
+  en un canal pago/privado sin acceso, votar responde 403).
+- **Borradores y programados** (`posts.status` + `scheduled_at`):
+  «Guardar borrador» y «Programar» en el compositor. Los borradores
+  solo los ve el autor (página `/drafts`: publicar ahora, editar
+  título/cuerpo/hora, borrar; el detalle público responde 404 a
+  cualquiera que no sea el autor). Los programados se publican de
+  forma **perezosa**: como en Workers no hay un cron por minuto
+  garantizado, `publishDuePosts()` se invoca al servir el feed, el
+  detalle de canal y el digest; al vencer la hora el post pasa a
+  publicado con `created_at` = su hora programada. Feed, canales,
+  búsqueda, videos, perfiles y contadores nunca incluyen borradores
+  ni programados sin vencer.
+- **Directorio de miembros** (`/members`, en la navegación): buscador
+  por nombre, filtro por rol (Todos / Administradores / Miembros —
+  hoy solo existen esos dos roles) y punto de «en línea» por
+  `last_seen_at` (< 2 min).
+- **Ajustes de cuenta** (`/settings`): perfil (nombre, bio, ubicación
+  y foto con la subida existente), seguridad (cambiar contraseña:
+  verifica la actual con scrypt, mínimo 8; al cambiar se incrementa
+  `users.token_version` y **todas las demás sesiones dejan de valer**
+  — la actual se reemite con la versión nueva), notificaciones
+  (interruptores por tipo en `user_prefs`, **respetados** por
+  `utils/notify.ts`) y privacidad («Aparecer en el directorio»,
+  respetado por `/members`). La preferencia de feed del original
+  (seguidos vs. todo) quedó fuera a propósito: el feed actual no
+  distingue seguidos de forma limpia y se prefirió no fingirla.
+- **Panel de administración** (`/admin`): tarjetas con cifras reales
+  (miembros, en línea ahora, canales, publicaciones, comentarios,
+  cursos, eventos, membresías activas e ingresos confirmados desde
+  `payments` en `paid`), actividad de los últimos 30 días,
+  «Publicaciones sin comentarios» y «Miembros recientes», además de
+  los ajustes de siempre.
+- **Rail derecho** (`RightRail.vue`): suma «Top líderes» (top 5 por
+  puntos, con enlace al ranking) y «Miembros en línea».
+- **Salas grupales de chat** (`/messages`): crear salas con nombre y
+  2+ miembros, listarlas, enviar/recibir (`chat_rooms`,
+  `chat_room_members`, `chat_room_messages`). Tiempo real con el
+  patrón de la Fase 3: sala `room:{tenant}:{roomId}` en el mismo
+  Durable Object; el upgrade valida membresía de la sala y en local
+  degradado funciona por polling. Un no-miembro recibe 403 tanto por
+  REST como en el upgrade WebSocket.
+- **Puntos por aprendizaje y eventos** (`point_events`, una sola vez
+  por índice único): inscribirse a un curso **+5**, completar un
+  curso al 100% **+50**, confirmar RSVP a un evento **+10**. Se suman
+  a los puntos de actividad en el ranking, los perfiles y los niveles.
+  Deshacer la acción (desmarcar la última lección, cancelar el RSVP)
+  no quita los puntos ya ganados.
+- **Filtros de notificaciones**: chips Todo / Menciones / Reacciones /
+  Comentarios / Publicaciones / Mensajes en la página de
+  notificaciones y en el desplegable de la campana.
+- **Textos legales por tenant** (`tenants.terms` / `tenants.privacy`):
+  editables en `/admin`, públicos en `/terms` y `/privacy` con texto
+  por defecto si están vacíos, enlazados en el pie de la app.
+- **Gestión de cursos y eventos (admin)**: `/admin/courses` con CRUD
+  completo — cursos (título, descripción, nivel, precio reutilizando
+  el guard de pago de la Fase 4, estado publicado/borrador e imagen
+  por URL o subida), capítulos y lecciones (contenido, URL de video
+  — YouTube se embebe en el visor —, duración, gratuita, orden con
+  campo numérico y flechas). Un curso en borrador no aparece en el
+  catálogo ni en la búsqueda y su detalle es 404 para no-admins.
+  `/admin/events` con CRUD de eventos (inicio/fin, lugar o en línea,
+  categoría y **agenda por sesiones** como texto libre, una sesión
+  por línea, mostrada como lista en el detalle público). Borrados con
+  confirmación y cascada (inscripciones, progresos y RSVP caen con su
+  curso/evento; los pagos registrados no se borran nunca). Ponentes
+  de evento: fuera de alcance.
+- **Bloqueos y publicaciones ocultas** (`user_blocks`,
+  `user_hidden_posts`): desde el perfil de un miembro, «Bloquear»
+  (con confirmación). Efecto real: sus posts y comentarios dejan de
+  verse para quien bloquea en feed, canales, búsqueda, videos,
+  recientes y perfiles, y los mensajes directos entre ambos quedan
+  impedidos en los dos sentidos (el envío responde 403 con el motivo).
+  En el menú de cada publicación ajena, «Ocultar publicación» la
+  quita de las vistas de ese usuario. Ambas cosas se revierten desde
+  Ajustes de cuenta → «Bloqueados y ocultos». **Decisión**: son
+  preferencias personales, no moderación — el admin conserva intactas
+  sus herramientas (borrar posts/comentarios, gestionar miembros) y
+  puede abrir cualquier publicación por su enlace directo para
+  moderarla; bloquear a alguien tampoco le avisa ni le bloquea la
+  cuenta.
+
+Verificado en local con `wrangler dev` (suite de ~70 comprobaciones
+contra la API con los usuarios demo + WebSocket real entre dos
+sesiones): encuestas y cambio de voto, borrador invisible y publicado,
+programado promovido al vencer su hora, directorio y opt-out,
+preferencia de notificación que suprime el aviso, cambio de
+contraseña con invalidación de las demás sesiones y restauración,
+dashboard coherente con la semilla, CRUD admin de cursos/eventos con
+403 para no-admins y agenda visible, puntos +5/+50/+10 sin duplicar,
+sala grupal en vivo con no-miembro rechazado, bloqueo con sus efectos
+y su restauración, y la suite de la Fase 3 (`scripts/test-realtime.mjs`)
+sin regresiones. Build y typecheck en 0 errores. Las migraciones son
+aditivas e idempotentes (tablas nuevas en el `CREATE_SQL` y columnas
+nuevas en `MIGRATIONS`, `server/utils/db.ts`); `scripts/d1-init.sql`
+regenerado con las 38 tablas.
+
 ## Pendiente a propósito (fuera de esta fase)
 
 - Migraciones versionadas con `drizzle-kit` para D1 (hoy: esquema

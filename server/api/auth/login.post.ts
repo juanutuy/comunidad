@@ -15,7 +15,7 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 401, message: 'Correo o contraseña incorrectos.' })
   const tenant = await resolveTenant(event)
   await ensureMembership(event, tenant.id, row.id)
-  setSession(event, row.id)
+  setSession(event, row.id, (row as { token_version?: number }).token_version ?? 0)
   const m = await db.prepare('SELECT role FROM memberships WHERE tenant_id = ? AND user_id = ?').get(tenant.id, row.id) as { role: string }
   return { user: { ...publicUser(row), role: m.role } }
 })

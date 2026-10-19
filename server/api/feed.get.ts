@@ -1,13 +1,16 @@
 // Feed principal: publicaciones de canales públicos + seguidos por el
 // usuario. Las de canales pagos/privados sin acceso van como teaser.
-import { POST_SELECT, canAccessChannel, channelBySlug, currentAuth, resolveTenant, serializePost } from '../utils/community'
+import { POST_SELECT, canAccessChannel, channelBySlug, currentAuth, publishDuePosts, resolveTenant, serializePost } from '../utils/community'
 import { dbFor } from '../utils/db'
+import { hiddenFilterSql } from '../utils/blocks'
 
 export default defineEventHandler(async (event) => {
   const tenant = await resolveTenant(event)
   const { user, role } = await currentAuth(event, tenant.id)
   const db = await dbFor(event)
-  const rows = await db.prepare(`${POST_SELECT} WHERE p.tenant_id = ? ORDER BY p.pinned DESC, p.created_at DESC LIMIT 50`).all(tenant.id) as Record<string, unknown>[]
+  await publishDuePosts(event, tenant.id)
+  const hf = hiddenFilterSql(user?.id ?? null)
+  const rows = await db.prepare(`${POST_SELECT} WHERE p.tenant_id = ? AND p.status = 'published'${hf.sql} ORDER BY p.pinned DESC, p.created_at DESC LIMIT 50`).all(tenant.id, ...hf.params) as Record<string, unknown>[]
   const followed = new Set(user
     ? (await db.prepare('SELECT channel_id FROM follows WHERE tenant_id = ? AND user_id = ?').all(tenant.id, user.id) as unknown as { channel_id: number }[]).map(f => f.channel_id)
     : [])

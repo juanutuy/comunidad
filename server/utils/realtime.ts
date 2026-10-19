@@ -52,6 +52,7 @@ export async function realtimeAvailable(event: H3Event): Promise<boolean> {
 export const roomChannel = (tenantId: number, channelId: number) => `chan:${tenantId}:${channelId}`
 export const roomDm = (tenantId: number, a: number, b: number) => `dm:${tenantId}:${Math.min(a, b)}:${Math.max(a, b)}`
 export const roomUser = (tenantId: number, userId: number) => `user:${tenantId}:${userId}`
+export const roomGroup = (tenantId: number, roomId: number) => `room:${tenantId}:${roomId}`
 
 export async function publishRealtime(event: H3Event, room: string, payload: Record<string, unknown>): Promise<void> {
   try {

@@ -8,8 +8,8 @@ export default defineEventHandler(async (event) => {
   const q = String(getQuery(event).q || '').trim()
   const db = await dbFor(event)
   const rows = (q
-    ? await db.prepare('SELECT * FROM courses WHERE tenant_id = ? AND (title LIKE ? OR description LIKE ?) ORDER BY created_at').all(tenant.id, `%${q}%`, `%${q}%`)
-    : await db.prepare('SELECT * FROM courses WHERE tenant_id = ? ORDER BY created_at').all(tenant.id)) as Record<string, unknown>[]
+    ? await db.prepare("SELECT * FROM courses WHERE tenant_id = ? AND status = 'published' AND (title LIKE ? OR description LIKE ?) ORDER BY created_at").all(tenant.id, `%${q}%`, `%${q}%`)
+    : await db.prepare("SELECT * FROM courses WHERE tenant_id = ? AND status = 'published' ORDER BY created_at").all(tenant.id)) as Record<string, unknown>[]
   const courses = await Promise.all(rows.map(async (c) => {
     const chapters = (await db.prepare('SELECT COUNT(*) AS n FROM chapters WHERE course_id = ?').get(c.id) as unknown as { n: number }).n
     const lessons = (await db.prepare('SELECT COUNT(*) AS n FROM lessons WHERE chapter_id IN (SELECT id FROM chapters WHERE course_id = ?)').get(c.id) as unknown as { n: number }).n
@@ -19,7 +19,7 @@ export default defineEventHandler(async (event) => {
           WHERE ch.course_id = ? AND lp.user_id = ? AND lp.tenant_id = ?`).get(c.id, user.id, tenant.id) as unknown as { n: number }).n
       : 0
     return {
-      id: c.id, slug: c.slug, title: c.title, description: c.description, level: c.level, priceCents: c.price_cents, chapters, lessons, enrolled,
+      id: c.id, slug: c.slug, title: c.title, description: c.description, level: c.level, priceCents: c.price_cents, imageUrl: (c.image_url as string) || '', chapters, lessons, enrolled,
       progress: { completed: done, total: lessons, pct: lessons ? Math.round((done / lessons) * 100) : 0 },
     }
   }))

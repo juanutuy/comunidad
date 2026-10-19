@@ -13,7 +13,7 @@ interface ProfileData {
   profile: {
     id: number, name: string, slug: string, bio: string, location: string, avatarUrl: string, memberSince: string
     lastSeenAt: string, online: boolean
-    points: number, level: { name: string, min: number, nextAt: number | null }, badges: Badge[]
+    points: number, level: { name: string, min: number, nextAt: number | null }, badges: Badge[], blockedByMe?: boolean
     stats: { posts: number, comments: number, reactionsReceived: number, coursesCompleted: number }
   }
   posts: PostView[]
@@ -42,6 +42,30 @@ async function onAvatarChange(e: Event) {
   }
   finally { uploadingAvatar.value = false }
 }
+// Fase 5: bloquear / desbloquear a este miembro (con confirmación).
+const confirmBlock = ref(false)
+const blockingBusy = ref(false)
+async function toggleBlock() {
+  if (!data.value) return
+  blockingBusy.value = true
+  try {
+    if (data.value.profile.blockedByMe) {
+      await api(`/api/users/${slug.value}/block`, { method: 'DELETE' })
+      toast.add({ title: 'Miembro desbloqueado', description: 'Su contenido vuelve a verse en tu feed.', color: 'success' })
+    }
+    else {
+      await api(`/api/users/${slug.value}/block`, { method: 'POST' })
+      toast.add({ title: 'Miembro bloqueado', description: 'Ya no vas a ver sus publicaciones ni comentarios, y los mensajes directos quedan impedidos.', color: 'success' })
+    }
+    confirmBlock.value = false
+    await refresh()
+  }
+  catch (e) {
+    toast.add({ title: 'No se pudo completar la acción', description: (e as { data?: { message?: string } }).data?.message || '', color: 'error' })
+  }
+  finally { blockingBusy.value = false }
+}
+
 const tab = ref('posts')
 const tabItems = [
   { label: 'Publicaciones', value: 'posts', icon: 'i-lucide-newspaper' },
@@ -62,9 +86,12 @@ const tabItems = [
             <UBadge v-if="data.profile.online" color="success" variant="soft" size="lg"><span class="mr-1 h-2 w-2 rounded-full bg-green-500" /> En línea</UBadge>
             <UBadge color="primary" variant="soft" icon="i-lucide-award" size="lg">Nivel {{ data.profile.level.name }}</UBadge>
             <UBadge color="neutral" variant="subtle" size="lg">{{ data.profile.points }} pts</UBadge>
-            <UButton v-if="user && !isOwn" size="sm" variant="soft" icon="i-lucide-message-circle" label="Enviar mensaje" :to="`/messages?with=${data.profile.slug}`" />
+            <UButton v-if="user && !isOwn && !data.profile.blockedByMe" size="sm" variant="soft" icon="i-lucide-message-circle" label="Enviar mensaje" :to="`/messages?with=${data.profile.slug}`" />
+            <UButton v-if="user && !isOwn && !data.profile.blockedByMe" size="sm" color="error" variant="ghost" icon="i-lucide-ban" label="Bloquear" @click="confirmBlock = true" />
+            <UButton v-if="user && !isOwn && data.profile.blockedByMe" size="sm" color="neutral" variant="soft" icon="i-lucide-undo-2" label="Desbloquear" :loading="blockingBusy" @click="toggleBlock" />
           </div>
           <p class="text-sm text-muted">Miembro desde {{ fmtDate(data.profile.memberSince) }}<span v-if="data.profile.location"> · {{ data.profile.location }}</span></p>
+          <UAlert v-if="data.profile.blockedByMe" class="mt-2" color="warning" variant="soft" icon="i-lucide-ban" title="Tenés bloqueado a este miembro" description="No ves sus publicaciones ni comentarios y los mensajes directos entre ustedes están impedidos. Podés desbloquearlo desde aquí o desde Ajustes de cuenta." />
           <p class="text-sm text-muted" v-if="data.profile.level.nextAt">Faltan {{ data.profile.level.nextAt - data.profile.points }} pts para el próximo nivel.</p>
           <p v-if="data.profile.bio" class="mt-2 whitespace-pre-line">{{ data.profile.bio }}</p>
           <label v-if="isOwn" class="mt-3 inline-flex cursor-pointer items-center gap-2 text-sm font-medium text-primary hover:underline">
@@ -108,5 +135,13 @@ const tabItems = [
         </div>
       </template>
     </UTabs>
+    <UModal v-model:open="confirmBlock" title="Bloquear a este miembro" :description="`Si bloqueás a ${data.profile.name}, dejás de ver sus publicaciones y comentarios, y ninguno de los dos podrá enviarse mensajes directos. La otra persona no recibe ningún aviso.`">
+      <template #footer>
+        <div class="flex justify-end gap-2">
+          <UButton color="neutral" variant="ghost" label="Cancelar" @click="confirmBlock = false" />
+          <UButton color="error" label="Sí, bloquear" icon="i-lucide-ban" :loading="blockingBusy" @click="toggleBlock" />
+        </div>
+      </template>
+    </UModal>
   </div>
 </template>

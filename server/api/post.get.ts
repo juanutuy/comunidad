@@ -2,6 +2,7 @@
 // Sin acceso al canal: solo teaser (locked).
 import { POST_SELECT, canAccessChannel, channelBySlug, currentAuth, resolveTenant, serializePost } from '../utils/community'
 import { dbFor } from '../utils/db'
+import { blockedByMe } from '../utils/blocks'
 
 export default defineEventHandler(async (event) => {
   const tenant = await resolveTenant(event)
@@ -12,9 +13,14 @@ export default defineEventHandler(async (event) => {
   const row = await db.prepare(`${POST_SELECT} WHERE p.channel_id = ? AND p.slug = ?`).get(channel.id, String(q.post || '')) as Record<string, unknown> | undefined
   if (!row) throw createError({ statusCode: 404, message: 'Publicación no encontrada.' })
   const { user, role } = await currentAuth(event, tenant.id)
+  // Fase 5: borradores y programados SOLO los abre su autor.
+  if (row.status && row.status !== 'published' && user?.id !== row.author_id)
+    throw createError({ statusCode: 404, message: 'Publicación no encontrada.' })
   const access = await canAccessChannel(event, user?.id ?? null, role, channel)
+  const blocked = await blockedByMe(event, tenant.id, user?.id ?? null)
   const comments = access
     ? (await db.prepare(`SELECT c.*, u.name AS author_name, u.slug AS author_slug, u.avatar_url AS author_avatar FROM comments c JOIN users u ON u.id = c.author_id WHERE c.post_id = ? ORDER BY c.created_at`).all(row.id as number) as Record<string, unknown>[])
+        .filter(c => !blocked.has(Number(c.author_id)))
         .map(c => ({ id: c.id, body: c.body, createdAt: c.created_at, author: { name: c.author_name, slug: c.author_slug, avatarUrl: c.author_avatar || '' } }))
     : []
   return { post: await serializePost(event, row, user?.id ?? null, access), comments }

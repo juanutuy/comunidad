@@ -5,6 +5,7 @@
 // pero el enrollment no se creó) y se concede en ese caso.
 import { requireUser, resolveTenant } from '../../../utils/community'
 import { nowIso, dbFor } from '../../../utils/db'
+import { awardPoints } from '../../../utils/points'
 
 export default defineEventHandler(async (event) => {
   const tenant = await resolveTenant(event)
@@ -20,7 +21,10 @@ export default defineEventHandler(async (event) => {
         throw createError({ statusCode: 402, message: 'Este curso es pago: completá la compra para inscribirte. Tu acceso se activa automáticamente cuando se confirma el pago.' })
     }
   }
+  const wasEnrolled = !!await db.prepare('SELECT id FROM enrollments WHERE tenant_id = ? AND course_id = ? AND user_id = ?').get(tenant.id, course.id, user.id)
   await db.prepare('INSERT OR IGNORE INTO enrollments (tenant_id, course_id, user_id, created_at) VALUES (?, ?, ?, ?)')
     .run(tenant.id, course.id, user.id, nowIso())
+  // Fase 5: +5 puntos la primera vez que se inscribe a un curso.
+  if (!wasEnrolled) await awardPoints(event, tenant.id, user.id, 'course_enroll', course.id).catch(() => {})
   return { enrolled: true }
 })

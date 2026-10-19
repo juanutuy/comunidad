@@ -15,6 +15,8 @@ export default defineEventHandler(async (event) => {
   if (!post) throw createError({ statusCode: 404, message: 'Publicación no encontrada.' })
   if (post.author_id !== user.id && role !== 'admin')
     throw createError({ statusCode: 403, message: 'Solo el autor o un administrador puede borrar esta publicación.' })
+  await db.prepare('DELETE FROM poll_votes WHERE post_id = ?').run(postId)
+  await db.prepare('DELETE FROM poll_options WHERE post_id = ?').run(postId)
   await db.prepare('DELETE FROM reactions WHERE post_id = ?').run(postId)
   await db.prepare('DELETE FROM comments WHERE post_id = ?').run(postId)
   await db.prepare('DELETE FROM bookmarks WHERE post_id = ?').run(postId)

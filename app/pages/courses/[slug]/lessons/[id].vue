@@ -10,7 +10,7 @@ const { user } = useAuth()
 
 interface LessonData {
   course: { slug: string, title: string, enrolled: boolean }
-  lesson: { id: number, title: string, chapterTitle: string, durationMin: number, isFree: boolean, content: string, canView: boolean, completed: boolean }
+  lesson: { id: number, title: string, chapterTitle: string, durationMin: number, isFree: boolean, content: string, videoUrl: string, canView: boolean, completed: boolean }
   prevId: number | null
   nextId: number | null
 }
@@ -19,6 +19,14 @@ const { data, refresh } = await useAsyncData(
   () => api<LessonData>(`/api/courses/${slug.value}/lessons/${lessonId.value}`),
   { watch: [slug, lessonId] },
 )
+
+const youtubeEmbed = computed(() => {
+  const url = data.value?.lesson.videoUrl || ''
+  if (!url) return ''
+  if (url.includes('/embed/')) return url
+  const m = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([\w-]+)/)
+  return m ? `https://www.youtube.com/embed/${m[1]}` : ''
+})
 
 const toggling = ref(false)
 async function toggleComplete() {
@@ -48,6 +56,10 @@ async function toggleComplete() {
         <UBadge v-if="data.lesson.completed" color="success" variant="soft" icon="i-lucide-check">Completada</UBadge>
       </div>
 
+      <div v-if="data.lesson.canView && data.lesson.videoUrl" class="mt-5 aspect-video overflow-hidden rounded-lg">
+        <iframe v-if="youtubeEmbed" :src="youtubeEmbed" class="h-full w-full" allowfullscreen title="Video de la lección" />
+        <a v-else :href="data.lesson.videoUrl" target="_blank" rel="noopener" class="flex h-full items-center justify-center bg-elevated text-primary hover:underline">Ver el video de la lección</a>
+      </div>
       <div v-if="data.lesson.canView" class="mt-5 space-y-4 leading-relaxed">
         <p v-for="(para, i) in data.lesson.content.split('\n\n')" :key="i" class="whitespace-pre-line">{{ para }}</p>
       </div>

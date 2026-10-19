@@ -19,6 +19,18 @@ const router = useRouter()
 const items = ref<NotificationView[]>([])
 const unread = ref(0)
 const open = ref(false)
+// Fase 5: filtro por tipo dentro del desplegable.
+const filter = ref('all')
+const filterChips = [
+  { label: 'Todo', value: 'all' },
+  { label: 'Menciones', value: 'mention' },
+  { label: 'Reacciones', value: 'reaction' },
+  { label: 'Comentarios', value: 'comment' },
+  { label: 'Publicaciones', value: 'new_post' },
+  { label: 'Mensajes', value: 'dm' },
+]
+const visibleItems = computed(() =>
+  items.value.filter(n => filter.value === 'all' || n.type === filter.value).slice(0, 8))
 
 const typeIcons: Record<string, string> = {
   reaction: 'i-lucide-heart',
@@ -32,7 +44,7 @@ async function load() {
   if (!user.value) { items.value = []; unread.value = 0; return }
   try {
     const data = await api<{ unread: number, notifications: NotificationView[] }>('/api/notifications')
-    items.value = data.notifications.slice(0, 8)
+    items.value = data.notifications
     unread.value = data.unread
   }
   catch { /* sin sesión o sin red: la campana queda en cero */ }
@@ -90,8 +102,16 @@ onMounted(async () => {
           <p class="text-sm font-bold">Notificaciones</p>
           <UButton to="/notifications" size="xs" color="neutral" variant="ghost" label="Ver todas" @click="open = false" />
         </div>
-        <ul v-if="items.length" class="max-h-80 divide-y divide-default overflow-y-auto">
-          <li v-for="n in items" :key="n.id">
+        <div class="flex flex-wrap gap-1 px-2 pb-1">
+          <UButton
+            v-for="chip in filterChips" :key="chip.value" size="xs"
+            :color="filter === chip.value ? 'primary' : 'neutral'"
+            :variant="filter === chip.value ? 'soft' : 'ghost'"
+            :label="chip.label" @click="filter = chip.value"
+          />
+        </div>
+        <ul v-if="visibleItems.length" class="max-h-80 divide-y divide-default overflow-y-auto">
+          <li v-for="n in visibleItems" :key="n.id">
             <button class="flex w-full items-start gap-2.5 px-2 py-2.5 text-left hover:bg-elevated" :class="{ 'opacity-70': n.isRead }" @click="go(n)">
               <UAvatar :src="n.actor?.avatarUrl || undefined" :text="n.actor ? initials(n.actor.name) : undefined" :icon="typeIcons[n.type] || 'i-lucide-bell'" size="sm" class="mt-0.5 shrink-0" />
               <span class="min-w-0 flex-1">
@@ -102,7 +122,7 @@ onMounted(async () => {
             </button>
           </li>
         </ul>
-        <p v-else class="px-2 py-4 text-center text-sm text-muted">No tenés notificaciones todavía.</p>
+        <p v-else class="px-2 py-4 text-center text-sm text-muted">{{ items.length ? 'Nada en este filtro.' : 'No tenés notificaciones todavía.' }}</p>
       </div>
     </template>
   </UPopover>

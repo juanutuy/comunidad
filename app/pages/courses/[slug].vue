@@ -8,7 +8,7 @@ const { fmtMoney } = useFormat()
 
 interface Lesson { id: number, title: string, durationMin: number, isFree: boolean, completed: boolean, canView: boolean }
 interface Chapter { id: number, title: string, lessons: Lesson[] }
-interface CourseDetail { course: { id: number, slug: string, title: string, description: string, level: string, priceCents: number, enrolled: boolean, progress: { completed: number, total: number, pct: number } }, chapters: Chapter[] }
+interface CourseDetail { course: { id: number, slug: string, title: string, description: string, level: string, priceCents: number, imageUrl: string, enrolled: boolean, progress: { completed: number, total: number, pct: number } }, chapters: Chapter[] }
 const { data, refresh } = await useAsyncData(() => `course-${slug.value}`, () => api<CourseDetail>(`/api/courses/${slug.value}`), { watch: [slug] })
 
 const open = ref<string[]>(['0'])
@@ -48,6 +48,7 @@ async function buyCourse() {
         <UBadge color="primary" variant="subtle">{{ data.course.level }}</UBadge>
         <UBadge :color="data.course.priceCents ? 'warning' : 'success'" variant="subtle">{{ fmtMoney(data.course.priceCents) }}{{ data.course.priceCents ? ' · Pago único' : '' }}</UBadge>
       </div>
+      <img v-if="data.course.imageUrl" :src="data.course.imageUrl" alt="" class="mt-3 h-52 w-full rounded-lg object-cover">
       <h1 class="mt-3 text-2xl font-bold">{{ data.course.title }}</h1>
       <p class="mt-2 whitespace-pre-line text-muted">{{ data.course.description }}</p>
       <div v-if="!data.course.enrolled" class="mt-4 flex flex-wrap items-center gap-2">

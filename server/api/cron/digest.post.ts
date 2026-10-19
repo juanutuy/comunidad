@@ -10,6 +10,7 @@
 // URL, o cualquier programador externo (cron del servidor, n8n) con el
 // header del secreto. Sin NUXT_CRON_SECRET el endpoint responde 503.
 import { dbFor } from '../../utils/db'
+import { publishDuePosts } from '../../utils/community'
 import { sendEmail } from '../../utils/email'
 
 export default defineEventHandler(async (event) => {
@@ -31,9 +32,10 @@ export default defineEventHandler(async (event) => {
 
   for (const tenant of tenants) {
     const tenantId = Number(tenant.id)
-    const newPosts = await db.prepare('SELECT p.title, c.name AS channel_name FROM posts p JOIN channels c ON c.id = p.channel_id WHERE p.tenant_id = ? AND p.created_at >= ? ORDER BY p.created_at DESC LIMIT 8').all(tenantId, weekAgo) as Record<string, unknown>[]
+    await publishDuePosts(event, tenantId)
+    const newPosts = await db.prepare("SELECT p.title, c.name AS channel_name FROM posts p JOIN channels c ON c.id = p.channel_id WHERE p.tenant_id = ? AND p.status = 'published' AND p.created_at >= ? ORDER BY p.created_at DESC LIMIT 8").all(tenantId, weekAgo) as Record<string, unknown>[]
     const upcoming = await db.prepare('SELECT title, starts_at FROM events WHERE tenant_id = ? AND starts_at >= ? ORDER BY starts_at LIMIT 5').all(tenantId, now) as Record<string, unknown>[]
-    const postCount = (await db.prepare('SELECT COUNT(*) AS n FROM posts WHERE tenant_id = ? AND created_at >= ?').get(tenantId, weekAgo) as { n: number }).n
+    const postCount = (await db.prepare("SELECT COUNT(*) AS n FROM posts WHERE tenant_id = ? AND status = 'published' AND created_at >= ?").get(tenantId, weekAgo) as { n: number }).n
     const lines = [
       `Hola, esto pasó esta semana en ${tenant.name}:`,
       '',

@@ -4,6 +4,7 @@
 //   chan:{tenantId}:{channelId}        chat de un canal
 //   dm:{tenantId}:{uidMenor}:{uidMayor} conversación directa entre dos
 //   user:{tenantId}:{userId}           canal personal (notificaciones)
+//   room:{tenantId}:{roomId}           sala grupal de chat (Fase 5)
 //
 // El DO no guarda historial: los mensajes viven en D1 (chat_messages /
 // dm_messages) y se leen/escriben por la API REST de Nitro. El DO solo

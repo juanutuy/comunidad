@@ -5,6 +5,7 @@
 import { POST_SELECT, canAccessChannel, channelBySlug, currentAuth, resolveTenant, serializePost } from '../utils/community'
 import type { ChannelRow } from '../utils/community'
 import { dbFor } from '../utils/db'
+import { hiddenFilterSql } from '../utils/blocks'
 
 export default defineEventHandler(async (event) => {
   const tenant = await resolveTenant(event)
@@ -14,7 +15,8 @@ export default defineEventHandler(async (event) => {
   const db = await dbFor(event)
   const { user, role } = await currentAuth(event, tenant.id)
 
-  const postRows = await db.prepare(`${POST_SELECT} WHERE p.tenant_id = ? AND (p.title LIKE ? OR p.body LIKE ?) ORDER BY p.created_at DESC LIMIT 10`).all(tenant.id, like, like) as Record<string, unknown>[]
+  const hf = hiddenFilterSql(user?.id ?? null)
+  const postRows = await db.prepare(`${POST_SELECT} WHERE p.tenant_id = ? AND p.status = 'published' AND (p.title LIKE ? OR p.body LIKE ?)${hf.sql} ORDER BY p.created_at DESC LIMIT 10`).all(tenant.id, like, like, ...hf.params) as Record<string, unknown>[]
   const posts = []
   for (const r of postRows) {
     const ch = (await channelBySlug(event, tenant.id, r.channel_slug as string))!
@@ -31,7 +33,7 @@ export default defineEventHandler(async (event) => {
     channels.push({ id: c.id, slug: c.slug, name: c.name, icon: c.icon, description: c.description, type: c.type, priceCents: c.price_cents, hasAccess: access })
   }
 
-  const courseRows = await db.prepare('SELECT * FROM courses WHERE tenant_id = ? AND (title LIKE ? OR description LIKE ?) ORDER BY created_at LIMIT 10').all(tenant.id, like, like) as Record<string, unknown>[]
+  const courseRows = await db.prepare('SELECT * FROM courses WHERE tenant_id = ? AND status = \'published\' AND (title LIKE ? OR description LIKE ?) ORDER BY created_at LIMIT 10').all(tenant.id, like, like) as Record<string, unknown>[]
   const courses = courseRows.map(c => ({ id: c.id, slug: c.slug, title: c.title, description: c.description, level: c.level, priceCents: c.price_cents }))
 
   const memberRows = await db.prepare(`SELECT u.id, u.name, u.slug, u.bio, u.avatar_url FROM users u JOIN memberships m ON m.user_id = u.id AND m.tenant_id = ? WHERE u.name LIKE ? LIMIT 10`).all(tenant.id, like) as Record<string, unknown>[]

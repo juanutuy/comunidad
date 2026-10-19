@@ -10,6 +10,8 @@ export default defineEventHandler(async (event) => {
   const db = await dbFor(event)
   const course = await db.prepare('SELECT * FROM courses WHERE tenant_id = ? AND slug = ?').get(tenant.id, slug) as Record<string, unknown> | undefined
   if (!course) throw createError({ statusCode: 404, message: 'Curso no encontrado.' })
+  const { role: courseRole } = await currentAuth(event, tenant.id)
+  if (course.status === 'draft' && courseRole !== 'admin') throw createError({ statusCode: 404, message: 'Curso no encontrado.' })
   const lesson = await db.prepare(`SELECT l.*, ch.title AS chapter_title FROM lessons l JOIN chapters ch ON ch.id = l.chapter_id WHERE l.id = ? AND ch.course_id = ?`).get(lessonId, course.id) as Record<string, unknown> | undefined
   if (!lesson) throw createError({ statusCode: 404, message: 'Lección no encontrada.' })
   const { user } = await currentAuth(event, tenant.id)
@@ -23,7 +25,7 @@ export default defineEventHandler(async (event) => {
     course: { slug: course.slug, title: course.title, enrolled },
     lesson: {
       id: lesson.id, title: lesson.title, chapterTitle: lesson.chapter_title, durationMin: lesson.duration_min,
-      isFree: !!lesson.is_free, content: canView ? lesson.content : '', canView, completed,
+      isFree: !!lesson.is_free, content: canView ? lesson.content : '', videoUrl: canView ? (lesson.video_url as string || '') : '', canView, completed,
     },
     prevId: idx > 0 ? all[idx - 1]!.id : null,
     nextId: idx >= 0 && idx < all.length - 1 ? all[idx + 1]!.id : null,

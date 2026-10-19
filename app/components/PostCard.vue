@@ -1,4 +1,7 @@
 <script setup lang="ts">
+export interface PollOptionView { id: number, label: string, votes: number, pct: number }
+export interface PollView { options: PollOptionView[], totalVotes: number, myOptionId: number | null }
+
 export interface PostView {
   id: number
   slug: string
@@ -9,6 +12,7 @@ export interface PostView {
   mediaType: string
   mediaUrl: string
   pinned: boolean
+  kind?: string
   createdAt: string
   author: { name: string, slug: string, avatarUrl?: string }
   channel: { name: string, slug: string, type: string }
@@ -16,6 +20,7 @@ export interface PostView {
   myReactions: string[]
   commentCount: number
   bookmarked: boolean
+  poll?: PollView | null
 }
 
 const props = defineProps<{ post: PostView, linkable?: boolean }>()
@@ -74,6 +79,40 @@ async function togglePin() {
   catch { toast.add({ title: 'No se pudo fijar la publicación', color: 'error' }) }
 }
 
+// Encuesta (Fase 5): votar o cambiar el voto; el servidor devuelve
+// los conteos actualizados y se refleja sin recargar.
+const localPoll = ref<PollView | null>(props.post.poll ?? null)
+watch(() => props.post.poll, p => { localPoll.value = p ?? null })
+const voting = ref(false)
+async function vote(optionId: number) {
+  if (!user.value) { toast.add({ title: 'Iniciá sesión para votar', color: 'warning' }); return }
+  if (voting.value || localPoll.value?.myOptionId === optionId) return
+  voting.value = true
+  try {
+    const res = await api<{ poll: PollView }>(`/api/posts/${props.post.id}/poll-vote`, { method: 'POST', body: { optionId } })
+    localPoll.value = res.poll
+  }
+  catch (e) {
+    toast.add({ title: 'No se pudo registrar tu voto', description: (e as { data?: { message?: string } }).data?.message || '', color: 'error' })
+  }
+  finally { voting.value = false }
+}
+
+// Fase 5: ocultar la publicación solo para mí (no es moderación).
+const locallyHidden = ref(false)
+async function hidePost() {
+  try {
+    await api(`/api/posts/${props.post.id}/hide`, { method: 'POST' })
+    locallyHidden.value = true
+    toast.add({ title: 'Publicación oculta', description: 'Podés volver a mostrarla desde Ajustes de cuenta.', color: 'success' })
+    emit('changed')
+  }
+  catch { toast.add({ title: 'No se pudo ocultar la publicación', color: 'error' }) }
+}
+const postMenuItems = computed(() => [
+  [{ label: 'Ocultar publicación', icon: 'i-lucide-eye-off', onSelect: hidePost }],
+])
+
 const canDelete = computed(() => !!user.value && (user.value.role === 'admin' || user.value.slug === props.post.author.slug))
 const confirmDelete = ref(false)
 const deleting = ref(false)
@@ -92,7 +131,7 @@ async function deletePost() {
 </script>
 
 <template>
-  <UCard>
+  <UCard v-if="!locallyHidden">
     <div class="flex items-start gap-3">
       <UAvatar :src="post.author.avatarUrl || undefined" :text="initials(post.author.name)" size="md" />
       <div class="min-w-0 flex-1">
@@ -107,6 +146,9 @@ async function deletePost() {
           <span class="text-muted">· {{ timeAgo(post.createdAt) }}</span>
           <UBadge v-if="post.pinned" color="warning" variant="subtle" icon="i-lucide-pin">
             Fijado
+          </UBadge>
+          <UBadge v-if="post.kind === 'poll'" color="primary" variant="subtle" icon="i-lucide-bar-chart-3">
+            Encuesta
           </UBadge>
           <UBadge v-if="post.channel.type === 'paid'" color="neutral" variant="subtle" icon="i-lucide-crown">
             Premium
@@ -145,6 +187,27 @@ async function deletePost() {
           <div v-else-if="post.mediaType === 'video' && post.mediaUrl" class="mt-3 text-sm">
             <a :href="post.mediaUrl" target="_blank" rel="noopener" class="text-primary hover:underline">Ver video</a>
           </div>
+
+          <div v-if="localPoll" class="mt-4 space-y-2">
+            <button
+              v-for="opt in localPoll.options"
+              :key="opt.id"
+              class="relative block w-full overflow-hidden rounded-lg border text-left text-sm transition"
+              :class="localPoll.myOptionId === opt.id ? 'border-primary bg-primary/5 font-medium' : 'border-default hover:bg-elevated'"
+              :disabled="voting"
+              @click="vote(opt.id)"
+            >
+              <span class="absolute inset-y-0 left-0 bg-primary/15" :style="{ width: `${localPoll.myOptionId || localPoll.totalVotes ? opt.pct : 0}%` }" />
+              <span class="relative flex items-center gap-2 px-3 py-2">
+                <UIcon v-if="localPoll.myOptionId === opt.id" name="i-lucide-check-circle-2" class="shrink-0 text-primary" />
+                <span class="min-w-0 flex-1 truncate">{{ opt.label }}</span>
+                <span v-if="localPoll.totalVotes || localPoll.myOptionId" class="shrink-0 text-muted">{{ opt.pct }}% · {{ opt.votes }}</span>
+              </span>
+            </button>
+            <p class="text-xs text-muted">
+              {{ localPoll.totalVotes }} voto{{ localPoll.totalVotes === 1 ? '' : 's' }}<span v-if="localPoll.myOptionId"> · Tocá otra opción para cambiar tu voto</span><span v-else-if="user"> · Tocá una opción para votar</span>
+            </p>
+          </div>
         </div>
 
         <div class="mt-4 flex flex-wrap items-center gap-1 border-t border-default pt-3">
@@ -164,6 +227,9 @@ async function deletePost() {
           </NuxtLink>
           <span class="flex-1" />
           <UButton size="sm" color="neutral" :variant="localBookmarked ? 'soft' : 'ghost'" icon="i-lucide-bookmark" @click="toggleBookmark" />
+          <UDropdownMenu v-if="user && user.slug !== post.author.slug" :items="postMenuItems">
+            <UButton size="sm" color="neutral" variant="ghost" icon="i-lucide-more-horizontal" title="Más acciones" />
+          </UDropdownMenu>
           <UButton v-if="user?.role === 'admin'" size="sm" color="neutral" variant="ghost" icon="i-lucide-pin" title="Fijar / desfijar (admin)" @click="togglePin" />
           <UButton v-if="canDelete" size="sm" color="error" variant="ghost" icon="i-lucide-trash-2" title="Eliminar publicación" @click="confirmDelete = true" />
         </div>

@@ -10,6 +10,7 @@
 //   Leyenda     250+
 import type { H3Event } from 'h3'
 import { dbFor } from './db'
+import { extraPoints } from './points'
 
 export interface Level { name: string, min: number, nextAt: number | null }
 
@@ -40,7 +41,7 @@ export interface MemberStats {
 export async function memberStats(event: H3Event, tenantId: number, userId: number): Promise<MemberStats> {
   const db = await dbFor(event)
   const one = async (sql: string, ...p: unknown[]) => ((await db.prepare(sql).get(...p)) as { n: number }).n
-  const posts = await one('SELECT COUNT(*) AS n FROM posts WHERE author_id = ? AND tenant_id = ?', userId, tenantId)
+  const posts = await one("SELECT COUNT(*) AS n FROM posts WHERE author_id = ? AND tenant_id = ? AND status = 'published'", userId, tenantId)
   const comments = await one('SELECT COUNT(*) AS n FROM comments WHERE author_id = ? AND tenant_id = ?', userId, tenantId)
   const reactionsReceived = await one('SELECT COUNT(*) AS n FROM reactions r JOIN posts p ON p.id = r.post_id WHERE p.author_id = ? AND p.tenant_id = ?', userId, tenantId)
   const bookmarks = await one('SELECT COUNT(*) AS n FROM bookmarks WHERE user_id = ? AND tenant_id = ?', userId, tenantId)
@@ -54,7 +55,9 @@ export async function memberStats(event: H3Event, tenantId: number, userId: numb
         = (SELECT COUNT(*) FROM lesson_progress lp JOIN lessons l2 ON l2.id = lp.lesson_id JOIN chapters ch2 ON ch2.id = l2.chapter_id
            WHERE ch2.course_id = c.id AND lp.user_id = ? AND lp.tenant_id = ?)`,
   tenantId, userId, tenantId)
-  return { posts, comments, reactionsReceived, coursesCompleted, bookmarks, points: posts * 10 + comments * 3 + reactionsReceived * 2 }
+  // Fase 5: se suman los hitos de point_events (cursos y eventos).
+  const extra = await extraPoints(event, tenantId, userId).catch(() => 0)
+  return { posts, comments, reactionsReceived, coursesCompleted, bookmarks, points: posts * 10 + comments * 3 + reactionsReceived * 2 + extra }
 }
 
 export interface Badge { id: string, name: string, description: string, icon: string, earned: boolean }

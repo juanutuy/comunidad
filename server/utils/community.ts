@@ -39,8 +39,12 @@ export async function currentAuth(event: H3Event, tenantId: number) {
   const session = readSession(event)
   if (!session) return { user: null as UserRow | null, role: null as string | null }
   const db = await dbFor(event)
-  const user = await db.prepare('SELECT * FROM users WHERE id = ?').get(session.uid) as UserRow | undefined
+  const user = await db.prepare('SELECT * FROM users WHERE id = ?').get(session.uid) as (UserRow & { token_version?: number }) | undefined
   if (!user) return { user: null, role: null }
+  // Fase 5: si la contraseña cambió después de emitida esta sesión, la
+  // versión ya no coincide y la sesión deja de valer (las sesiones sin
+  // versión — anteriores a la Fase 5 — valen 0, como la columna nueva).
+  if ((session.v ?? 0) !== (user.token_version ?? 0)) return { user: null, role: null }
   const m = await db.prepare('SELECT role FROM memberships WHERE tenant_id = ? AND user_id = ?').get(tenantId, user.id) as { role: string } | undefined
   return { user, role: m?.role ?? null }
 }
@@ -84,6 +88,26 @@ export async function canAccessChannel(event: H3Event, userId: number | null, ro
   catch { return false }
 }
 
+// Fase 5 — publicación perezosa de posts programados: en Workers no
+// hay un cron por minuto garantizado, así que cada lectura principal
+// (feed, detalle de canal, digest) promueve primero los programados
+// cuya hora ya venció. Al publicarse toman como fecha su hora
+// programada, así aparecen en el orden que el autor eligió.
+export async function publishDuePosts(event: H3Event, tenantId: number): Promise<void> {
+  try {
+    const db = await dbFor(event)
+    await db.prepare("UPDATE posts SET status = 'published', created_at = scheduled_at WHERE tenant_id = ? AND status = 'scheduled' AND scheduled_at != '' AND scheduled_at <= ?")
+      .run(tenantId, new Date().toISOString())
+  }
+  catch { /* bases anteriores sin la columna: nada que publicar */ }
+}
+
+export interface PollView {
+  options: { id: number, label: string, votes: number, pct: number }[]
+  totalVotes: number
+  myOptionId: number | null
+}
+
 export async function serializePost(event: H3Event, row: Record<string, unknown>, userId: number | null, fullAccess: boolean) {
   const db = await dbFor(event)
   const postId = row.id as number
@@ -97,6 +121,28 @@ export async function serializePost(event: H3Event, row: Record<string, unknown>
   const bookmarked = userId
     ? !!await db.prepare('SELECT id FROM bookmarks WHERE post_id = ? AND user_id = ?').get(postId, userId)
     : false
+  // Fase 5: si el post es una encuesta, se adjuntan opciones, conteos,
+  // porcentajes y el voto del usuario actual (solo con acceso completo:
+  // en un canal bloqueado la encuesta también queda detrás del teaser).
+  let poll: PollView | null = null
+  if (row.kind === 'poll' && fullAccess) {
+    const optionRows = await db.prepare('SELECT * FROM poll_options WHERE post_id = ? ORDER BY sort, id').all(postId) as Record<string, unknown>[]
+    const voteRows = await db.prepare('SELECT option_id, COUNT(*) AS n FROM poll_votes WHERE post_id = ? GROUP BY option_id').all(postId) as { option_id: number, n: number }[]
+    const counts = new Map(voteRows.map(v => [Number(v.option_id), Number(v.n)]))
+    const totalVotes = voteRows.reduce((acc, v) => acc + Number(v.n), 0)
+    const myVote = userId
+      ? await db.prepare('SELECT option_id FROM poll_votes WHERE post_id = ? AND user_id = ?').get(postId, userId) as { option_id: number } | undefined
+      : undefined
+    poll = {
+      options: optionRows.map(o => ({
+        id: Number(o.id), label: String(o.label),
+        votes: counts.get(Number(o.id)) ?? 0,
+        pct: totalVotes ? Math.round(((counts.get(Number(o.id)) ?? 0) / totalVotes) * 100) : 0,
+      })),
+      totalVotes,
+      myOptionId: myVote ? Number(myVote.option_id) : null,
+    }
+  }
   return {
     id: postId,
     slug: row.slug,
@@ -107,10 +153,12 @@ export async function serializePost(event: H3Event, row: Record<string, unknown>
     mediaType: row.media_type,
     mediaUrl: row.media_url,
     pinned: !!row.pinned,
+    kind: (row.kind as string) || 'post',
+    status: (row.status as string) || 'published',
     createdAt: row.created_at,
     author: { name: row.author_name, slug: row.author_slug, avatarUrl: row.author_avatar || '' },
     channel: { name: row.channel_name, slug: row.channel_slug, type: row.channel_type },
-    reactions, myReactions, commentCount, bookmarked,
+    reactions, myReactions, commentCount, bookmarked, poll,
   }
 }
 

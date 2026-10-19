@@ -7,6 +7,7 @@ import { otherMember, serializeChatMessage, type ChatMessageRow } from '../../ut
 import { publishRealtime, roomDm } from '../../utils/realtime'
 import { notify } from '../../utils/notify'
 import { dbFor, nowIso } from '../../utils/db'
+import { blockBetween } from '../../utils/blocks'
 
 export default defineEventHandler(async (event) => {
   const tenant = await resolveTenant(event)
@@ -14,6 +15,10 @@ export default defineEventHandler(async (event) => {
   const slug = getRouterParam(event, 'slug')!
   const other = await otherMember(event, tenant.id, slug, me.id)
 
+  // Fase 5: con un bloqueo entre ambos (en cualquier sentido) no se
+  // pueden enviar mensajes directos.
+  if (await blockBetween(event, tenant.id, me.id, other.id as number))
+    throw createError({ statusCode: 403, message: 'No se pueden enviar mensajes: hay un bloqueo entre vos y esta persona. Revisá tus ajustes de cuenta.' })
   const body = await readBody<{ body?: string }>(event)
   const text = (body?.body || '').trim()
   if (!text) throw createError({ statusCode: 400, message: 'El mensaje no puede estar vacío.' })

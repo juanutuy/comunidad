@@ -26,10 +26,10 @@ function sign(payload: string): string {
   return createHmac('sha256', secret()).update(payload).digest('base64url')
 }
 
-export interface SessionPayload { uid: number, exp: number }
+export interface SessionPayload { uid: number, exp: number, v?: number }
 
-export function setSession(event: H3Event, userId: number) {
-  const payload: SessionPayload = { uid: userId, exp: Date.now() + 1000 * 60 * 60 * 24 * 7 }
+export function setSession(event: H3Event, userId: number, version = 0) {
+  const payload: SessionPayload = { uid: userId, exp: Date.now() + 1000 * 60 * 60 * 24 * 7, v: version }
   const body = Buffer.from(JSON.stringify(payload)).toString('base64url')
   setCookie(event, 'cm_session', `${body}.${sign(body)}`, {
     httpOnly: true, sameSite: 'lax', path: '/', maxAge: 60 * 60 * 24 * 7,

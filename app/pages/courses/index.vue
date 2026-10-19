@@ -2,7 +2,7 @@
 const api = useApi()
 const { fmtMoney } = useFormat()
 const q = ref('')
-interface CourseCard { id: number, slug: string, title: string, description: string, level: string, priceCents: number, chapters: number, lessons: number, enrolled: boolean, progress: { completed: number, total: number, pct: number } }
+interface CourseCard { id: number, slug: string, title: string, description: string, level: string, priceCents: number, imageUrl: string, chapters: number, lessons: number, enrolled: boolean, progress: { completed: number, total: number, pct: number } }
 const { data, refresh } = await useAsyncData('courses', () => api<{ courses: CourseCard[] }>('/api/courses'))
 async function search() {
   data.value = await api<{ courses: CourseCard[] }>('/api/courses', { query: { q: q.value } })
@@ -23,6 +23,7 @@ async function search() {
     </div>
     <div class="grid gap-4 sm:grid-cols-2">
       <UCard v-for="c in data?.courses || []" :key="c.id">
+        <img v-if="c.imageUrl" :src="c.imageUrl" alt="" class="mb-3 h-36 w-full rounded-lg object-cover">
         <div class="flex items-start justify-between gap-2">
           <UBadge color="primary" variant="subtle">{{ c.level }}</UBadge>
           <UBadge :color="c.priceCents ? 'warning' : 'success'" variant="subtle">{{ fmtMoney(c.priceCents) }}</UBadge>

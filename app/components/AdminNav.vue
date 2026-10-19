@@ -1,9 +1,11 @@
 <script setup lang="ts">
 // Navegación compartida de las páginas de administración.
 const items = [
-  { label: 'Ajustes', icon: 'i-lucide-settings', to: '/admin' },
+  { label: 'Panel', icon: 'i-lucide-layout-dashboard', to: '/admin' },
   { label: 'Miembros', icon: 'i-lucide-users', to: '/admin/members' },
   { label: 'Canales', icon: 'i-lucide-hash', to: '/admin/channels' },
+  { label: 'Cursos', icon: 'i-lucide-graduation-cap', to: '/admin/courses' },
+  { label: 'Eventos', icon: 'i-lucide-calendar-days', to: '/admin/events' },
   { label: 'Planes', icon: 'i-lucide-credit-card', to: '/admin/plans' },
   { label: 'Dominios', icon: 'i-lucide-globe', to: '/admin/domains' },
   { label: 'Correos', icon: 'i-lucide-mail', to: '/admin/emails' },

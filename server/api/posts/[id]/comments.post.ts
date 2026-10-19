@@ -12,7 +12,7 @@ export default defineEventHandler(async (event) => {
   const text = (body.body || '').trim()
   if (!text) throw createError({ statusCode: 400, message: 'El comentario no puede estar vacío.' })
   const db = await dbFor(event)
-  const post = await db.prepare(`SELECT p.author_id, p.title, p.slug, c.slug AS channel_slug FROM posts p JOIN channels c ON c.id = p.channel_id WHERE p.id = ? AND p.tenant_id = ?`).get(postId, tenant.id) as { author_id: number, title: string, slug: string, channel_slug: string } | undefined
+  const post = await db.prepare(`SELECT p.author_id, p.title, p.slug, c.slug AS channel_slug FROM posts p JOIN channels c ON c.id = p.channel_id WHERE p.id = ? AND p.tenant_id = ? AND p.status = 'published'`).get(postId, tenant.id) as { author_id: number, title: string, slug: string, channel_slug: string } | undefined
   if (!post) throw createError({ statusCode: 404, message: 'Publicación no encontrada.' })
   const id = Number((await db.prepare('INSERT INTO comments (tenant_id, post_id, author_id, body, created_at) VALUES (?, ?, ?, ?, ?)')
     .run(tenant.id, postId, user.id, text, nowIso())).lastInsertRowId)

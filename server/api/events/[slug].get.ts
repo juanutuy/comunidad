@@ -14,6 +14,7 @@ export default defineEventHandler(async (event) => {
     event: {
       id: row.id, slug: row.slug, title: row.title, description: row.description,
       startsAt: row.starts_at, endsAt: row.ends_at, location: row.location, category: row.category,
+      agenda: String(row.agenda || '').split('\n').map(s => s.trim()).filter(Boolean),
       host: { name: row.host_name, slug: row.host_slug },
       going: attendees.length,
       myRsvp: user ? !!await db.prepare('SELECT id FROM rsvps WHERE event_id = ? AND user_id = ?').get(row.id, user.id) : false,

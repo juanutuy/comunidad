@@ -8,7 +8,9 @@ export default defineEventHandler(async (event) => {
   const db = await dbFor(event)
   const course = await db.prepare('SELECT * FROM courses WHERE tenant_id = ? AND slug = ?').get(tenant.id, slug) as Record<string, unknown> | undefined
   if (!course) throw createError({ statusCode: 404, message: 'Curso no encontrado.' })
-  const { user } = await currentAuth(event, tenant.id)
+  const { user, role } = await currentAuth(event, tenant.id)
+  // Fase 5: un curso en borrador no existe para el público (el admin sí lo abre).
+  if (course.status === 'draft' && role !== 'admin') throw createError({ statusCode: 404, message: 'Curso no encontrado.' })
   const enrolled = user ? !!await db.prepare('SELECT id FROM enrollments WHERE tenant_id = ? AND course_id = ? AND user_id = ?').get(tenant.id, course.id, user.id) : false
   const completedIds = new Set(user
     ? (await db.prepare(`SELECT lp.lesson_id FROM lesson_progress lp JOIN lessons l ON l.id = lp.lesson_id JOIN chapters ch ON ch.id = l.chapter_id
@@ -26,7 +28,7 @@ export default defineEventHandler(async (event) => {
   const progressPct = totalLessons ? Math.round((completedCount / totalLessons) * 100) : 0
   return {
     course: {
-      id: course.id, slug: course.slug, title: course.title, description: course.description, level: course.level, priceCents: course.price_cents, enrolled,
+      id: course.id, slug: course.slug, title: course.title, description: course.description, level: course.level, priceCents: course.price_cents, imageUrl: (course.image_url as string) || '', enrolled,
       progress: { completed: completedCount, total: totalLessons, pct: progressPct },
     },
     chapters,

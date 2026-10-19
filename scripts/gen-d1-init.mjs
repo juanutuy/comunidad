@@ -15,7 +15,9 @@ const TABLES = [
   'chapters', 'lessons', 'lesson_progress', 'enrollments', 'events', 'rsvps',
   'library_items', 'notifications', 'uploads', 'chat_messages', 'dm_messages',
   'plans', 'member_subscriptions', 'payments', 'stripe_events', 'email_log',
-  'tenant_domains',
+  'tenant_domains', 'poll_options', 'poll_votes', 'user_prefs', 'point_events',
+  'chat_rooms', 'chat_room_members', 'chat_room_messages', 'user_blocks',
+  'user_hidden_posts',
 ]
 
 const db = new Database(join(process.cwd(), 'data', 'comunidad.db'), { readonly: true })

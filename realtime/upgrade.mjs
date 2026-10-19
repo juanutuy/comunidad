@@ -61,6 +61,10 @@ export async function handleRtUpgrade(request, env, ctx) {
 
   const user = await q1(env, 'SELECT * FROM users WHERE id = ?', session.uid)
   if (!user) return new Response('Sesión inválida.', { status: 401 })
+  // Fase 5: si la contraseña cambió, la versión de la sesión ya no
+  // coincide con la del usuario y la conexión se rechaza (misma regla
+  // que currentAuth en server/utils/community.ts).
+  if ((session.v ?? 0) !== (user.token_version ?? 0)) return new Response('Sesión inválida.', { status: 401 })
   const membership = await q1(env, 'SELECT role FROM memberships WHERE tenant_id = ? AND user_id = ?', tenant.id, user.id)
   const role = membership?.role ?? null
   if (!role) return new Response('No sos miembro de esta comunidad.', { status: 403 })
@@ -103,6 +107,16 @@ export async function handleRtUpgrade(request, env, ctx) {
     const lo = Math.min(user.id, other.id)
     const hi = Math.max(user.id, other.id)
     room = `dm:${tenant.id}:${lo}:${hi}`
+  }
+  else if (kind === 'room' && param) {
+    // Fase 5: salas grupales de chat — solo sus miembros.
+    const roomId = Number(param)
+    if (!roomId) return new Response('Sala no válida.', { status: 400 })
+    const chatRoom = await q1(env, 'SELECT id FROM chat_rooms WHERE id = ? AND tenant_id = ?', roomId, tenant.id)
+    if (!chatRoom) return new Response('Sala no encontrada.', { status: 404 })
+    const member = await q1(env, 'SELECT id FROM chat_room_members WHERE room_id = ? AND user_id = ?', roomId, user.id)
+    if (!member) return new Response('No sos miembro de esta sala.', { status: 403 })
+    room = `room:${tenant.id}:${roomId}`
   }
 
   if (!room) return new Response('Sala no válida.', { status: 400 })

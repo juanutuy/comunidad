@@ -169,6 +169,7 @@ export const events = sqliteTable('events', {
   location: text('location').notNull().default('En línea'),
   category: text('category').notNull().default('General'),
   hostId: integer('host_id').references(() => users.id),
+  agenda: text('agenda').notNull().default(''),
   createdAt: text('created_at').notNull(),
 }, t => [uniqueIndex('events_tenant_slug').on(t.tenantId, t.slug)])
 
@@ -240,5 +241,85 @@ export const dmMessages = sqliteTable('dm_messages', {
   createdAt: text('created_at').notNull(),
 })
 
-// Puntos: no es tabla aparte en el MVP; el ranking se calcula de la
-// actividad real (posts x10, comentarios x3, reacciones recibidas x2).
+// Fase 5 — encuestas, preferencias, puntos extra, salas grupales.
+// (Las columnas nuevas de tablas viejas — posts.status/scheduled_at/kind,
+// users.token_version, tenants.terms/privacy, courses.status/image_url,
+// lessons.video_url — se agregan por migración aditiva en utils/db.ts.)
+export const pollOptions = sqliteTable('poll_options', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  tenantId: integer('tenant_id').notNull(),
+  postId: integer('post_id').notNull().references(() => posts.id),
+  label: text('label').notNull(),
+  sort: integer('sort').notNull().default(0),
+})
+
+export const pollVotes = sqliteTable('poll_votes', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  tenantId: integer('tenant_id').notNull(),
+  postId: integer('post_id').notNull().references(() => posts.id),
+  optionId: integer('option_id').notNull().references(() => pollOptions.id),
+  userId: integer('user_id').notNull(),
+  createdAt: text('created_at').notNull(),
+}, t => [uniqueIndex('poll_votes_unique').on(t.postId, t.userId)])
+
+export const userPrefs = sqliteTable('user_prefs', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  tenantId: integer('tenant_id').notNull(),
+  userId: integer('user_id').notNull(),
+  key: text('key').notNull(),
+  value: text('value').notNull().default(''),
+}, t => [uniqueIndex('user_prefs_unique').on(t.tenantId, t.userId, t.key)])
+
+export const pointEvents = sqliteTable('point_events', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  tenantId: integer('tenant_id').notNull(),
+  userId: integer('user_id').notNull(),
+  kind: text('kind').notNull(), // 'course_enroll' | 'course_complete' | 'event_rsvp'
+  refId: integer('ref_id').notNull().default(0),
+  points: integer('points').notNull().default(0),
+  createdAt: text('created_at').notNull(),
+}, t => [uniqueIndex('point_events_unique').on(t.tenantId, t.userId, t.kind, t.refId)])
+
+export const chatRooms = sqliteTable('chat_rooms', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  tenantId: integer('tenant_id').notNull(),
+  name: text('name').notNull(),
+  createdBy: integer('created_by').notNull(),
+  createdAt: text('created_at').notNull(),
+})
+
+export const chatRoomMembers = sqliteTable('chat_room_members', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  tenantId: integer('tenant_id').notNull(),
+  roomId: integer('room_id').notNull().references(() => chatRooms.id),
+  userId: integer('user_id').notNull(),
+}, t => [uniqueIndex('chat_room_members_unique').on(t.roomId, t.userId)])
+
+export const chatRoomMessages = sqliteTable('chat_room_messages', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  tenantId: integer('tenant_id').notNull(),
+  roomId: integer('room_id').notNull().references(() => chatRooms.id),
+  authorId: integer('author_id').notNull().references(() => users.id),
+  body: text('body').notNull(),
+  createdAt: text('created_at').notNull(),
+})
+
+export const userBlocks = sqliteTable('user_blocks', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  tenantId: integer('tenant_id').notNull(),
+  blockerId: integer('blocker_id').notNull(),
+  blockedId: integer('blocked_id').notNull(),
+  createdAt: text('created_at').notNull(),
+}, t => [uniqueIndex('user_blocks_unique').on(t.tenantId, t.blockerId, t.blockedId)])
+
+export const userHiddenPosts = sqliteTable('user_hidden_posts', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  tenantId: integer('tenant_id').notNull(),
+  userId: integer('user_id').notNull(),
+  postId: integer('post_id').notNull().references(() => posts.id),
+  createdAt: text('created_at').notNull(),
+}, t => [uniqueIndex('user_hidden_posts_unique').on(t.tenantId, t.userId, t.postId)])
+
+// Puntos base: se calculan de la actividad real (posts x10, comentarios
+// x3, reacciones recibidas x2) y se suman los point_events de la Fase 5
+// (inscripción a curso +5, curso completo +50, RSVP a evento +10).

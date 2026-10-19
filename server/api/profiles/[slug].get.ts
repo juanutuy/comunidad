@@ -4,6 +4,7 @@ import { POST_SELECT, canAccessChannel, channelBySlug, currentAuth, resolveTenan
 import { badgesFor, levelFor, memberStats } from '../../utils/levels'
 import { isOnline } from '../../utils/chat'
 import { dbFor } from '../../utils/db'
+import { blockedByMe } from '../../utils/blocks'
 
 export default defineEventHandler(async (event) => {
   const tenant = await resolveTenant(event)
@@ -12,16 +13,18 @@ export default defineEventHandler(async (event) => {
   const user = await db.prepare('SELECT * FROM users WHERE slug = ?').get(slug) as Record<string, unknown> | undefined
   if (!user) throw createError({ statusCode: 404, message: 'Miembro no encontrado.' })
   const { user: me, role } = await currentAuth(event, tenant.id)
-  const postRows = await db.prepare(`${POST_SELECT} WHERE p.author_id = ? AND p.tenant_id = ? ORDER BY p.created_at DESC`).all(user.id, tenant.id) as Record<string, unknown>[]
+  // Fase 5: si bloqueé a esta persona, su contenido no se me muestra.
+  const iBlockedThem = (await blockedByMe(event, tenant.id, me?.id ?? null)).has(Number(user.id))
+  const postRows = iBlockedThem ? [] : await db.prepare(`${POST_SELECT} WHERE p.author_id = ? AND p.tenant_id = ? AND p.status = 'published' ORDER BY p.created_at DESC`).all(user.id, tenant.id) as Record<string, unknown>[]
   const posts = []
   for (const r of postRows) {
     const ch = (await channelBySlug(event, tenant.id, r.channel_slug as string))!
     const access = await canAccessChannel(event, me?.id ?? null, role, ch)
     if (ch.type === 'free' || access) posts.push(await serializePost(event, r, me?.id ?? null, access))
   }
-  const comments = await db.prepare(`SELECT c.body, c.created_at, p.title AS post_title, p.slug AS post_slug, ch.slug AS channel_slug
+  const comments = iBlockedThem ? [] : await db.prepare(`SELECT c.body, c.created_at, p.title AS post_title, p.slug AS post_slug, ch.slug AS channel_slug
     FROM comments c JOIN posts p ON p.id = c.post_id JOIN channels ch ON ch.id = p.channel_id
-    WHERE c.author_id = ? AND c.tenant_id = ? ORDER BY c.created_at DESC LIMIT 20`).all(user.id, tenant.id)
+    WHERE c.author_id = ? AND c.tenant_id = ? AND p.status = 'published' ORDER BY c.created_at DESC LIMIT 20`).all(user.id, tenant.id)
   const channels = await db.prepare(`SELECT c.name, c.slug FROM follows f JOIN channels c ON c.id = f.channel_id WHERE f.tenant_id = ? AND f.user_id = ?`).all(tenant.id, user.id)
   const stats = await memberStats(event, tenant.id, user.id as number)
   return {
@@ -30,6 +33,7 @@ export default defineEventHandler(async (event) => {
       avatarUrl: user.avatar_url || '', memberSince: user.created_at,
       lastSeenAt: user.last_seen_at || '', online: isOnline(user.last_seen_at as string),
       points: stats.points, level: levelFor(stats.points), badges: badgesFor(stats), stats,
+      blockedByMe: iBlockedThem,
     },
     posts, comments, channels,
   }

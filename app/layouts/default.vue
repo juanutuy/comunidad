@@ -1,18 +1,17 @@
 <script setup lang="ts">
 const { user, tenant, logout } = useAuth()
-const { fmtDate, initials } = useFormat()
+const { initials } = useFormat()
 const api = useApi()
 const router = useRouter()
 const showChannels = ref(false)
 
 const { data: channelData, refresh: refreshChannels } = await useAsyncData('layout-channels', () =>
   api<{ groups: { id: number, name: string, channels: { id: number, slug: string, name: string, icon: string, type: string, priceCents: number, following: boolean }[] }[] }>('/api/channels'))
-const { data: sidebar } = await useAsyncData('layout-sidebar', () =>
-  api<{ events: { slug: string, title: string, starts_at: string }[], recent: { slug: string, title: string, channel_slug: string }[] }>('/api/sidebar'))
 
 const navItems = [
   { label: 'Feed', icon: 'i-lucide-newspaper', to: '/feeds' },
   { label: 'Mensajes', icon: 'i-lucide-message-circle', to: '/messages' },
+  { label: 'Miembros', icon: 'i-lucide-users', to: '/members' },
   { label: 'Cursos', icon: 'i-lucide-graduation-cap', to: '/courses' },
   { label: 'Eventos', icon: 'i-lucide-calendar-days', to: '/events' },
   { label: 'Videos', icon: 'i-lucide-play-square', to: '/videos' },
@@ -31,6 +30,8 @@ async function doLogout() {
 const userMenuItems = computed(() => [
   [
     { label: 'Mi perfil', icon: 'i-lucide-user', to: `/profile/${user.value?.slug}` },
+    { label: 'Mis borradores', icon: 'i-lucide-file-edit', to: '/drafts' },
+    { label: 'Ajustes de cuenta', icon: 'i-lucide-settings-2', to: '/settings' },
     { label: 'Notificaciones', icon: 'i-lucide-bell', to: '/notifications' },
     ...(user.value?.role === 'admin'
       ? [
@@ -124,32 +125,18 @@ function doSearch() {
         <slot />
       </main>
 
-      <aside class="hidden space-y-5 xl:block">
-        <UCard>
-          <h3 class="mb-3 flex items-center gap-2 text-sm font-bold">
-            <UIcon name="i-lucide-calendar-days" /> Próximos eventos
-          </h3>
-          <ul v-if="sidebar?.events?.length" class="space-y-3">
-            <li v-for="e in sidebar.events" :key="e.slug">
-              <NuxtLink :to="`/events/${e.slug}`" class="text-sm font-medium hover:underline">{{ e.title }}</NuxtLink>
-              <p class="text-xs text-muted">{{ fmtDate(e.starts_at) }}</p>
-            </li>
-          </ul>
-          <p v-else class="text-sm text-muted">No hay eventos próximos.</p>
-        </UCard>
-        <UCard>
-          <h3 class="mb-3 flex items-center gap-2 text-sm font-bold">
-            <UIcon name="i-lucide-flame" /> Publicaciones recientes
-          </h3>
-          <ul v-if="sidebar?.recent?.length" class="space-y-2.5">
-            <li v-for="p in sidebar.recent" :key="p.slug">
-              <NuxtLink :to="`/p/${p.channel_slug}/${p.slug}`" class="text-sm leading-snug hover:underline">{{ p.title }}</NuxtLink>
-            </li>
-          </ul>
-          <p v-else class="text-sm text-muted">Todavía no hay publicaciones.</p>
-        </UCard>
-        <p class="px-1 text-xs text-muted">{{ tenant?.tagline }}</p>
+      <aside class="hidden xl:block">
+        <RightRail />
       </aside>
     </div>
+
+    <footer class="border-t border-default">
+      <div class="mx-auto flex max-w-[1400px] flex-wrap items-center gap-x-4 gap-y-1 px-4 py-4 text-xs text-muted">
+        <span>{{ tenant?.name || 'Comunidad' }}</span>
+        <span class="flex-1" />
+        <NuxtLink to="/terms" class="hover:underline">Términos y condiciones</NuxtLink>
+        <NuxtLink to="/privacy" class="hover:underline">Política de privacidad</NuxtLink>
+      </div>
+    </footer>
   </div>
 </template>

@@ -1,6 +1,7 @@
 // RSVP a un evento (toggle "Asistiré").
 import { requireUser, resolveTenant } from '../../../utils/community'
 import { dbFor } from '../../../utils/db'
+import { awardPoints } from '../../../utils/points'
 
 export default defineEventHandler(async (event) => {
   const tenant = await resolveTenant(event)
@@ -14,5 +15,7 @@ export default defineEventHandler(async (event) => {
     return { myRsvp: false }
   }
   await db.prepare('INSERT INTO rsvps (tenant_id, event_id, user_id) VALUES (?, ?, ?)').run(tenant.id, row.id, user.id)
+  // Fase 5: +10 puntos por confirmar asistencia (una vez por evento).
+  await awardPoints(event, tenant.id, user.id, 'event_rsvp', row.id).catch(() => {})
   return { myRsvp: true }
 })

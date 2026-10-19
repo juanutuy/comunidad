@@ -1,8 +1,9 @@
 // Detalle de un canal: datos, seguimiento, acceso y sus publicaciones.
 // Si el canal es pago/privado y el usuario no tiene acceso, las
 // publicaciones se devuelven bloqueadas (solo teaser).
-import { POST_SELECT, canAccessChannel, channelBySlug, currentAuth, resolveTenant, serializePost } from '../../utils/community'
+import { POST_SELECT, canAccessChannel, channelBySlug, currentAuth, publishDuePosts, resolveTenant, serializePost } from '../../utils/community'
 import { dbFor } from '../../utils/db'
+import { hiddenFilterSql } from '../../utils/blocks'
 
 export default defineEventHandler(async (event) => {
   const tenant = await resolveTenant(event)
@@ -13,7 +14,9 @@ export default defineEventHandler(async (event) => {
   const access = await canAccessChannel(event, user?.id ?? null, role, channel)
   const db = await dbFor(event)
   const following = user ? !!await db.prepare('SELECT id FROM follows WHERE tenant_id = ? AND user_id = ? AND channel_id = ?').get(tenant.id, user.id, channel.id) : false
-  const rows = await db.prepare(`${POST_SELECT} WHERE p.tenant_id = ? AND p.channel_id = ? ORDER BY p.pinned DESC, p.created_at DESC`).all(tenant.id, channel.id) as Record<string, unknown>[]
+  await publishDuePosts(event, tenant.id)
+  const hf = hiddenFilterSql(user?.id ?? null)
+  const rows = await db.prepare(`${POST_SELECT} WHERE p.tenant_id = ? AND p.channel_id = ? AND p.status = 'published'${hf.sql} ORDER BY p.pinned DESC, p.created_at DESC`).all(tenant.id, channel.id, ...hf.params) as Record<string, unknown>[]
   return {
     channel: {
       id: channel.id, slug: channel.slug, name: channel.name, icon: channel.icon,
