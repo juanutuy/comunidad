@@ -1,10 +1,11 @@
-// Fijar / desfijar una publicación (solo admin del tenant).
-import { requireAdmin, resolveTenant } from '../../../utils/community'
+// Fijar / desfijar una publicación (staff que modera: admin o
+// moderador — Fase 16-B; antes solo admin).
+import { requireModerator, resolveTenant } from '../../../utils/community'
 import { dbFor } from '../../../utils/db'
 
 export default defineEventHandler(async (event) => {
   const tenant = await resolveTenant(event)
-  await requireAdmin(event, tenant.id)
+  await requireModerator(event, tenant.id)
   const postId = Number(getRouterParam(event, 'id'))
   const db = await dbFor(event)
   const row = await db.prepare('SELECT pinned FROM posts WHERE id = ? AND tenant_id = ?').get(postId, tenant.id) as { pinned: number } | undefined

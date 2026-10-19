@@ -1,5 +1,8 @@
-// Editar título y cuerpo de un borrador o programado propio (Fase 5).
-// Las publicaciones ya publicadas no se editan por esta vía.
+// Editar título y cuerpo de una publicación propia (Fase 5: borradores
+// y programados desde «Mis borradores»; Fase 16-B: también las YA
+// PUBLICADAS, desde el menú «…» de la tarjeta — «Editar publicación»
+// como en la referencia). Solo el autor; el cuerpo rico se sanitiza y
+// toda edición deja la marca edited_at del «Editado».
 import { requireUser, resolveTenant } from '../../utils/community'
 import { dbFor, nowIso } from '../../utils/db'
 import { htmlToText, sanitizeHtml } from '../../utils/sanitize'
@@ -13,9 +16,7 @@ export default defineEventHandler(async (event) => {
   const post = await db.prepare('SELECT author_id, status, kind FROM posts WHERE id = ? AND tenant_id = ?').get(postId, tenant.id) as { author_id: number, status: string, kind: string } | undefined
   if (!post) throw createError({ statusCode: 404, message: 'Publicación no encontrada.' })
   if (post.author_id !== user.id)
-    throw createError({ statusCode: 403, message: 'Solo el autor puede editar este borrador.' })
-  if (post.status === 'published')
-    throw createError({ statusCode: 400, message: 'Una publicación ya publicada no se edita desde borradores.' })
+    throw createError({ statusCode: 403, message: 'Solo el autor puede editar esta publicación.' })
   let title = (body.title || '').trim()
   // Fase 8: si el editor manda cuerpo rico, se sanitiza y el texto
   // plano se deriva (igual que al crear). El anónimo NO se toca acá:
@@ -27,7 +28,7 @@ export default defineEventHandler(async (event) => {
     text = htmlToText(bodyHtml)
   }
   if (post.kind === 'poll' && !title && text) title = text.slice(0, 80)
-  if (!title || !text) throw createError({ statusCode: 400, message: 'El borrador necesita título y contenido.' })
+  if (!title || !text) throw createError({ statusCode: 400, message: 'La publicación necesita título y contenido.' })
   let scheduledAt: string | null = null
   if (post.status === 'scheduled') {
     const when = new Date(body.scheduledAt || '')
