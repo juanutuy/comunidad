@@ -6,6 +6,7 @@ import type { PostView } from '~/components/PostCard.vue'
 const route = useRoute()
 const router = useRouter()
 const api = useApi()
+const { t } = useI18n()
 const { initials, fmtMoney } = useFormat()
 
 const q = ref(String(route.query.q || ''))
@@ -38,24 +39,24 @@ watch(() => route.query.q, v => { q.value = String(v || '') })
 <template>
   <div class="space-y-6">
     <div>
-      <h1 class="text-2xl font-bold">Buscar</h1>
-      <p class="text-muted">Publicaciones, canales, cursos y miembros de la comunidad.</p>
+      <h1 class="text-2xl font-bold">{{ t('search.title') }}</h1>
+      <p class="text-muted">{{ t('search.subtitle') }}</p>
     </div>
     <form class="flex gap-2" @submit.prevent="submit">
-      <UInput v-model="q" placeholder="Escribí al menos 2 caracteres…" icon="i-lucide-search" class="flex-1" autofocus />
-      <UButton type="submit" label="Buscar" />
+      <UInput v-model="q" :placeholder="t('search.placeholder')" icon="i-lucide-search" class="flex-1" autofocus />
+      <UButton type="submit" :label="t('search.button')" />
     </form>
 
     <template v-if="String(route.query.q || '').trim().length >= 2">
-      <p class="text-sm text-muted">{{ total }} resultado(s) para «{{ route.query.q }}»</p>
+      <p class="text-sm text-muted">{{ t('search.resultsFor', { count: total, q: String(route.query.q) }) }}</p>
 
       <section v-if="data?.posts.length" class="space-y-4">
-        <h2 class="flex items-center gap-2 font-bold"><UIcon name="i-lucide-newspaper" /> Publicaciones</h2>
+        <h2 class="flex items-center gap-2 font-bold"><UIcon name="i-lucide-newspaper" /> {{ t('search.posts') }}</h2>
         <PostCard v-for="p in data.posts" :key="p.id" :post="p" />
       </section>
 
       <section v-if="data?.channels.length" class="space-y-3">
-        <h2 class="flex items-center gap-2 font-bold"><UIcon name="i-lucide-hash" /> Canales</h2>
+        <h2 class="flex items-center gap-2 font-bold"><UIcon name="i-lucide-hash" /> {{ t('search.channels') }}</h2>
         <div class="grid gap-3 sm:grid-cols-2">
           <UCard v-for="c in data.channels" :key="c.id">
             <NuxtLink :to="`/channels/${c.slug}`" class="flex items-center gap-2 font-semibold hover:underline">
@@ -68,7 +69,7 @@ watch(() => route.query.q, v => { q.value = String(v || '') })
       </section>
 
       <section v-if="data?.courses.length" class="space-y-3">
-        <h2 class="flex items-center gap-2 font-bold"><UIcon name="i-lucide-graduation-cap" /> Cursos</h2>
+        <h2 class="flex items-center gap-2 font-bold"><UIcon name="i-lucide-graduation-cap" /> {{ t('search.courses') }}</h2>
         <div class="grid gap-3 sm:grid-cols-2">
           <UCard v-for="c in data.courses" :key="c.id">
             <div class="flex gap-2">
@@ -82,7 +83,7 @@ watch(() => route.query.q, v => { q.value = String(v || '') })
       </section>
 
       <section v-if="data?.members.length" class="space-y-3">
-        <h2 class="flex items-center gap-2 font-bold"><UIcon name="i-lucide-users" /> Miembros</h2>
+        <h2 class="flex items-center gap-2 font-bold"><UIcon name="i-lucide-users" /> {{ t('search.members') }}</h2>
         <div class="grid gap-3 sm:grid-cols-2">
           <UCard v-for="m in data.members" :key="m.id">
             <div class="flex items-center gap-3">
@@ -96,8 +97,8 @@ watch(() => route.query.q, v => { q.value = String(v || '') })
         </div>
       </section>
 
-      <UAlert v-if="!total" color="neutral" variant="soft" title="Sin resultados" description="Probá con otras palabras o revisá la ortografía." />
+      <UAlert v-if="!total" color="neutral" variant="soft" :title="t('search.noResultsTitle')" :description="t('search.noResultsText')" />
     </template>
-    <UAlert v-else color="neutral" variant="soft" title="Escribí qué estás buscando" description="Buscamos en títulos y contenido de publicaciones, canales, cursos y perfiles de miembros." />
+    <UAlert v-else color="neutral" variant="soft" :title="t('search.writeTitle')" :description="t('search.writeText')" />
   </div>
 </template>

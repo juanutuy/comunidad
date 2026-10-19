@@ -4,6 +4,7 @@ import type { PostView } from '~/components/PostCard.vue'
 const route = useRoute()
 const slug = computed(() => String(route.params.slug))
 const { user, tenant } = useAuth()
+const { t } = useI18n()
 const { fmtMoney } = useFormat()
 const api = useApi()
 const toast = useToast()
@@ -14,13 +15,13 @@ interface ChannelDetail {
 }
 const { data, refresh } = await useAsyncData(() => `channel-${slug.value}`, () => api<ChannelDetail>(`/api/channels/${slug.value}`), { watch: [slug] })
 const tab = ref('posts')
-const tabItems = [
-  { label: 'Publicaciones', value: 'posts', icon: 'i-lucide-newspaper' },
-  { label: 'Chat', value: 'chat', icon: 'i-lucide-messages-square' },
-]
+const tabItems = computed(() => [
+  { label: t('channel.postsTab'), value: 'posts', icon: 'i-lucide-newspaper' },
+  { label: t('channel.chatTab'), value: 'chat', icon: 'i-lucide-messages-square' },
+])
 
 async function toggleFollow() {
-  if (!user.value) { toast.add({ title: 'Iniciá sesión para seguir canales', color: 'warning' }); return }
+  if (!user.value) { toast.add({ title: t('channel.loginToFollow'), color: 'warning' }); return }
   await api(`/api/channels/${slug.value}/follow`, { method: 'POST' })
   await refresh()
 }
@@ -28,10 +29,10 @@ async function toggleFollow() {
 async function demoAccess() {
   try {
     await api(`/api/channels/${slug.value}/access`, { method: 'POST' })
-    toast.add({ title: 'Acceso demo activado', description: 'Ya podés ver el contenido completo de este canal.', color: 'success' })
+    toast.add({ title: t('channel.demoAccessToast'), description: t('channel.demoAccessToastText'), color: 'success' })
     await refresh()
   }
-  catch { toast.add({ title: 'No se pudo activar el acceso', color: 'error' }) }
+  catch { toast.add({ title: t('channel.demoAccessFailed'), color: 'error' }) }
 }
 
 const { data: billing } = await useAsyncData('billing-status-channel', () => api<{ enabled: boolean, manualEnabled: boolean }>('/api/billing/status'))
@@ -46,7 +47,7 @@ async function buyAccess() {
     window.location.href = res.url
   }
   catch (e) {
-    toast.add({ title: 'No se pudo iniciar el pago', description: (e as { data?: { message?: string } }).data?.message || '', color: 'error' })
+    toast.add({ title: t('channel.buyFailed'), description: (e as { data?: { message?: string } }).data?.message || '', color: 'error' })
   }
   finally { buying.value = false }
 }
@@ -66,13 +67,13 @@ async function buyAccess() {
             <h1 class="flex flex-wrap items-center gap-2 text-2xl font-bold">
               # {{ data.channel.name }}
               <UBadge v-if="data.channel.type === 'paid'" color="warning" variant="subtle" icon="i-lucide-crown">
-                Pago · {{ fmtMoney(data.channel.priceCents) }}
+                {{ t('channel.paidBadge', { price: fmtMoney(data.channel.priceCents) }) }}
               </UBadge>
               <UBadge v-else-if="data.channel.type === 'private'" color="neutral" variant="subtle" icon="i-lucide-lock">
-                Privado
+                {{ t('channel.privateBadge') }}
               </UBadge>
               <UBadge v-else color="success" variant="subtle">
-                Gratuito
+                {{ t('channel.freeBadge') }}
               </UBadge>
             </h1>
             <p class="mt-1 text-muted">{{ data.channel.description }}</p>
@@ -81,26 +82,26 @@ async function buyAccess() {
             :color="data.channel.following ? 'neutral' : 'primary'"
             :variant="data.channel.following ? 'soft' : 'solid'"
             :icon="data.channel.following ? 'i-lucide-check' : 'i-lucide-plus'"
-            :label="data.channel.following ? 'Siguiendo' : 'Seguir'"
+            :label="data.channel.following ? t('channel.following') : t('channel.follow')"
             @click="toggleFollow"
           />
         </div>
       </div>
-      <UAlert v-if="data.channel.type === 'paid' && !data.channel.hasAccess" class="mx-5 mb-4" color="warning" variant="soft" icon="i-lucide-lock" title="Este es un canal pago" :description="billing?.enabled ? 'Con acceso ves todas las publicaciones completas y participás en la conversación. El pago se procesa con Stripe y el acceso se activa al confirmarse.' : billing?.manualEnabled ? 'Con acceso ves todas las publicaciones completas y participás en la conversación. Podés pagar por fuera (pago manual): la administración verifica tu pago y recién ahí se activa el acceso.' : 'Con acceso ves todas las publicaciones completas y participás en la conversación. Los pagos todavía no están activados en esta comunidad (próximamente); mientras tanto podés activar el acceso de demostración.'">
+      <UAlert v-if="data.channel.type === 'paid' && !data.channel.hasAccess" class="mx-5 mb-4" color="warning" variant="soft" icon="i-lucide-lock" :title="t('channel.paidChannelTitle')" :description="billing?.enabled ? t('channel.paidDescStripe') : billing?.manualEnabled ? t('channel.paidDescManual') : t('channel.paidDescNone')">
         <template #actions>
-          <UButton v-if="user && billing?.enabled" size="sm" color="warning" :label="`Comprar acceso · ${fmtMoney(data.channel.priceCents)}`" icon="i-lucide-credit-card" :loading="buying" @click="buyAccess" />
-          <UButton v-if="user && billing?.manualEnabled" size="sm" color="warning" variant="soft" :label="`Pago manual · ${fmtMoney(data.channel.priceCents)}`" icon="i-lucide-hand-coins" @click="manualOpen = true" />
-          <UButton v-if="user" size="sm" color="warning" variant="soft" label="Acceso demo" icon="i-lucide-key-round" @click="demoAccess" />
-          <UButton v-if="user" size="sm" to="/pricing" color="neutral" variant="soft" label="Ver planes" />
-          <UButton v-else size="sm" to="/login" label="Iniciar sesión" />
+          <UButton v-if="user && billing?.enabled" size="sm" color="warning" :label="t('channel.buyAccess', { price: fmtMoney(data.channel.priceCents) })" icon="i-lucide-credit-card" :loading="buying" @click="buyAccess" />
+          <UButton v-if="user && billing?.manualEnabled" size="sm" color="warning" variant="soft" :label="t('channel.manualAccess', { price: fmtMoney(data.channel.priceCents) })" icon="i-lucide-hand-coins" @click="manualOpen = true" />
+          <UButton v-if="user" size="sm" color="warning" variant="soft" :label="t('channel.demoAccess')" icon="i-lucide-key-round" @click="demoAccess" />
+          <UButton v-if="user" size="sm" to="/pricing" color="neutral" variant="soft" :label="t('channel.viewPlans')" />
+          <UButton v-else size="sm" to="/login" :label="t('nav.login')" />
         </template>
       </UAlert>
     </UCard>
 
     <UAlert
       v-if="data.channel.archived" color="neutral" variant="soft" icon="i-lucide-archive"
-      title="Este canal está archivado"
-      description="Solo vos lo ves, como administrador: para los miembros desapareció de la navegación, el feed, la búsqueda y el chat. Podés desarchivarlo desde Contenido → Canales en la consola."
+      :title="t('channel.archivedTitle')"
+      :description="t('channel.archivedText')"
       class="mb-4"
     />
 
@@ -109,23 +110,23 @@ async function buyAccess() {
         <div v-if="item.value === 'posts'" class="mt-4 space-y-5">
           <PostComposer v-if="user && data.channel.hasAccess" :channel-slug="slug" @published="refresh" />
           <PostCard v-for="post in data.posts" :key="post.id" :post="post" @changed="refresh" />
-          <UAlert v-if="!data.posts.length" color="neutral" variant="soft" title="Sin publicaciones todavía" description="Sé la primera persona en publicar en este canal." />
+          <UAlert v-if="!data.posts.length" color="neutral" variant="soft" :title="t('channel.noPostsTitle')" :description="t('channel.noPostsText')" />
         </div>
         <UCard v-else class="mt-4">
           <ChannelChat v-if="user && data.channel.hasAccess" :slug="slug" />
-          <UAlert v-else-if="!user" color="neutral" variant="soft" icon="i-lucide-lock" title="Iniciá sesión para usar el chat" description="El chat de cada canal es solo para miembros con acceso a ese canal.">
+          <UAlert v-else-if="!user" color="neutral" variant="soft" icon="i-lucide-lock" :title="t('channel.chatLoginTitle')" :description="t('channel.chatLoginText')">
             <template #actions>
-              <UButton size="sm" to="/login" label="Iniciar sesión" />
+              <UButton size="sm" to="/login" :label="t('nav.login')" />
             </template>
           </UAlert>
-          <UAlert v-else color="warning" variant="soft" icon="i-lucide-lock" title="Sin acceso al chat de este canal" description="El chat sigue las mismas reglas que las publicaciones: necesitás acceso a este canal para participar." />
+          <UAlert v-else color="warning" variant="soft" icon="i-lucide-lock" :title="t('channel.chatNoAccessTitle')" :description="t('channel.chatNoAccessText')" />
         </UCard>
       </template>
     </UTabs>
 
     <ManualPaymentDialog
       v-model:open="manualOpen" kind="channel" :slug="slug" :item-id="data.channel.id"
-      :product-name="`Acceso al canal ${data.channel.name}`" :amount-cents="data.channel.priceCents"
+      :product-name="t('channel.manualProductName', { name: data.channel.name })" :amount-cents="data.channel.priceCents"
     />
   </div>
 </template>

@@ -9,11 +9,12 @@ const api = useApi()
 const toast = useToast()
 const rt = useRealtime()
 const { user, gates } = useAuth()
+const { t } = useI18n()
 // Fase 14: compuerta de mensajes directos — el hilo se lee, pero el
 // compositor se reemplaza por el aviso hasta alcanzar el nivel.
 const dmGate = computed(() => gates.value?.dm?.blocked ? gates.value.dm : null)
 const dmBlockedMessage = computed(() => dmGate.value
-  ? `Necesitás el nivel ${dmGate.value.levelName} para enviar mensajes directos. Tenés ${dmGate.value.myPoints} puntos y el nivel se alcanza con ${dmGate.value.neededPoints}.`
+  ? t('messages.dmGateText', { level: dmGate.value.levelName, mine: dmGate.value.myPoints, needed: dmGate.value.neededPoints })
   : undefined)
 const { timeAgo, initials } = useFormat()
 
@@ -107,7 +108,7 @@ async function select(slug: string) {
     connectLive(`/api/rt/dm/${slug}`, 'dm')
   }
   catch (e) {
-    toast.add({ title: 'No se pudo abrir la conversación', description: (e as { data?: { message?: string } }).data?.message || '', color: 'error' })
+    toast.add({ title: t('messages.openFailed'), description: (e as { data?: { message?: string } }).data?.message || '', color: 'error' })
   }
 }
 
@@ -123,7 +124,7 @@ async function selectRoom(id: number) {
     connectLive(`/api/rt/room/${id}`, 'room')
   }
   catch (e) {
-    toast.add({ title: 'No se pudo abrir la sala', description: (e as { data?: { message?: string } }).data?.message || '', color: 'error' })
+    toast.add({ title: t('messages.roomOpenFailed'), description: (e as { data?: { message?: string } }).data?.message || '', color: 'error' })
   }
 }
 
@@ -140,7 +141,7 @@ async function send(body: string) {
     }
   }
   catch (e) {
-    toast.add({ title: 'No se pudo enviar el mensaje', description: (e as { data?: { message?: string } }).data?.message || 'Intentá de nuevo.', color: 'error' })
+    toast.add({ title: t('messages.sendFailed'), description: (e as { data?: { message?: string } }).data?.message || t('chat.retryText'), color: 'error' })
   }
 }
 
@@ -152,7 +153,7 @@ async function createRoom() {
   creatingRoom.value = true
   try {
     const res = await api<{ room: { id: number } }>('/api/rooms', { method: 'POST', body: { name: roomForm.name, memberSlugs: roomForm.members } })
-    toast.add({ title: 'Sala creada', color: 'success' })
+    toast.add({ title: t('messages.roomCreated'), color: 'success' })
     showCreateRoom.value = false
     roomForm.name = ''
     roomForm.members = []
@@ -160,7 +161,7 @@ async function createRoom() {
     await selectRoom(res.room.id)
   }
   catch (e) {
-    toast.add({ title: 'No se pudo crear la sala', description: (e as { data?: { message?: string } }).data?.message || '', color: 'error' })
+    toast.add({ title: t('messages.roomCreateFailed'), description: (e as { data?: { message?: string } }).data?.message || '', color: 'error' })
   }
   finally { creatingRoom.value = false }
 }
@@ -187,13 +188,13 @@ onUnmounted(() => {
 <template>
   <div class="space-y-5">
     <div>
-      <h1 class="text-2xl font-bold">Mensajes</h1>
-      <p class="text-muted">Conversaciones directas y salas grupales con miembros de la comunidad.</p>
+      <h1 class="text-2xl font-bold">{{ t('messages.title') }}</h1>
+      <p class="text-muted">{{ t('messages.subtitle') }}</p>
     </div>
 
-    <UAlert v-if="!user" color="neutral" variant="soft" icon="i-lucide-lock" title="Iniciá sesión para ver tus mensajes">
+    <UAlert v-if="!user" color="neutral" variant="soft" icon="i-lucide-lock" :title="t('messages.loginTitle')">
       <template #actions>
-        <UButton size="sm" to="/login" label="Iniciar sesión" />
+        <UButton size="sm" to="/login" :label="t('nav.login')" />
       </template>
     </UAlert>
 
@@ -201,8 +202,8 @@ onUnmounted(() => {
       <div class="space-y-5">
         <UCard :ui="{ body: 'p-2 sm:p-2' }">
           <div class="flex items-center justify-between px-2 pt-1 pb-2">
-            <h2 class="text-sm font-bold">Salas grupales</h2>
-            <UButton size="xs" icon="i-lucide-plus" label="Nueva sala" @click="showCreateRoom = true" />
+            <h2 class="text-sm font-bold">{{ t('messages.groupRooms') }}</h2>
+            <UButton size="xs" icon="i-lucide-plus" :label="t('messages.newRoom')" @click="showCreateRoom = true" />
           </div>
           <ul class="divide-y divide-default">
             <li v-for="r in rooms" :key="r.id">
@@ -212,32 +213,32 @@ onUnmounted(() => {
                 </span>
                 <span class="min-w-0 flex-1">
                   <span class="block truncate text-sm font-medium">{{ r.name }}</span>
-                  <span class="block truncate text-xs text-muted">{{ r.memberCount }} miembros<span v-if="r.lastBody"> · {{ r.lastBody }}</span></span>
+                  <span class="block truncate text-xs text-muted">{{ t('messages.membersCount', { count: r.memberCount }) }}<span v-if="r.lastBody"> · {{ r.lastBody }}</span></span>
                 </span>
               </button>
             </li>
           </ul>
-          <p v-if="!rooms.length" class="px-2 py-3 text-sm text-muted">Todavía no estás en ninguna sala. Creá la primera.</p>
+          <p v-if="!rooms.length" class="px-2 py-3 text-sm text-muted">{{ t('messages.noRooms') }}</p>
         </UCard>
 
         <UCard :ui="{ body: 'p-2 sm:p-2' }">
-          <h2 class="px-2 pt-1 pb-2 text-sm font-bold">Mensajes directos</h2>
+          <h2 class="px-2 pt-1 pb-2 text-sm font-bold">{{ t('messages.directMessages') }}</h2>
           <ul class="divide-y divide-default">
             <li v-for="m in members" :key="m.id">
               <button class="flex w-full items-center gap-2.5 rounded-md px-2 py-2.5 text-left hover:bg-elevated" :class="{ 'bg-elevated': mode === 'dm' && selected === m.slug }" @click="select(m.slug)">
                 <span class="relative shrink-0">
                   <UAvatar :src="m.avatarUrl || undefined" :text="initials(m.name)" size="sm" />
-                  <span v-if="m.online" class="absolute -right-0.5 -bottom-0.5 h-2.5 w-2.5 rounded-full bg-green-500 ring-2 ring-white dark:ring-neutral-900" title="En línea" />
+                  <span v-if="m.online" class="absolute -right-0.5 -bottom-0.5 h-2.5 w-2.5 rounded-full bg-green-500 ring-2 ring-white dark:ring-neutral-900" :title="t('common.online')" />
                 </span>
                 <span class="min-w-0 flex-1">
                   <span class="block truncate text-sm font-medium">{{ m.name }}</span>
-                  <span class="block text-xs text-muted">{{ m.online ? 'En línea' : (m.lastSeenAt ? `Activo ${timeAgo(m.lastSeenAt)}` : 'Sin actividad reciente') }}</span>
+                  <span class="block text-xs text-muted">{{ m.online ? t('common.online') : (m.lastSeenAt ? t('messages.activeAgo', { time: timeAgo(m.lastSeenAt) }) : t('messages.noRecentActivity')) }}</span>
                 </span>
                 <span v-if="m.unread" class="flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-[11px] font-bold text-white">{{ m.unread }}</span>
               </button>
             </li>
           </ul>
-          <p v-if="!members.length" class="px-2 py-4 text-sm text-muted">Todavía no hay otros miembros en la comunidad.</p>
+          <p v-if="!members.length" class="px-2 py-4 text-sm text-muted">{{ t('messages.noOtherMembers') }}</p>
         </UCard>
       </div>
 
@@ -250,14 +251,14 @@ onUnmounted(() => {
             </span>
             <div>
               <NuxtLink :to="`/profile/${other.slug}`" class="font-bold hover:underline">{{ other.name }}</NuxtLink>
-              <p class="text-xs text-muted">{{ other.online ? 'En línea' : 'Sin conexión reciente' }}</p>
+              <p class="text-xs text-muted">{{ other.online ? t('common.online') : t('messages.offlineRecent') }}</p>
             </div>
           </div>
         </template>
         <ChatThread
           :messages="messages" :live="live" :typing-name="typingName" :me-id="user?.id ?? null"
           :blocked-message="dmBlockedMessage"
-          placeholder="Escribí un mensaje directo…" @send="send" @typing="handle?.sendTyping()"
+          :placeholder="t('messages.dmPlaceholder')" @send="send" @typing="handle?.sendTyping()"
         />
       </UCard>
       <UCard v-else-if="mode === 'room' && roomInfo">
@@ -274,21 +275,21 @@ onUnmounted(() => {
         </template>
         <ChatThread
           :messages="messages" :live="live" :typing-name="typingName" :me-id="user?.id ?? null"
-          placeholder="Escribí en la sala…" @send="send" @typing="handle?.sendTyping()"
+          :placeholder="t('messages.roomPlaceholder')" @send="send" @typing="handle?.sendTyping()"
         />
       </UCard>
       <UCard v-else>
-        <p class="py-8 text-center text-sm text-muted">Elegí una sala o un miembro para empezar a conversar.</p>
+        <p class="py-8 text-center text-sm text-muted">{{ t('messages.chooseConversation') }}</p>
       </UCard>
     </div>
 
-    <UModal v-model:open="showCreateRoom" title="Nueva sala grupal" description="Elegí un nombre y al menos 2 miembros más de la comunidad.">
+    <UModal v-model:open="showCreateRoom" :title="t('messages.newRoomTitle')" :description="t('messages.newRoomText')">
       <template #body>
         <div class="space-y-4">
-          <UFormField label="Nombre de la sala">
-            <UInput v-model="roomForm.name" placeholder="Ej.: Equipo de contenido" class="w-full" maxlength="60" />
+          <UFormField :label="t('messages.roomName')">
+            <UInput v-model="roomForm.name" :placeholder="t('messages.roomNamePlaceholder')" class="w-full" maxlength="60" />
           </UFormField>
-          <UFormField label="Miembros">
+          <UFormField :label="t('messages.membersLabel')">
             <div class="max-h-56 space-y-1 overflow-y-auto">
               <label v-for="m in members" :key="m.id" class="flex cursor-pointer items-center gap-2.5 rounded-md px-2 py-1.5 hover:bg-elevated">
                 <UCheckbox v-model="roomForm.members" :value="m.slug" />
@@ -296,14 +297,14 @@ onUnmounted(() => {
                 <span class="text-sm font-medium">{{ m.name }}</span>
               </label>
             </div>
-            <p class="mt-1 text-xs text-muted">{{ roomForm.members.length }} seleccionados (mínimo 2).</p>
+            <p class="mt-1 text-xs text-muted">{{ t('messages.selectedCount', { count: roomForm.members.length }) }}</p>
           </UFormField>
         </div>
       </template>
       <template #footer>
         <div class="flex justify-end gap-2">
-          <UButton color="neutral" variant="ghost" label="Cancelar" @click="showCreateRoom = false" />
-          <UButton label="Crear sala" icon="i-lucide-users" :loading="creatingRoom" :disabled="!roomForm.name.trim() || roomForm.members.length < 2" @click="createRoom" />
+          <UButton color="neutral" variant="ghost" :label="t('common.cancel')" @click="showCreateRoom = false" />
+          <UButton :label="t('messages.createRoom')" icon="i-lucide-users" :loading="creatingRoom" :disabled="!roomForm.name.trim() || roomForm.members.length < 2" @click="createRoom" />
         </div>
       </template>
     </UModal>

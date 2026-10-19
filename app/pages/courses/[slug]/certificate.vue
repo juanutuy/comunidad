@@ -9,6 +9,7 @@
 const route = useRoute()
 const slug = computed(() => String(route.params.slug))
 const api = useApi()
+const { t } = useI18n()
 const { fmtDate } = useFormat()
 
 interface CertDesign {
@@ -34,22 +35,22 @@ function printCert() {
 <template>
   <div class="space-y-5">
     <div class="flex flex-wrap items-center gap-2 print:hidden">
-      <UButton :to="`/courses/${slug}`" color="neutral" variant="ghost" icon="i-lucide-arrow-left" label="Volver al curso" class="-ml-2" />
+      <UButton :to="`/courses/${slug}`" color="neutral" variant="ghost" icon="i-lucide-arrow-left" :label="t('certificate.backToCourse')" class="-ml-2" />
       <span class="flex-1" />
-      <UButton v-if="data?.eligible" label="Imprimir certificado" icon="i-lucide-printer" @click="printCert" />
+      <UButton v-if="data?.eligible" :label="t('certificate.print')" icon="i-lucide-printer" @click="printCert" />
     </div>
 
     <UAlert
       v-if="data && !data.certificateEnabled"
       color="neutral" variant="soft" icon="i-lucide-award"
-      title="Este curso no emite certificado"
-      description="La comunidad no habilitó el certificado de finalización para este curso."
+      :title="t('certificate.noCertTitle')"
+      :description="t('certificate.noCertText')"
     />
     <UAlert
       v-else-if="data && !data.eligible"
       color="warning" variant="soft" icon="i-lucide-lock"
-      title="Todavía no completaste el curso"
-      :description="`Tu avance es ${data.progress.completed}/${data.progress.total} lecciones (${data.progress.pct}%). El certificado se habilita al llegar al 100%.`"
+      :title="t('certificate.notEligibleTitle')"
+      :description="t('certificate.progressText', { completed: data.progress.completed, total: data.progress.total, pct: data.progress.pct })"
     />
 
     <div
@@ -60,7 +61,7 @@ function printCert() {
       <img v-if="data.certificate.design.showLogo && data.certificate.logoUrl" :src="data.certificate.logoUrl" alt="" class="mx-auto h-14 w-auto object-contain">
       <UIcon name="i-lucide-award" class="mx-auto text-5xl" :style="{ color: data.certificate.design.accentColor, marginTop: data.certificate.design.showLogo && data.certificate.logoUrl ? '1rem' : undefined }" />
       <p class="mt-4 text-sm font-bold tracking-[0.3em] uppercase" :style="{ color: data.certificate.design.accentColor }">{{ data.certificate.design.headingText }}</p>
-      <p class="mt-6 text-muted">Se otorga a</p>
+      <p class="mt-6 text-muted">{{ t('certificate.awardedTo') }}</p>
       <p class="mt-1 font-serif text-4xl font-bold">{{ data.certificate.memberName }}</p>
       <p class="mx-auto mt-6 max-w-xl leading-relaxed">{{ data.certificate.design.bodyText }}</p>
       <div v-if="data.certificate.design.signerName" class="mx-auto mt-10 max-w-56">
@@ -73,8 +74,8 @@ function printCert() {
         {{ data.certificate.communityName }} · {{ data.certificate.finishedAt ? fmtDate(data.certificate.finishedAt) : '' }}
       </p>
       <p class="mt-3 text-xs text-muted">
-        Código de verificación: <span class="font-mono font-semibold text-default">{{ data.certificate.code }}</span>
-        · Verificalo en <span class="font-medium text-default">/verify</span>
+        {{ t('certificate.verificationCode') }} <span class="font-mono font-semibold text-default">{{ data.certificate.code }}</span>
+        · {{ t('certificate.verifyAt') }} <span class="font-medium text-default">/verify</span>
       </p>
     </div>
   </div>

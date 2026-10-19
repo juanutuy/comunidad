@@ -1,5 +1,6 @@
 <script setup lang="ts">
 const api = useApi()
+const { t } = useI18n()
 const { initials } = useFormat()
 interface RankRow { id: number, name: string, slug: string, avatarUrl: string, posts: number, comments: number, reactionsReceived: number, points: number, level: string }
 const { data } = await useAsyncData('leaderboard', () => api<{ ranking: RankRow[] }>('/api/leaderboard'))
@@ -9,8 +10,8 @@ const medals = ['text-amber-500', 'text-neutral-400', 'text-amber-700']
 <template>
   <div class="space-y-5">
     <div>
-      <h1 class="text-2xl font-bold">Ranking de la comunidad</h1>
-      <p class="text-muted">Puntos por actividad real: publicar suma 10, comentar 3 y cada reacción recibida 2. Niveles: Inicial (0), Activo (25), Colaborador (60), Referente (120) y Leyenda (250).</p>
+      <h1 class="text-2xl font-bold">{{ t('leaderboard.title') }}</h1>
+      <p class="text-muted">{{ t('leaderboard.subtitle') }}</p>
     </div>
     <UCard :ui="{ body: 'p-0 sm:p-0' }">
       <ul class="divide-y divide-default">
@@ -22,9 +23,9 @@ const medals = ['text-amber-500', 'text-neutral-400', 'text-amber-700']
               <NuxtLink :to="`/profile/${r.slug}`" class="font-semibold hover:underline">{{ r.name }}</NuxtLink>
               <UBadge color="primary" variant="subtle" size="sm" icon="i-lucide-award">{{ r.level }}</UBadge>
             </p>
-            <p class="text-xs text-muted">{{ r.posts }} publicaciones · {{ r.comments }} comentarios · {{ r.reactionsReceived }} reacciones recibidas</p>
+            <p class="text-xs text-muted">{{ t('leaderboard.statsLine', { posts: r.posts, comments: r.comments, reactions: r.reactionsReceived }) }}</p>
           </div>
-          <UBadge color="primary" variant="soft" size="lg">{{ r.points }} pts</UBadge>
+          <UBadge color="primary" variant="soft" size="lg">{{ r.points }} {{ t('common.points') }}</UBadge>
         </li>
       </ul>
     </UCard>

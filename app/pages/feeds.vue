@@ -2,15 +2,16 @@
 import type { PostView } from '~/components/PostCard.vue'
 
 const { user, tenant } = useAuth()
+const { t } = useI18n()
 const api = useApi()
 
 // Fase 7: orden del feed (Recientes = fijados primero y más nuevos;
 // Antiguos = cronológico simple). El parámetro viaja al endpoint.
 const sort = ref<'desc' | 'asc'>('desc')
-const sortOptions = [
-  { label: 'Recientes', value: 'desc' as const, icon: 'i-lucide-arrow-down-wide-narrow' },
-  { label: 'Antiguos', value: 'asc' as const, icon: 'i-lucide-arrow-up-narrow-wide' },
-]
+const sortOptions = computed(() => [
+  { label: t('feed.latest'), value: 'desc' as const, icon: 'i-lucide-arrow-down-wide-narrow' },
+  { label: t('feed.oldest'), value: 'asc' as const, icon: 'i-lucide-arrow-up-narrow-wide' },
+])
 const { data, refresh } = await useAsyncData('feed',
   () => api<{ posts: PostView[] }>('/api/feed', { query: { sort: sort.value } }),
   { watch: [sort] })
@@ -29,21 +30,21 @@ const { data, refresh } = await useAsyncData('feed',
         <p class="mt-0.5 text-muted">{{ tenant?.tagline }}</p>
       </div>
       <div class="flex items-center gap-3 border-t border-default px-5 py-3">
-        <h2 class="text-lg font-bold">Feed</h2>
+        <h2 class="text-lg font-bold">{{ t('feed.title') }}</h2>
         <span class="flex-1" />
         <USelect v-model="sort" :items="sortOptions" size="sm" class="w-40" />
       </div>
     </UCard>
 
     <PostComposer v-if="user" @published="refresh" />
-    <UAlert v-else color="primary" variant="soft" icon="i-lucide-sparkles" title="Estás viendo como visitante" description="Iniciá sesión o creá tu cuenta para publicar, comentar y reaccionar.">
+    <UAlert v-else color="primary" variant="soft" icon="i-lucide-sparkles" :title="t('feed.visitorTitle')" :description="t('feed.visitorText')">
       <template #actions>
-        <UButton to="/login" size="sm" color="neutral" label="Iniciar sesión" />
-        <UButton to="/register" size="sm" label="Unirse gratis" />
+        <UButton to="/login" size="sm" color="neutral" :label="t('nav.login')" />
+        <UButton to="/register" size="sm" :label="t('nav.joinFree')" />
       </template>
     </UAlert>
 
     <PostCard v-for="post in data?.posts || []" :key="post.id" :post="post" @changed="refresh" />
-    <UAlert v-if="!(data?.posts?.length)" color="neutral" variant="soft" title="Todavía no hay publicaciones en tu feed" description="Seguí canales desde la barra lateral para ver su contenido aquí." />
+    <UAlert v-if="!(data?.posts?.length)" color="neutral" variant="soft" :title="t('feed.emptyTitle')" :description="t('feed.emptyText')" />
   </div>
 </template>

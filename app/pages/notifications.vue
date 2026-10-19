@@ -12,6 +12,7 @@ interface NotificationView {
 }
 
 const { user } = useAuth()
+const { t } = useI18n()
 const { fmtDateTime, initials } = useFormat()
 const api = useApi()
 const toast = useToast()
@@ -34,15 +35,15 @@ const typeIcons: Record<string, string> = {
 
 // Fase 5: filtro por tipo con chips (valores reales de notifications.type).
 const filter = ref('all')
-const filterTabs = [
-  { label: 'Todo', value: 'all' },
-  { label: 'Menciones', value: 'mention' },
-  { label: 'Reacciones', value: 'reaction' },
-  { label: 'Comentarios', value: 'comment' },
-  { label: 'Publicaciones', value: 'new_post' },
-  { label: 'Mensajes', value: 'dm' },
-  { label: 'Seguidores', value: 'follow' },
-]
+const filterTabs = computed(() => [
+  { label: t('notifications.filterAll'), value: 'all' },
+  { label: t('notifications.filterMentions'), value: 'mention' },
+  { label: t('notifications.filterReactions'), value: 'reaction' },
+  { label: t('notifications.filterComments'), value: 'comment' },
+  { label: t('notifications.filterPosts'), value: 'new_post' },
+  { label: t('notifications.filterMessages'), value: 'dm' },
+  { label: t('notifications.filterFollowers'), value: 'follow' },
+])
 const filtered = computed(() =>
   (data.value?.notifications || []).filter(n => filter.value === 'all' || n.type === filter.value))
 
@@ -55,7 +56,7 @@ async function markOne(n: NotificationView) {
 
 async function markAll() {
   await api('/api/notifications/read', { method: 'POST', body: {} })
-  toast.add({ title: 'Todas las notificaciones quedaron marcadas como leídas', color: 'success' })
+  toast.add({ title: t('notifications.markedToast'), color: 'success' })
   await refresh()
 }
 </script>
@@ -64,12 +65,12 @@ async function markAll() {
   <div class="space-y-5">
     <div class="flex flex-wrap items-end justify-between gap-3">
       <div>
-        <h1 class="text-2xl font-bold">Notificaciones</h1>
-        <p class="text-muted">Reacciones, comentarios, menciones y publicaciones nuevas de tus canales.</p>
+        <h1 class="text-2xl font-bold">{{ t('notifications.title') }}</h1>
+        <p class="text-muted">{{ t('notifications.subtitle') }}</p>
       </div>
-      <UButton v-if="data?.unread" label="Marcar todas como leídas" icon="i-lucide-check-check" size="sm" @click="markAll" />
+      <UButton v-if="data?.unread" :label="t('notifications.markAllRead')" icon="i-lucide-check-check" size="sm" @click="markAll" />
     </div>
-    <UAlert v-if="!user" color="neutral" variant="soft" title="Iniciá sesión para ver tus notificaciones" />
+    <UAlert v-if="!user" color="neutral" variant="soft" :title="t('notifications.loginTitle')" />
     <template v-else>
       <UTabs v-model="filter" :items="filterTabs" :content="false" size="sm" />
       <UCard :ui="{ body: 'p-0 sm:p-0' }">
@@ -86,8 +87,8 @@ async function markAll() {
           </li>
         </ul>
       </UCard>
-      <UAlert v-if="!(data?.notifications?.length)" color="neutral" variant="soft" title="Sin notificaciones todavía" description="Cuando alguien reaccione o comente tus publicaciones, lo vas a ver aquí." />
-      <UAlert v-else-if="!filtered.length" color="neutral" variant="soft" title="Nada en este filtro" description="No tenés notificaciones de este tipo todavía." />
+      <UAlert v-if="!(data?.notifications?.length)" color="neutral" variant="soft" :title="t('notifications.emptyTitle')" :description="t('notifications.emptyText')" />
+      <UAlert v-else-if="!filtered.length" color="neutral" variant="soft" :title="t('notifications.emptyFilterTitle')" :description="t('notifications.emptyFilterText')" />
     </template>
   </div>
 </template>

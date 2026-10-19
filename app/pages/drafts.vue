@@ -24,6 +24,7 @@ interface DraftView {
 }
 
 const { user } = useAuth()
+const { t } = useI18n()
 const { fmtDateTime } = useFormat()
 const api = useApi()
 const toast = useToast()
@@ -63,13 +64,13 @@ async function publishNow(d: DraftView) {
     // Fase 12: con la revisión previa encendida, «publicar» un
     // borrador de un miembro lo manda a la cola de revisión.
     if (res.review)
-      toast.add({ title: 'Enviado a revisión', description: 'Un administrador lo va a revisar antes de que aparezca en el feed.', color: 'success' })
+      toast.add({ title: t('drafts.sentToReview'), description: t('drafts.sentToReviewText'), color: 'success' })
     else
-      toast.add({ title: 'Publicado', description: 'Tu publicación ya se ve en el canal.', color: 'success' })
+      toast.add({ title: t('drafts.publishedToast'), description: t('drafts.publishedToastText'), color: 'success' })
     await refresh()
   }
   catch (e) {
-    toast.add({ title: 'No se pudo publicar', description: (e as { data?: { message?: string } }).data?.message || '', color: 'error' })
+    toast.add({ title: t('drafts.publishFailed'), description: (e as { data?: { message?: string } }).data?.message || '', color: 'error' })
   }
 }
 
@@ -78,31 +79,31 @@ async function deleteDraft() {
   if (!toDelete.value) return
   try {
     await api(`/api/posts/${toDelete.value.id}`, { method: 'DELETE' })
-    toast.add({ title: 'Borrador eliminado', color: 'success' })
+    toast.add({ title: t('drafts.deletedToast'), color: 'success' })
     toDelete.value = null
     await refresh()
   }
-  catch { toast.add({ title: 'No se pudo eliminar', color: 'error' }) }
+  catch { toast.add({ title: t('drafts.deleteFailed'), color: 'error' }) }
 }
 </script>
 
 <template>
   <div class="space-y-5">
     <div>
-      <h1 class="text-2xl font-bold">Mis borradores</h1>
-      <p class="text-muted">Tus publicaciones guardadas y programadas. Solo vos las ves.</p>
+      <h1 class="text-2xl font-bold">{{ t('drafts.title') }}</h1>
+      <p class="text-muted">{{ t('drafts.subtitle') }}</p>
     </div>
-    <UAlert v-if="!user" color="neutral" variant="soft" title="Iniciá sesión para ver tus borradores" />
+    <UAlert v-if="!user" color="neutral" variant="soft" :title="t('drafts.loginTitle')" />
     <template v-else>
       <UCard v-for="d in data?.drafts || []" :key="d.id">
         <div class="flex flex-wrap items-center gap-2 text-sm">
           <UBadge :color="d.status === 'draft' ? 'neutral' : 'warning'" variant="soft" :icon="d.status === 'draft' ? 'i-lucide-file-edit' : 'i-lucide-calendar-clock'">
-            {{ d.status === 'draft' ? 'Borrador' : 'Programado' }}
+            {{ d.status === 'draft' ? t('drafts.draftBadge') : t('drafts.scheduledBadge') }}
           </UBadge>
-          <UBadge v-if="d.kind === 'poll'" color="primary" variant="subtle" icon="i-lucide-bar-chart-3">Encuesta</UBadge>
-          <UBadge v-if="d.anonymous" color="neutral" variant="subtle" icon="i-lucide-venetian-mask">Anónimo</UBadge>
-          <span class="text-muted">en {{ d.channel.name }}</span>
-          <span v-if="d.status === 'scheduled'" class="text-muted">· se publica el {{ fmtDateTime(d.scheduledAt) }}</span>
+          <UBadge v-if="d.kind === 'poll'" color="primary" variant="subtle" icon="i-lucide-bar-chart-3">{{ t('post.poll') }}</UBadge>
+          <UBadge v-if="d.anonymous" color="neutral" variant="subtle" icon="i-lucide-venetian-mask">{{ t('post.anonymous') }}</UBadge>
+          <span class="text-muted">{{ t('drafts.inChannel', { name: d.channel.name }) }}</span>
+          <span v-if="d.status === 'scheduled'" class="text-muted">{{ t('drafts.publishesOn', { date: fmtDateTime(d.scheduledAt) }) }}</span>
         </div>
         <h2 class="mt-2 font-bold">{{ d.title }}</h2>
         <p class="mt-1 line-clamp-2 text-sm text-muted">{{ d.body }}</p>
@@ -110,19 +111,19 @@ async function deleteDraft() {
           <li v-for="o in d.options" :key="o">{{ o }}</li>
         </ul>
         <div class="mt-3 flex flex-wrap gap-2">
-          <UButton size="sm" label="Publicar ahora" icon="i-lucide-send" @click="publishNow(d)" />
-          <UButton size="sm" color="neutral" variant="soft" label="Editar" icon="i-lucide-pen-line" @click="startEdit(d)" />
-          <UButton size="sm" color="error" variant="ghost" label="Borrar" icon="i-lucide-trash-2" @click="toDelete = d" />
+          <UButton size="sm" :label="t('drafts.publishNow')" icon="i-lucide-send" @click="publishNow(d)" />
+          <UButton size="sm" color="neutral" variant="soft" :label="t('common.edit')" icon="i-lucide-pen-line" @click="startEdit(d)" />
+          <UButton size="sm" color="error" variant="ghost" :label="t('common.delete')" icon="i-lucide-trash-2" @click="toDelete = d" />
         </div>
       </UCard>
-      <UAlert v-if="!(data?.drafts?.length)" color="neutral" variant="soft" title="No tenés borradores ni programados" description="Desde el compositor del feed podés guardar un borrador o programar una publicación para más tarde." />
+      <UAlert v-if="!(data?.drafts?.length)" color="neutral" variant="soft" :title="t('drafts.emptyTitle')" :description="t('drafts.emptyText')" />
     </template>
 
-    <UModal :open="!!toDelete" title="Borrar borrador" description="Esta acción no se puede deshacer." @update:open="(v: boolean) => { if (!v) toDelete = null }">
+    <UModal :open="!!toDelete" :title="t('drafts.deleteTitle')" :description="t('drafts.deleteText')" @update:open="(v: boolean) => { if (!v) toDelete = null }">
       <template #footer>
         <div class="flex justify-end gap-2">
-          <UButton color="neutral" variant="ghost" label="Cancelar" @click="toDelete = null" />
-          <UButton color="error" label="Sí, borrar" icon="i-lucide-trash-2" @click="deleteDraft" />
+          <UButton color="neutral" variant="ghost" :label="t('common.cancel')" @click="toDelete = null" />
+          <UButton color="error" :label="t('drafts.yesDelete')" icon="i-lucide-trash-2" @click="deleteDraft" />
         </div>
       </template>
     </UModal>

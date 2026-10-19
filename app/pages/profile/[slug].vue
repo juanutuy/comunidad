@@ -6,6 +6,7 @@ const slug = computed(() => String(route.params.slug))
 const api = useApi()
 const toast = useToast()
 const { user } = useAuth()
+const { t } = useI18n()
 const { fmtDate, fmtDateTime, timeAgo, initials } = useFormat()
 
 interface Badge { id: string, name: string, description: string, icon: string, earned: boolean }
@@ -55,7 +56,7 @@ async function toggleFollow() {
     await refresh()
   }
   catch (e) {
-    toast.add({ title: 'No se pudo completar la acción', description: (e as { data?: { message?: string } }).data?.message || '', color: 'error' })
+    toast.add({ title: t('profile.actionFailed'), description: (e as { data?: { message?: string } }).data?.message || '', color: 'error' })
   }
   finally { followBusy.value = false }
 }
@@ -68,17 +69,17 @@ async function toggleBlock() {
   try {
     if (data.value.profile.blockedByMe) {
       await api(`/api/users/${slug.value}/block`, { method: 'DELETE' })
-      toast.add({ title: 'Miembro desbloqueado', description: 'Su contenido vuelve a verse en tu feed.', color: 'success' })
+      toast.add({ title: t('profile.unblockedToast'), description: t('profile.unblockedToastText'), color: 'success' })
     }
     else {
       await api(`/api/users/${slug.value}/block`, { method: 'POST' })
-      toast.add({ title: 'Miembro bloqueado', description: 'Ya no vas a ver sus publicaciones ni comentarios, y los mensajes directos quedan impedidos.', color: 'success' })
+      toast.add({ title: t('profile.blockedToast'), description: t('profile.blockedToastText'), color: 'success' })
     }
     confirmBlock.value = false
     await refresh()
   }
   catch (e) {
-    toast.add({ title: 'No se pudo completar la acción', description: (e as { data?: { message?: string } }).data?.message || '', color: 'error' })
+    toast.add({ title: t('profile.actionFailed'), description: (e as { data?: { message?: string } }).data?.message || '', color: 'error' })
   }
   finally { blockingBusy.value = false }
 }
@@ -119,12 +120,12 @@ const statCells = computed(() => {
   const s = data.value?.profile.stats
   if (!s) return []
   return [
-    { label: 'Publicaciones', value: s.posts },
-    { label: 'Comentarios', value: s.comments },
-    { label: 'Reacciones recibidas', value: s.reactionsReceived },
-    { label: 'Cursos completados', value: s.coursesCompleted },
-    { label: 'Seguidores', value: s.followers },
-    { label: 'Siguiendo', value: s.following },
+    { label: t('profile.statPosts'), value: s.posts },
+    { label: t('profile.statComments'), value: s.comments },
+    { label: t('profile.statReactions'), value: s.reactionsReceived },
+    { label: t('profile.statCourses'), value: s.coursesCompleted },
+    { label: t('profile.statFollowers'), value: s.followers },
+    { label: t('profile.statFollowing'), value: s.following },
   ]
 })
 
@@ -132,13 +133,13 @@ const statCells = computed(() => {
 const tab = ref('posts')
 const navItems = computed(() => {
   const items = [
-    { label: 'Publicaciones', value: 'posts', icon: 'i-lucide-newspaper' },
-    { label: 'Comentarios', value: 'comments', icon: 'i-lucide-message-circle' },
-    { label: 'Canales', value: 'channels', icon: 'i-lucide-hash' },
-    { label: 'Eventos', value: 'events', icon: 'i-lucide-calendar-days' },
+    { label: t('profile.tabPosts'), value: 'posts', icon: 'i-lucide-newspaper' },
+    { label: t('profile.tabComments'), value: 'comments', icon: 'i-lucide-message-circle' },
+    { label: t('profile.tabChannels'), value: 'channels', icon: 'i-lucide-hash' },
+    { label: t('profile.tabEvents'), value: 'events', icon: 'i-lucide-calendar-days' },
   ]
   // Guardados: solo en el perfil propio (la API ni los devuelve a otros).
-  if (isOwn.value) items.push({ label: 'Guardados', value: 'saved', icon: 'i-lucide-bookmark' })
+  if (isOwn.value) items.push({ label: t('profile.tabSaved'), value: 'saved', icon: 'i-lucide-bookmark' })
   return items
 })
 </script>
@@ -156,7 +157,7 @@ const navItems = computed(() => {
           @click="openSettings('perfil')"
         >
           <UIcon name="i-lucide-camera" />
-          {{ data.profile.coverUrl ? 'Cambiar portada' : 'Agregar portada' }}
+          {{ data.profile.coverUrl ? t('profile.changeCover') : t('profile.addCover') }}
         </button>
       </div>
       <div class="mt-4 flex flex-wrap items-start gap-4">
@@ -165,26 +166,26 @@ const navItems = computed(() => {
           <span
             class="absolute right-0.5 bottom-0.5 h-4 w-4 rounded-full ring-2 ring-white dark:ring-neutral-900"
             :class="data.profile.online ? 'bg-green-500' : 'bg-neutral-400'"
-            :title="data.profile.online ? 'En línea ahora' : 'No está en línea'"
+            :title="data.profile.online ? t('profile.onlineNow') : t('profile.notOnline')"
           />
         </div>
         <div class="min-w-0 flex-1 pt-1">
           <div class="flex flex-wrap items-center gap-2">
             <h1 class="text-2xl font-bold">{{ data.profile.name }}</h1>
-            <UBadge color="primary" variant="soft" :icon="data.profile.level.icon" size="lg">Nivel {{ data.profile.level.name }}</UBadge>
-            <UBadge color="neutral" variant="subtle" size="lg">{{ data.profile.points }} pts</UBadge>
+            <UBadge color="primary" variant="soft" :icon="data.profile.level.icon" size="lg">{{ t('profile.levelBadge', { name: data.profile.level.name }) }}</UBadge>
+            <UBadge color="neutral" variant="subtle" size="lg">{{ data.profile.points }} {{ t('common.points') }}</UBadge>
           </div>
           <p class="text-sm text-muted">@{{ data.profile.slug }}</p>
           <p class="mt-0.5 text-sm text-muted">
-            Miembro desde {{ fmtDate(data.profile.memberSince) }}<span v-if="data.profile.location"> · {{ data.profile.location }}</span>
-            <span v-if="data.profile.online"> · <span class="font-medium text-green-600 dark:text-green-400">Activo ahora</span></span>
-            <span v-else-if="data.profile.lastSeenAt"> · Última vez {{ timeAgo(data.profile.lastSeenAt) }}</span>
+            {{ t('profile.memberSince', { date: fmtDate(data.profile.memberSince) }) }}<span v-if="data.profile.location"> · {{ data.profile.location }}</span>
+            <span v-if="data.profile.online"> · <span class="font-medium text-green-600 dark:text-green-400">{{ t('profile.activeNow') }}</span></span>
+            <span v-else-if="data.profile.lastSeenAt"> · {{ t('profile.lastSeen', { time: timeAgo(data.profile.lastSeenAt) }) }}</span>
           </p>
-          <UAlert v-if="data.profile.blockedByMe" class="mt-2" color="warning" variant="soft" icon="i-lucide-ban" title="Tenés bloqueado a este miembro" description="No ves sus publicaciones ni comentarios y los mensajes directos entre ustedes están impedidos. Podés desbloquearlo desde aquí o desde Ajustes de cuenta." />
+          <UAlert v-if="data.profile.blockedByMe" class="mt-2" color="warning" variant="soft" icon="i-lucide-ban" :title="t('profile.blockedTitle')" :description="t('profile.blockedText')" />
         </div>
         <div class="flex flex-wrap items-center gap-2 pt-1">
           <template v-if="isOwn">
-            <UButton size="sm" icon="i-lucide-pencil" label="Editar perfil" @click="openSettings('perfil')" />
+            <UButton size="sm" icon="i-lucide-pencil" :label="t('profile.editProfile')" @click="openSettings('perfil')" />
           </template>
           <template v-else-if="user">
             <UButton
@@ -192,12 +193,12 @@ const navItems = computed(() => {
               :color="data.profile.followedByMe ? 'neutral' : 'primary'"
               :variant="data.profile.followedByMe ? 'soft' : 'solid'"
               :icon="data.profile.followedByMe ? 'i-lucide-user-check' : 'i-lucide-user-plus'"
-              :label="data.profile.followedByMe ? 'Siguiendo' : 'Seguir'"
+              :label="data.profile.followedByMe ? t('profile.following') : t('profile.follow')"
               :loading="followBusy" @click="toggleFollow"
             />
-            <UButton v-if="!data.profile.blockedByMe" size="sm" variant="soft" icon="i-lucide-message-circle" label="Enviar mensaje" :to="`/messages?with=${data.profile.slug}`" />
-            <UButton v-if="!data.profile.blockedByMe" size="sm" color="error" variant="ghost" icon="i-lucide-ban" label="Bloquear" @click="confirmBlock = true" />
-            <UButton v-else size="sm" color="neutral" variant="soft" icon="i-lucide-undo-2" label="Desbloquear" :loading="blockingBusy" @click="toggleBlock" />
+            <UButton v-if="!data.profile.blockedByMe" size="sm" variant="soft" icon="i-lucide-message-circle" :label="t('profile.sendMessage')" :to="`/messages?with=${data.profile.slug}`" />
+            <UButton v-if="!data.profile.blockedByMe" size="sm" color="error" variant="ghost" icon="i-lucide-ban" :label="t('profile.block')" @click="confirmBlock = true" />
+            <UButton v-else size="sm" color="neutral" variant="soft" icon="i-lucide-undo-2" :label="t('profile.unblock')" :loading="blockingBusy" @click="toggleBlock" />
           </template>
         </div>
       </div>
@@ -228,28 +229,28 @@ const navItems = computed(() => {
 
         <UCard>
           <div class="mb-3 flex items-baseline justify-between gap-2">
-            <h2 class="text-sm font-bold">Insignias ganadas</h2>
-            <span class="text-xs text-muted">{{ levelBadgesEarned }} de {{ data.profile.levels.length }}</span>
+            <h2 class="text-sm font-bold">{{ t('profile.badgesEarned') }}</h2>
+            <span class="text-xs text-muted">{{ t('profile.ofCount', { a: levelBadgesEarned, b: data.profile.levels.length }) }}</span>
           </div>
           <div class="grid grid-cols-3 gap-2">
             <div
               v-for="b in data.profile.levels" :key="b.id"
               class="flex flex-col items-center gap-1.5 rounded-lg border border-default px-1 py-3 text-center"
               :class="{ 'opacity-45': !b.earned }"
-              :title="`${b.name} · se gana con ${b.min} pts`"
+              :title="t('profile.badgeTitle', { name: b.name, min: b.min })"
             >
               <span class="relative flex h-11 w-11 items-center justify-center rounded-full" :class="b.earned ? 'bg-primary/15' : 'bg-elevated'">
                 <UIcon :name="b.icon" class="text-[22px]" :class="b.earned ? 'text-primary' : 'text-muted'" />
                 <span class="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-neutral-500 text-[9px] font-bold text-white">{{ b.order }}</span>
               </span>
               <span class="text-[11px] leading-tight font-medium">{{ b.name }}</span>
-              <span class="text-[10px] text-muted">{{ b.min }} pts</span>
+              <span class="text-[10px] text-muted">{{ b.min }} {{ t('common.points') }}</span>
             </div>
           </div>
           <div class="mt-4 border-t border-default pt-3">
             <div class="mb-2 flex items-baseline justify-between gap-2">
-              <h3 class="text-xs font-bold tracking-wide text-muted uppercase">De actividad</h3>
-              <span class="text-xs text-muted">{{ activityEarned }} de {{ data.profile.badges.length }}</span>
+              <h3 class="text-xs font-bold tracking-wide text-muted uppercase">{{ t('profile.activityBadges') }}</h3>
+              <span class="text-xs text-muted">{{ t('profile.ofCount', { a: activityEarned, b: data.profile.badges.length }) }}</span>
             </div>
             <ul class="space-y-1.5">
               <li
@@ -262,7 +263,7 @@ const navItems = computed(() => {
                 <span class="font-medium">{{ b.name }}</span>
               </li>
             </ul>
-            <p class="mt-2 text-[11px] text-muted">Las insignias de actividad se ganan publicando, comentando, recibiendo reacciones, completando cursos y guardando contenido.</p>
+            <p class="mt-2 text-[11px] text-muted">{{ t('profile.activityNote') }}</p>
           </div>
         </UCard>
       </div>
@@ -271,22 +272,22 @@ const navItems = computed(() => {
       <div class="min-w-0">
         <div v-if="tab === 'posts'" class="space-y-4">
           <PostCard v-for="p in data.posts" :key="p.id" :post="p" @changed="refresh" />
-          <EmptyState v-if="!data.posts.length" icon="i-lucide-newspaper" title="Sin publicaciones todavía" description="Las publicaciones de este miembro en los canales van a aparecer acá." />
+          <EmptyState v-if="!data.posts.length" icon="i-lucide-newspaper" :title="t('profile.noPostsTitle')" :description="t('profile.noPostsText')" />
         </div>
         <div v-else-if="tab === 'comments'" class="space-y-3">
           <UCard v-for="(c, i) in data.comments" :key="i">
             <p class="text-sm text-muted">
-              Comentó en <NuxtLink :to="`/p/${c.channel_slug}/${c.post_slug}`" class="font-medium text-primary hover:underline">{{ c.post_title }}</NuxtLink> · {{ fmtDate(c.created_at) }}
+              {{ t('profile.commentedOn') }} <NuxtLink :to="`/p/${c.channel_slug}/${c.post_slug}`" class="font-medium text-primary hover:underline">{{ c.post_title }}</NuxtLink> · {{ fmtDate(c.created_at) }}
             </p>
             <p class="mt-1 whitespace-pre-line text-sm">{{ c.body }}</p>
           </UCard>
-          <EmptyState v-if="!data.comments.length" icon="i-lucide-message-circle" title="Sin comentarios todavía" description="Los comentarios en publicaciones van a aparecer acá." />
+          <EmptyState v-if="!data.comments.length" icon="i-lucide-message-circle" :title="t('profile.noCommentsTitle')" :description="t('profile.noCommentsText')" />
         </div>
         <div v-else-if="tab === 'channels'" class="flex flex-wrap gap-2">
           <NuxtLink v-for="ch in data.channels" :key="ch.slug" :to="`/channels/${ch.slug}`">
             <UBadge color="neutral" variant="soft" size="lg" icon="i-lucide-hash">{{ ch.name }}</UBadge>
           </NuxtLink>
-          <EmptyState v-if="!data.channels.length" class="w-full" icon="i-lucide-hash" title="No sigue canales todavía" description="Los canales que sigue este miembro van a aparecer acá." />
+          <EmptyState v-if="!data.channels.length" class="w-full" icon="i-lucide-hash" :title="t('profile.noChannelsTitle')" :description="t('profile.noChannelsText')" />
         </div>
         <div v-else-if="tab === 'events'" class="space-y-3">
           <UCard v-for="e in data.events" :key="e.slug">
@@ -295,14 +296,14 @@ const navItems = computed(() => {
                 <NuxtLink :to="`/events/${e.slug}`" class="font-bold hover:underline">{{ e.title }}</NuxtLink>
                 <p class="mt-0.5 text-sm text-muted">{{ fmtDateTime(e.startsAt) }} · {{ e.location }}</p>
               </div>
-              <UBadge :color="e.past ? 'neutral' : 'success'" variant="soft">{{ e.past ? 'Finalizado' : 'Confirmado' }}</UBadge>
+              <UBadge :color="e.past ? 'neutral' : 'success'" variant="soft">{{ e.past ? t('profile.finished') : t('profile.confirmed') }}</UBadge>
             </div>
           </UCard>
-          <EmptyState v-if="!data.events.length" icon="i-lucide-calendar-days" title="Sin eventos confirmados todavía" description="Cuando confirme asistencia a un evento, va a aparecer acá." />
+          <EmptyState v-if="!data.events.length" icon="i-lucide-calendar-days" :title="t('profile.noEventsTitle')" :description="t('profile.noEventsText')" />
         </div>
         <div v-else-if="tab === 'saved'" class="space-y-4">
           <PostCard v-for="p in data.saved || []" :key="p.id" :post="p" @changed="refresh" />
-          <EmptyState v-if="!(data.saved?.length)" icon="i-lucide-bookmark" title="Todavía no guardaste publicaciones" description="Tocá el marcador en cualquier publicación para encontrarla acá." />
+          <EmptyState v-if="!(data.saved?.length)" icon="i-lucide-bookmark" :title="t('profile.noSavedTitle')" :description="t('profile.noSavedText')" />
         </div>
       </div>
 
@@ -313,26 +314,26 @@ const navItems = computed(() => {
             <span class="relative flex h-16 w-16 items-center justify-center rounded-full" :class="hasLevelBadge ? 'bg-primary/15' : 'bg-elevated'">
               <UIcon :name="levelCardIcon" class="text-3xl" :class="hasLevelBadge ? 'text-primary' : 'text-muted'" />
             </span>
-            <h2 class="mt-2 font-bold">{{ hasLevelBadge ? data.profile.level.name : 'Sin insignia aún' }}</h2>
-            <p class="text-sm text-muted">{{ data.profile.points }} pts acumulados</p>
+            <h2 class="mt-2 font-bold">{{ hasLevelBadge ? data.profile.level.name : t('profile.noBadgeYet') }}</h2>
+            <p class="text-sm text-muted">{{ t('profile.pointsAccumulated', { count: data.profile.points }) }}</p>
           </div>
           <template v-if="data.profile.level.nextAt">
             <div class="mt-4 flex items-baseline justify-between text-xs">
-              <span class="text-muted">Progreso a {{ data.profile.level.nextName }}</span>
+              <span class="text-muted">{{ t('profile.progressTo', { name: data.profile.level.nextName || '' }) }}</span>
               <span class="font-semibold">{{ data.profile.points }} / {{ data.profile.level.nextAt }}</span>
             </div>
             <UProgress :model-value="levelPct" size="sm" class="mt-1.5" />
             <p class="mt-2 text-center text-xs text-muted">
-              Te faltan {{ data.profile.level.nextAt - data.profile.points }} pts para {{ data.profile.level.nextName }}.
+              {{ t('profile.missingPoints', { count: data.profile.level.nextAt - data.profile.points, name: data.profile.level.nextName || '' }) }}
             </p>
           </template>
-          <p v-else class="mt-3 text-center text-xs text-muted">Nivel máximo alcanzado.</p>
+          <p v-else class="mt-3 text-center text-xs text-muted">{{ t('profile.maxLevel') }}</p>
         </UCard>
 
         <UCard>
-          <h2 class="mb-3 text-sm font-bold">Acerca de</h2>
+          <h2 class="mb-3 text-sm font-bold">{{ t('profile.about') }}</h2>
           <p v-if="data.profile.bio" class="whitespace-pre-line text-sm">{{ data.profile.bio }}</p>
-          <p v-else class="text-sm text-muted">Este miembro todavía no escribió su bio.</p>
+          <p v-else class="text-sm text-muted">{{ t('profile.noBio') }}</p>
           <ul class="mt-3 space-y-2 text-sm">
             <li v-if="data.profile.location" class="flex items-center gap-2">
               <UIcon name="i-lucide-map-pin" class="text-muted" /> {{ data.profile.location }}
@@ -342,11 +343,11 @@ const navItems = computed(() => {
               <a :href="websiteHref" target="_blank" rel="noopener noreferrer" class="font-medium text-primary hover:underline">{{ websiteLabel }}</a>
             </li>
             <li class="flex items-center gap-2">
-              <UIcon name="i-lucide-calendar" class="text-muted" /> Miembro desde {{ fmtDate(data.profile.memberSince) }}
+              <UIcon name="i-lucide-calendar" class="text-muted" /> {{ t('profile.memberSince', { date: fmtDate(data.profile.memberSince) }) }}
             </li>
           </ul>
           <div class="mt-4 border-t border-default pt-3">
-            <h3 class="mb-2 text-xs font-bold tracking-wide text-muted uppercase">Activo en</h3>
+            <h3 class="mb-2 text-xs font-bold tracking-wide text-muted uppercase">{{ t('profile.activeIn') }}</h3>
             <ul v-if="data.channels.length" class="space-y-1.5">
               <li v-for="ch in data.channels" :key="ch.slug">
                 <NuxtLink :to="`/channels/${ch.slug}`" class="flex items-center gap-1.5 text-sm font-medium hover:text-primary">
@@ -354,17 +355,17 @@ const navItems = computed(() => {
                 </NuxtLink>
               </li>
             </ul>
-            <p v-else class="text-sm text-muted">Todavía no sigue canales.</p>
+            <p v-else class="text-sm text-muted">{{ t('profile.notFollowingYet') }}</p>
           </div>
         </UCard>
       </div>
     </div>
 
-    <UModal v-model:open="confirmBlock" title="Bloquear a este miembro" :description="`Si bloqueás a ${data.profile.name}, dejás de ver sus publicaciones y comentarios, y ninguno de los dos podrá enviarse mensajes directos. La otra persona no recibe ningún aviso.`">
+    <UModal v-model:open="confirmBlock" :title="t('profile.blockModalTitle')" :description="t('profile.blockModalText', { name: data.profile.name })">
       <template #footer>
         <div class="flex justify-end gap-2">
-          <UButton color="neutral" variant="ghost" label="Cancelar" @click="confirmBlock = false" />
-          <UButton color="error" label="Sí, bloquear" icon="i-lucide-ban" :loading="blockingBusy" @click="toggleBlock" />
+          <UButton color="neutral" variant="ghost" :label="t('common.cancel')" @click="confirmBlock = false" />
+          <UButton color="error" :label="t('profile.yesBlock')" icon="i-lucide-ban" :loading="blockingBusy" @click="toggleBlock" />
         </div>
       </template>
     </UModal>

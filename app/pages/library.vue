@@ -5,18 +5,19 @@
 // candado premium.
 const api = useApi()
 const { user } = useAuth()
+const { t } = useI18n()
 const toast = useToast()
 const { fmtDate } = useFormat()
 type LibItem = { id: number, title: string, kind: string, category: string, sizeLabel: string, downloads: number, locked: boolean, createdAt: string, hasFile: boolean, canDownload: boolean }
-const kinds = [
-  { label: 'Todos', value: 'all' },
-  { label: 'PDF', value: 'pdf' },
-  { label: 'Documentos', value: 'doc' },
-  { label: 'Video', value: 'video' },
-  { label: 'Imágenes', value: 'image' },
-  { label: 'Audio', value: 'audio' },
-  { label: 'Enlaces', value: 'link' },
-]
+const kinds = computed(() => [
+  { label: t('library.kindAll'), value: 'all' },
+  { label: t('library.kindPdf'), value: 'pdf' },
+  { label: t('library.kindDoc'), value: 'doc' },
+  { label: t('library.kindVideo'), value: 'video' },
+  { label: t('library.kindImage'), value: 'image' },
+  { label: t('library.kindAudio'), value: 'audio' },
+  { label: t('library.kindLink'), value: 'link' },
+])
 const kindIcons: Record<string, string> = { pdf: 'i-lucide-file-text', doc: 'i-lucide-file', video: 'i-lucide-file-video', image: 'i-lucide-file-image', audio: 'i-lucide-file-audio', link: 'i-lucide-link' }
 const active = ref('all')
 const { data, refresh } = await useAsyncData('library', () => api<{ items: LibItem[] }>('/api/library'))
@@ -46,13 +47,13 @@ async function upload() {
     fd.append('category', upForm.category || 'General')
     fd.append('locked', upForm.locked ? '1' : '0')
     await api('/api/library/upload', { method: 'POST', body: fd })
-    toast.add({ title: 'Recurso subido a la biblioteca', color: 'success' })
+    toast.add({ title: t('library.uploadedToast'), color: 'success' })
     upForm.title = ''; upForm.category = ''; upForm.locked = false; upFile.value = null
     await refresh()
     if (active.value !== 'all') await setKind(active.value)
   }
   catch (e) {
-    toast.add({ title: 'No se pudo subir el recurso', description: (e as { data?: { message?: string } }).data?.message || '', color: 'error' })
+    toast.add({ title: t('library.uploadFailed'), description: (e as { data?: { message?: string } }).data?.message || '', color: 'error' })
   }
   finally { uploading.value = false }
 }
@@ -61,27 +62,27 @@ async function upload() {
 <template>
   <div class="space-y-5">
     <div>
-      <h1 class="text-2xl font-bold">Biblioteca</h1>
-      <p class="text-muted">Documentos, guías, plantillas y enlaces compartidos de la comunidad.</p>
+      <h1 class="text-2xl font-bold">{{ t('library.title') }}</h1>
+      <p class="text-muted">{{ t('library.subtitle') }}</p>
     </div>
 
     <UCard v-if="user?.role === 'admin'">
-      <h2 class="mb-3 flex items-center gap-2 font-semibold"><UIcon name="i-lucide-upload" /> Subir un recurso (admin)</h2>
+      <h2 class="mb-3 flex items-center gap-2 font-semibold"><UIcon name="i-lucide-upload" /> {{ t('library.uploadTitle') }}</h2>
       <div class="space-y-3">
-        <UFormField label="Archivo (PDF, documentos, imágenes, audio, video MP4, ZIP · máx. 10 MB)">
+        <UFormField :label="t('library.fileLabel')">
           <input type="file" class="block w-full text-sm file:mr-3 file:rounded-md file:border-0 file:bg-elevated file:px-3 file:py-2 file:text-sm file:font-medium" @change="onUpFile">
         </UFormField>
         <div class="grid gap-3 sm:grid-cols-2">
-          <UFormField label="Título">
-            <UInput v-model="upForm.title" placeholder="Nombre del recurso" class="w-full" />
+          <UFormField :label="t('library.titleLabel')">
+            <UInput v-model="upForm.title" :placeholder="t('library.titlePlaceholder')" class="w-full" />
           </UFormField>
-          <UFormField label="Categoría">
-            <UInput v-model="upForm.category" placeholder="Ej.: Guías" class="w-full" />
+          <UFormField :label="t('library.categoryLabel')">
+            <UInput v-model="upForm.category" :placeholder="t('library.categoryPlaceholder')" class="w-full" />
           </UFormField>
         </div>
-        <UCheckbox v-model="upForm.locked" label="Solo miembros con acceso premium" />
+        <UCheckbox v-model="upForm.locked" :label="t('library.premiumOnly')" />
         <div class="flex justify-end">
-          <UButton label="Subir recurso" icon="i-lucide-upload" :loading="uploading" :disabled="!upFile" @click="upload" />
+          <UButton :label="t('library.uploadButton')" icon="i-lucide-upload" :loading="uploading" :disabled="!upFile" @click="upload" />
         </div>
       </div>
     </UCard>
@@ -97,17 +98,17 @@ async function upload() {
           </span>
           <div class="min-w-0 flex-1">
             <p class="font-semibold leading-snug">{{ i.title }}</p>
-            <p class="mt-1 text-xs text-muted">{{ i.category }} · {{ i.sizeLabel }} · {{ fmtDate(i.createdAt) }} · {{ i.downloads }} descargas</p>
+            <p class="mt-1 text-xs text-muted">{{ i.category }} · {{ i.sizeLabel }} · {{ fmtDate(i.createdAt) }} · {{ t('library.downloadsCount', { count: i.downloads }) }}</p>
             <div class="mt-2 flex flex-wrap items-center gap-2">
-              <UButton v-if="i.hasFile && i.canDownload" :to="`/api/library/${i.id}/download`" external size="xs" icon="i-lucide-download" label="Descargar" />
-              <UBadge v-if="i.locked && !i.canDownload" color="warning" variant="subtle" icon="i-lucide-lock">Solo miembros con acceso premium</UBadge>
-              <UBadge v-else-if="i.hasFile" color="success" variant="subtle" icon="i-lucide-download">Archivo disponible</UBadge>
-              <UBadge v-else color="neutral" variant="subtle" icon="i-lucide-info">Registro de referencia</UBadge>
+              <UButton v-if="i.hasFile && i.canDownload" :to="`/api/library/${i.id}/download`" external size="xs" icon="i-lucide-download" :label="t('library.download')" />
+              <UBadge v-if="i.locked && !i.canDownload" color="warning" variant="subtle" icon="i-lucide-lock">{{ t('library.premiumBadge') }}</UBadge>
+              <UBadge v-else-if="i.hasFile" color="success" variant="subtle" icon="i-lucide-download">{{ t('library.availableBadge') }}</UBadge>
+              <UBadge v-else color="neutral" variant="subtle" icon="i-lucide-info">{{ t('library.referenceBadge') }}</UBadge>
             </div>
           </div>
         </div>
       </UCard>
     </div>
-    <UAlert v-if="!items.length" color="neutral" variant="soft" title="No hay recursos de este tipo todavía" />
+    <UAlert v-if="!items.length" color="neutral" variant="soft" :title="t('library.emptyTitle')" />
   </div>
 </template>
