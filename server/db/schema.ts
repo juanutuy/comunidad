@@ -22,6 +22,8 @@ export const users = sqliteTable('users', {
   passwordHash: text('password_hash').notNull(),
   bio: text('bio').notNull().default(''),
   location: text('location').notNull().default(''),
+  // Fase 2: se agrega a bases viejas por migración aditiva (ver utils/db.ts).
+  avatarUrl: text('avatar_url').notNull().default(''),
   createdAt: text('created_at').notNull(),
 })
 
@@ -134,7 +136,17 @@ export const lessons = sqliteTable('lessons', {
   durationMin: integer('duration_min').notNull().default(0),
   isFree: integer('is_free', { mode: 'boolean' }).notNull().default(false),
   sort: integer('sort').notNull().default(0),
+  // Fase 2 (migración aditiva): contenido de la lección para el visor.
+  content: text('content').notNull().default(''),
 })
+
+export const lessonProgress = sqliteTable('lesson_progress', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  tenantId: integer('tenant_id').notNull(),
+  userId: integer('user_id').notNull(),
+  lessonId: integer('lesson_id').notNull().references(() => lessons.id),
+  completedAt: text('completed_at').notNull(),
+}, t => [uniqueIndex('lesson_progress_unique').on(t.tenantId, t.userId, t.lessonId)])
 
 export const enrollments = sqliteTable('enrollments', {
   id: integer('id').primaryKey({ autoIncrement: true }),
@@ -174,6 +186,33 @@ export const libraryItems = sqliteTable('library_items', {
   sizeLabel: text('size_label').notNull().default(''),
   downloads: integer('downloads').notNull().default(0),
   locked: integer('locked', { mode: 'boolean' }).notNull().default(false),
+  // Fase 2 (migración aditiva): archivo real asociado (clave en R2 o en
+  // data/uploads local). Vacío = item de solo metadatos/enlace (semilla).
+  fileKey: text('file_key').notNull().default(''),
+  fileName: text('file_name').notNull().default(''),
+  createdAt: text('created_at').notNull(),
+})
+
+export const notifications = sqliteTable('notifications', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  tenantId: integer('tenant_id').notNull(),
+  userId: integer('user_id').notNull().references(() => users.id), // destinatario
+  actorId: integer('actor_id'), // quién originó la acción (puede ser null)
+  type: text('type', { enum: ['reaction', 'comment', 'new_post', 'mention'] }).notNull(),
+  title: text('title').notNull(),
+  link: text('link').notNull().default(''),
+  isRead: integer('is_read', { mode: 'boolean' }).notNull().default(false),
+  createdAt: text('created_at').notNull(),
+})
+
+export const uploads = sqliteTable('uploads', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  tenantId: integer('tenant_id').notNull(),
+  userId: integer('user_id').notNull(),
+  key: text('key').notNull(), // clave en R2 / ruta bajo data/uploads en local
+  filename: text('filename').notNull().default(''),
+  contentType: text('content_type').notNull().default(''),
+  size: integer('size').notNull().default(0),
   createdAt: text('created_at').notNull(),
 })
 

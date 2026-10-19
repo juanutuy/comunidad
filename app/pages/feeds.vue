@@ -18,8 +18,14 @@ const mediaOptions = [
   { label: 'Sin adjunto', value: 'none' },
   { label: 'Video (enlace de YouTube)', value: 'video' },
   { label: 'Imagen (URL)', value: 'image' },
+  { label: 'Imagen (subir archivo)', value: 'upload' },
 ]
 const publishing = ref(false)
+const imageFile = ref<File | null>(null)
+
+function onFileChange(e: Event) {
+  imageFile.value = (e.target as HTMLInputElement).files?.[0] ?? null
+}
 
 watchEffect(() => {
   if (!form.channelSlug && channelOptions.value.length) form.channelSlug = channelOptions.value[0]!.value
@@ -28,13 +34,23 @@ watchEffect(() => {
 async function publish() {
   publishing.value = true
   try {
-    await api('/api/posts', { method: 'POST', body: { ...form } })
-    form.title = ''; form.body = ''; form.mediaUrl = ''; form.mediaType = 'none'
+    const payload = { ...form }
+    if (form.mediaType === 'upload') {
+      if (!imageFile.value) throw new Error('Elegí una imagen para subir.')
+      const fd = new FormData()
+      fd.append('file', imageFile.value)
+      fd.append('kind', 'image')
+      const up = await api<{ url: string }>('/api/uploads', { method: 'POST', body: fd })
+      payload.mediaType = 'image'
+      payload.mediaUrl = up.url
+    }
+    await api('/api/posts', { method: 'POST', body: payload })
+    form.title = ''; form.body = ''; form.mediaUrl = ''; form.mediaType = 'none'; imageFile.value = null
     toast.add({ title: 'Publicación creada', color: 'success' })
     await refresh()
   }
   catch (e) {
-    toast.add({ title: 'No se pudo publicar', description: (e as { data?: { message?: string } }).data?.message || 'Intentá de nuevo.', color: 'error' })
+    toast.add({ title: 'No se pudo publicar', description: (e as { data?: { message?: string } }).data?.message || (e as Error).message || 'Intentá de nuevo.', color: 'error' })
   }
   finally { publishing.value = false }
 }
@@ -66,8 +82,12 @@ async function publish() {
         <UFormField label="Contenido">
           <UTextarea v-model="form.body" :rows="4" placeholder="Escribí tu publicación…" class="w-full" />
         </UFormField>
-        <UFormField v-if="form.mediaType !== 'none'" label="URL del adjunto">
+        <UFormField v-if="form.mediaType === 'video' || form.mediaType === 'image'" label="URL del adjunto">
           <UInput v-model="form.mediaUrl" placeholder="https://…" class="w-full" />
+        </UFormField>
+        <UFormField v-else-if="form.mediaType === 'upload'" label="Imagen (PNG, JPG, WebP o GIF · máx. 5 MB)">
+          <input type="file" accept="image/png,image/jpeg,image/webp,image/gif" class="block w-full text-sm file:mr-3 file:rounded-md file:border-0 file:bg-elevated file:px-3 file:py-2 file:text-sm file:font-medium" @change="onFileChange">
+          <p v-if="imageFile" class="mt-1 text-xs text-muted">{{ imageFile.name }} · {{ (imageFile.size / 1024).toFixed(0) }} KB</p>
         </UFormField>
         <div class="flex justify-end">
           <UButton label="Publicar" icon="i-lucide-send" :loading="publishing" :disabled="!form.title.trim() || !form.body.trim()" @click="publish" />

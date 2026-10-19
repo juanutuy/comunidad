@@ -1,5 +1,7 @@
-// Perfil público de un miembro: datos, sus publicaciones, comentarios y canales.
+// Perfil público de un miembro: datos, nivel e insignias (Fase 2), sus
+// publicaciones, comentarios y canales.
 import { POST_SELECT, canAccessChannel, channelBySlug, currentAuth, resolveTenant, serializePost } from '../../utils/community'
+import { badgesFor, levelFor, memberStats } from '../../utils/levels'
 import { dbFor } from '../../utils/db'
 
 export default defineEventHandler(async (event) => {
@@ -20,8 +22,13 @@ export default defineEventHandler(async (event) => {
     FROM comments c JOIN posts p ON p.id = c.post_id JOIN channels ch ON ch.id = p.channel_id
     WHERE c.author_id = ? AND c.tenant_id = ? ORDER BY c.created_at DESC LIMIT 20`).all(user.id, tenant.id)
   const channels = await db.prepare(`SELECT c.name, c.slug FROM follows f JOIN channels c ON c.id = f.channel_id WHERE f.tenant_id = ? AND f.user_id = ?`).all(tenant.id, user.id)
+  const stats = await memberStats(event, tenant.id, user.id as number)
   return {
-    profile: { id: user.id, name: user.name, slug: user.slug, bio: user.bio, location: user.location, memberSince: user.created_at },
+    profile: {
+      id: user.id, name: user.name, slug: user.slug, bio: user.bio, location: user.location,
+      avatarUrl: user.avatar_url || '', memberSince: user.created_at,
+      points: stats.points, level: levelFor(stats.points), badges: badgesFor(stats), stats,
+    },
     posts, comments, channels,
   }
 })

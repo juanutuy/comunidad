@@ -12,7 +12,8 @@ import Database from 'better-sqlite3'
 const TABLES = [
   'tenants', 'users', 'memberships', 'channel_groups', 'channels', 'follows',
   'channel_access', 'posts', 'reactions', 'comments', 'bookmarks', 'courses',
-  'chapters', 'lessons', 'enrollments', 'events', 'rsvps', 'library_items',
+  'chapters', 'lessons', 'lesson_progress', 'enrollments', 'events', 'rsvps',
+  'library_items', 'notifications', 'uploads',
 ]
 
 const db = new Database(join(process.cwd(), 'data', 'comunidad.db'), { readonly: true })

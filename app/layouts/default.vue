@@ -29,10 +29,23 @@ async function doLogout() {
 const userMenuItems = computed(() => [
   [
     { label: 'Mi perfil', icon: 'i-lucide-user', to: `/profile/${user.value?.slug}` },
-    ...(user.value?.role === 'admin' ? [{ label: 'Administrar canales', icon: 'i-lucide-settings', to: '/admin/channels' }] : []),
+    { label: 'Notificaciones', icon: 'i-lucide-bell', to: '/notifications' },
+    ...(user.value?.role === 'admin'
+      ? [
+          { label: 'Ajustes de la comunidad', icon: 'i-lucide-settings', to: '/admin' },
+          { label: 'Miembros', icon: 'i-lucide-users', to: '/admin/members' },
+          { label: 'Administrar canales', icon: 'i-lucide-hash', to: '/admin/channels' },
+        ]
+      : []),
   ],
   [{ label: 'Cerrar sesión', icon: 'i-lucide-log-out', onSelect: doLogout }],
 ])
+
+const searchQuery = ref('')
+function doSearch() {
+  const q = searchQuery.value.trim()
+  if (q.length >= 2) router.push({ path: '/search', query: { q } })
+}
 </script>
 
 <template>
@@ -52,11 +65,16 @@ const userMenuItems = computed(() => [
           </NuxtLink>
         </nav>
         <span class="flex-1" />
+        <form class="hidden md:block" @submit.prevent="doSearch">
+          <UInput v-model="searchQuery" placeholder="Buscar en la comunidad…" icon="i-lucide-search" size="sm" class="w-52" />
+        </form>
+        <UButton to="/search" color="neutral" variant="ghost" icon="i-lucide-search" class="md:hidden" aria-label="Buscar" />
+        <NotificationBell />
         <UColorModeButton />
         <template v-if="user">
           <UDropdownMenu :items="userMenuItems">
             <UButton color="neutral" variant="ghost" class="gap-2">
-              <UAvatar :text="initials(user.name)" size="sm" />
+              <UAvatar :src="user.avatarUrl || undefined" :text="initials(user.name)" size="sm" />
               <span class="hidden max-w-32 truncate sm:block">{{ user.name }}</span>
             </UButton>
           </UDropdownMenu>

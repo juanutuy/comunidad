@@ -10,7 +10,7 @@ export interface PostView {
   mediaUrl: string
   pinned: boolean
   createdAt: string
-  author: { name: string, slug: string }
+  author: { name: string, slug: string, avatarUrl?: string }
   channel: { name: string, slug: string, type: string }
   reactions: Record<string, number>
   myReactions: string[]
@@ -19,7 +19,7 @@ export interface PostView {
 }
 
 const props = defineProps<{ post: PostView, linkable?: boolean }>()
-const emit = defineEmits<{ changed: [] }>()
+const emit = defineEmits<{ changed: [], deleted: [] }>()
 const { user } = useAuth()
 const { timeAgo, initials } = useFormat()
 const api = useApi()
@@ -73,12 +73,28 @@ async function togglePin() {
   }
   catch { toast.add({ title: 'No se pudo fijar la publicación', color: 'error' }) }
 }
+
+const canDelete = computed(() => !!user.value && (user.value.role === 'admin' || user.value.slug === props.post.author.slug))
+const confirmDelete = ref(false)
+const deleting = ref(false)
+async function deletePost() {
+  deleting.value = true
+  try {
+    await api(`/api/posts/${props.post.id}`, { method: 'DELETE' })
+    toast.add({ title: 'Publicación eliminada', color: 'success' })
+    confirmDelete.value = false
+    emit('deleted')
+    emit('changed')
+  }
+  catch { toast.add({ title: 'No se pudo eliminar la publicación', color: 'error' }) }
+  finally { deleting.value = false }
+}
 </script>
 
 <template>
   <UCard>
     <div class="flex items-start gap-3">
-      <UAvatar :text="initials(post.author.name)" size="md" />
+      <UAvatar :src="post.author.avatarUrl || undefined" :text="initials(post.author.name)" size="md" />
       <div class="min-w-0 flex-1">
         <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
           <NuxtLink :to="`/profile/${post.author.slug}`" class="font-semibold hover:underline">
@@ -149,7 +165,17 @@ async function togglePin() {
           <span class="flex-1" />
           <UButton size="sm" color="neutral" :variant="localBookmarked ? 'soft' : 'ghost'" icon="i-lucide-bookmark" @click="toggleBookmark" />
           <UButton v-if="user?.role === 'admin'" size="sm" color="neutral" variant="ghost" icon="i-lucide-pin" title="Fijar / desfijar (admin)" @click="togglePin" />
+          <UButton v-if="canDelete" size="sm" color="error" variant="ghost" icon="i-lucide-trash-2" title="Eliminar publicación" @click="confirmDelete = true" />
         </div>
+
+        <UModal v-model:open="confirmDelete" title="Eliminar publicación" description="Esta acción no se puede deshacer: se borran también sus comentarios y reacciones.">
+          <template #footer>
+            <div class="flex justify-end gap-2">
+              <UButton color="neutral" variant="ghost" label="Cancelar" @click="confirmDelete = false" />
+              <UButton color="error" label="Sí, eliminar" icon="i-lucide-trash-2" :loading="deleting" @click="deletePost" />
+            </div>
+          </template>
+        </UModal>
       </div>
     </div>
   </UCard>

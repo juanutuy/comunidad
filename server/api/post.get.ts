@@ -14,8 +14,8 @@ export default defineEventHandler(async (event) => {
   const { user, role } = await currentAuth(event, tenant.id)
   const access = await canAccessChannel(event, user?.id ?? null, role, channel)
   const comments = access
-    ? (await db.prepare(`SELECT c.*, u.name AS author_name, u.slug AS author_slug FROM comments c JOIN users u ON u.id = c.author_id WHERE c.post_id = ? ORDER BY c.created_at`).all(row.id as number) as Record<string, unknown>[])
-        .map(c => ({ id: c.id, body: c.body, createdAt: c.created_at, author: { name: c.author_name, slug: c.author_slug } }))
+    ? (await db.prepare(`SELECT c.*, u.name AS author_name, u.slug AS author_slug, u.avatar_url AS author_avatar FROM comments c JOIN users u ON u.id = c.author_id WHERE c.post_id = ? ORDER BY c.created_at`).all(row.id as number) as Record<string, unknown>[])
+        .map(c => ({ id: c.id, body: c.body, createdAt: c.created_at, author: { name: c.author_name, slug: c.author_slug, avatarUrl: c.author_avatar || '' } }))
     : []
   return { post: await serializePost(event, row, user?.id ?? null, access), comments }
 })

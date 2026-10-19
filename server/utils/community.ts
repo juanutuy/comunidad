@@ -7,7 +7,7 @@ import { readSession } from './auth'
 import { dbFor } from './db'
 
 export interface TenantRow { id: number, slug: string, name: string, tagline: string, brand_color: string, guidelines: string }
-export interface UserRow { id: number, name: string, slug: string, email: string, bio: string, location: string, created_at: string }
+export interface UserRow { id: number, name: string, slug: string, email: string, bio: string, location: string, avatar_url: string, created_at: string }
 export interface ChannelRow { id: number, tenant_id: number, group_id: number | null, slug: string, name: string, icon: string, description: string, type: string, price_cents: number }
 
 export async function resolveTenant(event: H3Event): Promise<TenantRow> {
@@ -23,7 +23,7 @@ export async function resolveTenant(event: H3Event): Promise<TenantRow> {
 }
 
 export function publicUser(u: UserRow) {
-  return { id: u.id, name: u.name, slug: u.slug, email: u.email, bio: u.bio, location: u.location, memberSince: u.created_at }
+  return { id: u.id, name: u.name, slug: u.slug, email: u.email, bio: u.bio, location: u.location, avatarUrl: u.avatar_url || '', memberSince: u.created_at }
 }
 
 export async function currentAuth(event: H3Event, tenantId: number) {
@@ -92,13 +92,13 @@ export async function serializePost(event: H3Event, row: Record<string, unknown>
     mediaUrl: row.media_url,
     pinned: !!row.pinned,
     createdAt: row.created_at,
-    author: { name: row.author_name, slug: row.author_slug },
+    author: { name: row.author_name, slug: row.author_slug, avatarUrl: row.author_avatar || '' },
     channel: { name: row.channel_name, slug: row.channel_slug, type: row.channel_type },
     reactions, myReactions, commentCount, bookmarked,
   }
 }
 
-export const POST_SELECT = `SELECT p.*, u.name AS author_name, u.slug AS author_slug,
+export const POST_SELECT = `SELECT p.*, u.name AS author_name, u.slug AS author_slug, u.avatar_url AS author_avatar,
   c.name AS channel_name, c.slug AS channel_slug, c.type AS channel_type, c.id AS channel_id_raw
   FROM posts p JOIN users u ON u.id = p.author_id JOIN channels c ON c.id = p.channel_id`
 

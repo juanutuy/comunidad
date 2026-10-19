@@ -2,7 +2,7 @@
 const api = useApi()
 const { fmtMoney } = useFormat()
 const q = ref('')
-interface CourseCard { id: number, slug: string, title: string, description: string, level: string, priceCents: number, chapters: number, lessons: number, enrolled: boolean }
+interface CourseCard { id: number, slug: string, title: string, description: string, level: string, priceCents: number, chapters: number, lessons: number, enrolled: boolean, progress: { completed: number, total: number, pct: number } }
 const { data, refresh } = await useAsyncData('courses', () => api<{ courses: CourseCard[] }>('/api/courses'))
 async function search() {
   data.value = await api<{ courses: CourseCard[] }>('/api/courses', { query: { q: q.value } })
@@ -30,9 +30,16 @@ async function search() {
         <NuxtLink :to="`/courses/${c.slug}`" class="mt-3 block text-lg font-bold leading-snug hover:underline">{{ c.title }}</NuxtLink>
         <p class="mt-1 line-clamp-3 text-sm text-muted">{{ c.description }}</p>
         <p class="mt-3 text-xs text-muted">{{ c.chapters }} capítulos · {{ c.lessons }} lecciones</p>
+        <div v-if="c.enrolled" class="mt-3">
+          <div class="mb-1 flex justify-between text-xs text-muted">
+            <span>Tu avance</span><span>{{ c.progress.completed }}/{{ c.progress.total }} lecciones · {{ c.progress.pct }}%</span>
+          </div>
+          <UProgress :model-value="c.progress.pct" size="sm" />
+        </div>
         <div class="mt-4 flex gap-2">
           <UButton :to="`/courses/${c.slug}`" label="Ver curso" size="sm" />
-          <UBadge v-if="c.enrolled" color="success" variant="soft" icon="i-lucide-check">Inscrito</UBadge>
+          <UBadge v-if="c.progress.pct === 100 && c.progress.total > 0" color="success" variant="soft" icon="i-lucide-award">Completado</UBadge>
+          <UBadge v-else-if="c.enrolled" color="success" variant="soft" icon="i-lucide-check">Inscrito</UBadge>
         </div>
       </UCard>
     </div>

@@ -1,0 +1,96 @@
+<script setup lang="ts">
+// Campana de notificaciones (Fase 2): contador de no leídas y desplegable
+// con las últimas. Al abrir el desplegable se marca todo como leído.
+interface NotificationView {
+  id: number
+  type: string
+  title: string
+  link: string
+  isRead: boolean
+  createdAt: string
+  actor: { name: string, slug: string, avatarUrl: string } | null
+}
+
+const { user } = useAuth()
+const { timeAgo, initials } = useFormat()
+const api = useApi()
+const router = useRouter()
+
+const items = ref<NotificationView[]>([])
+const unread = ref(0)
+const open = ref(false)
+
+const typeIcons: Record<string, string> = {
+  reaction: 'i-lucide-heart',
+  comment: 'i-lucide-message-circle',
+  new_post: 'i-lucide-pen-square',
+  mention: 'i-lucide-at-sign',
+}
+
+async function load() {
+  if (!user.value) { items.value = []; unread.value = 0; return }
+  try {
+    const data = await api<{ unread: number, notifications: NotificationView[] }>('/api/notifications')
+    items.value = data.notifications.slice(0, 8)
+    unread.value = data.unread
+  }
+  catch { /* sin sesión o sin red: la campana queda en cero */ }
+}
+
+async function markAllRead() {
+  if (!unread.value) return
+  try {
+    await api('/api/notifications/read', { method: 'POST', body: {} })
+    unread.value = 0
+    items.value = items.value.map(n => ({ ...n, isRead: true }))
+  }
+  catch { /* se reintenta en la próxima apertura */ }
+}
+
+function onOpenChange(value: boolean) {
+  open.value = value
+  if (value) { load(); markAllRead() }
+}
+
+function go(n: NotificationView) {
+  open.value = false
+  if (n.link) router.push(n.link)
+}
+
+watch(() => user.value?.id, load, { immediate: true })
+onMounted(() => {
+  const t = setInterval(load, 60000)
+  onUnmounted(() => clearInterval(t))
+})
+</script>
+
+<template>
+  <UPopover v-if="user" :open="open" @update:open="onOpenChange">
+    <UButton color="neutral" variant="ghost" icon="i-lucide-bell" class="relative" aria-label="Notificaciones">
+      <span v-if="unread" class="absolute -top-0.5 -right-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+        {{ unread > 9 ? '9+' : unread }}
+      </span>
+    </UButton>
+    <template #content>
+      <div class="w-80 p-2">
+        <div class="flex items-center justify-between px-2 py-1">
+          <p class="text-sm font-bold">Notificaciones</p>
+          <UButton to="/notifications" size="xs" color="neutral" variant="ghost" label="Ver todas" @click="open = false" />
+        </div>
+        <ul v-if="items.length" class="max-h-80 divide-y divide-default overflow-y-auto">
+          <li v-for="n in items" :key="n.id">
+            <button class="flex w-full items-start gap-2.5 px-2 py-2.5 text-left hover:bg-elevated" :class="{ 'opacity-70': n.isRead }" @click="go(n)">
+              <UAvatar :src="n.actor?.avatarUrl || undefined" :text="n.actor ? initials(n.actor.name) : undefined" :icon="typeIcons[n.type] || 'i-lucide-bell'" size="sm" class="mt-0.5 shrink-0" />
+              <span class="min-w-0 flex-1">
+                <span class="block text-sm leading-snug">{{ n.title }}</span>
+                <span class="block text-xs text-muted">{{ timeAgo(n.createdAt) }}</span>
+              </span>
+              <span v-if="!n.isRead" class="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-primary" />
+            </button>
+          </li>
+        </ul>
+        <p v-else class="px-2 py-4 text-center text-sm text-muted">No tenés notificaciones todavía.</p>
+      </div>
+    </template>
+  </UPopover>
+</template>

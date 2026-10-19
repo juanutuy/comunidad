@@ -14,7 +14,14 @@ export default defineEventHandler(async (event) => {
     const chapters = (await db.prepare('SELECT COUNT(*) AS n FROM chapters WHERE course_id = ?').get(c.id) as unknown as { n: number }).n
     const lessons = (await db.prepare('SELECT COUNT(*) AS n FROM lessons WHERE chapter_id IN (SELECT id FROM chapters WHERE course_id = ?)').get(c.id) as unknown as { n: number }).n
     const enrolled = user ? !!await db.prepare('SELECT id FROM enrollments WHERE tenant_id = ? AND course_id = ? AND user_id = ?').get(tenant.id, c.id, user.id) : false
-    return { id: c.id, slug: c.slug, title: c.title, description: c.description, level: c.level, priceCents: c.price_cents, chapters, lessons, enrolled }
+    const done = user
+      ? (await db.prepare(`SELECT COUNT(*) AS n FROM lesson_progress lp JOIN lessons l ON l.id = lp.lesson_id JOIN chapters ch ON ch.id = l.chapter_id
+          WHERE ch.course_id = ? AND lp.user_id = ? AND lp.tenant_id = ?`).get(c.id, user.id, tenant.id) as unknown as { n: number }).n
+      : 0
+    return {
+      id: c.id, slug: c.slug, title: c.title, description: c.description, level: c.level, priceCents: c.price_cents, chapters, lessons, enrolled,
+      progress: { completed: done, total: lessons, pct: lessons ? Math.round((done / lessons) * 100) : 0 },
+    }
   }))
   return { courses }
 })

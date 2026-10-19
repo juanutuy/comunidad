@@ -10,14 +10,25 @@ export default defineEventHandler(async (event) => {
   if (!course) throw createError({ statusCode: 404, message: 'Curso no encontrado.' })
   const { user } = await currentAuth(event, tenant.id)
   const enrolled = user ? !!await db.prepare('SELECT id FROM enrollments WHERE tenant_id = ? AND course_id = ? AND user_id = ?').get(tenant.id, course.id, user.id) : false
+  const completedIds = new Set(user
+    ? (await db.prepare(`SELECT lp.lesson_id FROM lesson_progress lp JOIN lessons l ON l.id = lp.lesson_id JOIN chapters ch ON ch.id = l.chapter_id
+        WHERE lp.tenant_id = ? AND lp.user_id = ? AND ch.course_id = ?`).all(tenant.id, user.id, course.id) as { lesson_id: number }[]).map(r => r.lesson_id)
+    : [])
   const chapterRows = await db.prepare('SELECT * FROM chapters WHERE course_id = ? ORDER BY sort').all(course.id) as Record<string, unknown>[]
-  const chapters = await Promise.all(chapterRows.map(async ch => ({
-    id: ch.id, title: ch.title,
-    lessons: (await db.prepare('SELECT * FROM lessons WHERE chapter_id = ? ORDER BY sort').all(ch.id) as Record<string, unknown>[])
-      .map(l => ({ id: l.id, title: l.title, durationMin: l.duration_min, isFree: !!l.is_free })),
-  })))
+  let totalLessons = 0
+  const chapters = await Promise.all(chapterRows.map(async (ch) => {
+    const lessons = (await db.prepare('SELECT * FROM lessons WHERE chapter_id = ? ORDER BY sort').all(ch.id) as Record<string, unknown>[])
+      .map(l => ({ id: l.id, title: l.title, durationMin: l.duration_min, isFree: !!l.is_free, completed: completedIds.has(l.id as number), canView: !!l.is_free || enrolled }))
+    totalLessons += lessons.length
+    return { id: ch.id, title: ch.title, lessons }
+  }))
+  const completedCount = completedIds.size
+  const progressPct = totalLessons ? Math.round((completedCount / totalLessons) * 100) : 0
   return {
-    course: { id: course.id, slug: course.slug, title: course.title, description: course.description, level: course.level, priceCents: course.price_cents, enrolled },
+    course: {
+      id: course.id, slug: course.slug, title: course.title, description: course.description, level: course.level, priceCents: course.price_cents, enrolled,
+      progress: { completed: completedCount, total: totalLessons, pct: progressPct },
+    },
     chapters,
   }
 })

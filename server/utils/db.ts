@@ -74,7 +74,31 @@ CREATE UNIQUE INDEX IF NOT EXISTS events_tenant_slug ON events (tenant_id, slug)
 CREATE TABLE IF NOT EXISTS rsvps (id INTEGER PRIMARY KEY AUTOINCREMENT, tenant_id INTEGER NOT NULL, event_id INTEGER NOT NULL, user_id INTEGER NOT NULL);
 CREATE UNIQUE INDEX IF NOT EXISTS rsvps_unique ON rsvps (tenant_id, event_id, user_id);
 CREATE TABLE IF NOT EXISTS library_items (id INTEGER PRIMARY KEY AUTOINCREMENT, tenant_id INTEGER NOT NULL, title TEXT NOT NULL, kind TEXT NOT NULL, category TEXT NOT NULL DEFAULT 'General', size_label TEXT NOT NULL DEFAULT '', downloads INTEGER NOT NULL DEFAULT 0, locked INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS notifications (id INTEGER PRIMARY KEY AUTOINCREMENT, tenant_id INTEGER NOT NULL, user_id INTEGER NOT NULL, actor_id INTEGER, type TEXT NOT NULL, title TEXT NOT NULL, link TEXT NOT NULL DEFAULT '', is_read INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL);
+CREATE INDEX IF NOT EXISTS notifications_user_read ON notifications (user_id, is_read, created_at);
+CREATE TABLE IF NOT EXISTS lesson_progress (id INTEGER PRIMARY KEY AUTOINCREMENT, tenant_id INTEGER NOT NULL, user_id INTEGER NOT NULL, lesson_id INTEGER NOT NULL, completed_at TEXT NOT NULL);
+CREATE UNIQUE INDEX IF NOT EXISTS lesson_progress_unique ON lesson_progress (tenant_id, user_id, lesson_id);
+CREATE TABLE IF NOT EXISTS uploads (id INTEGER PRIMARY KEY AUTOINCREMENT, tenant_id INTEGER NOT NULL, user_id INTEGER NOT NULL, key TEXT NOT NULL, filename TEXT NOT NULL DEFAULT '', content_type TEXT NOT NULL DEFAULT '', size INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL);
 `
+
+// Migraciones aditivas (Fase 2) para bases creadas en la Fase 1 — ya hay
+// datos demo en producción sobre D1, y el esquema nuevo solo suma:
+// tablas nuevas (arriba) y columnas nuevas (abajo). Los ALTER corren en
+// try/catch: si la columna ya existe, SQLite/D1 lanzan "duplicate column"
+// y se ignora. Idempotente y seguro en ambos motores.
+const MIGRATIONS = [
+  `ALTER TABLE users ADD COLUMN avatar_url TEXT NOT NULL DEFAULT ''`,
+  `ALTER TABLE lessons ADD COLUMN content TEXT NOT NULL DEFAULT ''`,
+  `ALTER TABLE library_items ADD COLUMN file_key TEXT NOT NULL DEFAULT ''`,
+  `ALTER TABLE library_items ADD COLUMN file_name TEXT NOT NULL DEFAULT ''`,
+]
+
+async function runMigrations(db: AsyncDb): Promise<void> {
+  for (const sql of MIGRATIONS) {
+    try { await db.prepare(sql).run() }
+    catch { /* la columna ya existe: nada que hacer */ }
+  }
+}
 
 function splitSql(sql: string): string[] {
   return sql.split(/;\s*\n/).map(s => s.trim()).filter(Boolean)
@@ -83,8 +107,10 @@ function splitSql(sql: string): string[] {
 async function initDb(db: AsyncDb): Promise<void> {
   // CREATE TABLE/INDEX IF NOT EXISTS: idempotente en SQLite y en D1.
   for (const stmt of splitSql(CREATE_SQL)) await db.prepare(stmt).run()
-  const { seedIfEmpty } = await import('./seed')
+  await runMigrations(db)
+  const { seedIfEmpty, backfillLessonContent } = await import('./seed')
   await seedIfEmpty(db)
+  await backfillLessonContent(db)
 }
 
 // --- Adaptador D1 ---

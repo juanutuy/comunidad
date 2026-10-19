@@ -5,6 +5,27 @@
 import { hashPassword } from './auth'
 import type { AsyncDb } from './db'
 
+export const LESSON_CONTENTS: Record<string, string> = {
+  'Qué hace que una comunidad funcione': 'Una comunidad no funciona por la plataforma: funciona porque la gente vuelve. Y la gente vuelve por tres cosas: sentirse vista, aprender algo útil y conocer a otras personas como ella.\n\nEn esta lección revisamos ejemplos reales de comunidades que crecieron sin publicidad y detectamos el patrón común: rituales semanales simples, respuestas rápidas a cada nuevo miembro y un espacio claro para compartir logros.\n\nEjercicio: escribí en una frase qué obtiene alguien que participa activamente durante un mes en tu comunidad. Esa frase va a guiar todo lo demás.',
+  'Definí tu promesa y tu audiencia': 'La promesa es el resultado concreto que tu comunidad ayuda a lograr: no "un espacio para emprendedores", sino "salir con tu primer cliente en 90 días". Cuanto más específica, mejor filtra y mejor retiene.\n\nTu audiencia inicial debería ser un grupo pequeño y reconocible: las primeras 50 personas definen la cultura. Hablales en su idioma, con sus problemas reales, y evitá mezclar públicos que no se hablan entre sí.\n\nAl terminar, completá esta plantilla: "Ayudo a [audiencia] a lograr [resultado] mediante [método o dinámica de la comunidad]".',
+  'Canales y reglas claras desde el día uno': 'Menos canales, mejor comunidad: empezá con tres a cinco espacios con propósito evidente (presentaciones, dudas, logros y un canal social). Cada canal nuevo se crea cuando el contenido ya existe y no encuentra lugar, nunca antes.\n\nLas reglas deben ser cortas, positivas y visibles: qué se celebra, qué se mueve a otro canal y qué se elimina. Publicalas dentro de la comunidad y enlazalas en el mensaje de bienvenida.\n\nChecklist de lanzamiento: canal de presentaciones con una pregunta rompehielos, reglas fijadas, primer evento agendado y tres publicaciones semilla tuyas.',
+  'Tu plan de contenido de 90 días': 'Noventa días es el horizonte mínimo para que una comunidad despegue: tiempo suficiente para crear hábito sin quemarte. El plan combina cuatro tipos de contenido en rotación: enseñar (tutoriales cortos), conversar (preguntas abiertas), celebrar (logros de miembros) y reunir (eventos en vivo).\n\nArmá una grilla semanal repetible — por ejemplo: lunes de pregunta, miércoles de recurso, viernes de logros — y prepará el contenido en bloques de dos horas.\n\nRegla de oro: tu contenido siembra, pero la meta es que en el día 90 la mitad de las publicaciones nazcan de los miembros. Medilo cada mes.',
+  'El gancho de los primeros 3 segundos': 'Nadie decide ver tu video por el tema: decide por la primera frase. Un buen gancho promete un resultado, abre una pregunta o contradice una creencia común: "Estás editando tus videos al revés y por eso nadie los termina".\n\nEscribí el gancho antes que el resto del guion y grabalo en dos versiones. Si el gancho no te genera curiosidad a vos, no va a generársela a nadie.\n\nPráctica: tomá tu último video y reescribí solo los primeros 3 segundos con estas tres fórmulas. Grabá la versión nueva y compará la retención.',
+  'Luz y sonido con lo que ya tenés': 'La gente perdona una imagen regular; no perdona un audio malo. Acercate al micrófono del teléfono o de los auriculares, grabá en el cuarto con más muebles y cortinas de tu casa, y apagá ventiladores y notificaciones.\n\nPara la luz: enfrentá una ventana o una lámpara suave, nunca la tengas detrás. Si grabás de noche, una lámpara con pantalla frente a vos, levemente elevada, alcanza.\n\nAntes de grabar en serio, hacé una toma de prueba de 15 segundos y escuchala con auriculares. Ese hábito simple evita el 90% de los videos que hay que repetir.',
+  'Cortes que mantienen la atención': 'Editar video corto es, sobre todo, sacar: silencios mayores a medio segundo, muletillas y cualquier frase que no agregue información o emoción. Cada corte debe ganarse su lugar.\n\nTrabajá en dos pasadas: primero la estructura (que la historia se entienda sin mirar la pantalla) y después el ritmo (acercamientos, textos en pantalla y cambios de plano cada pocos segundos).\n\nCerrá siempre con una sola llamada a la acción: comentar una palabra, guardar el video o seguirte para la parte dos. Una sola.',
+  'Títulos y portadas que invitan a ver': 'El título no resume el video: vende el clic. Prometé un resultado específico o una tensión concreta, en menos de ocho palabras: "3 errores que matan tu primer video" funciona mejor que "Consejos de grabación".\n\nLa portada se lee en un segundo: un rostro con expresión clara, tres palabras grandes como máximo y contraste fuerte. Evitá repetir el título entero en la portada: se complementan, no se duplican.\n\nPublicá, medí el porcentaje de clics a las 48 horas y ajustá un solo elemento por vez. Así aprendés qué mueve la aguja en TU audiencia.',
+}
+
+// Backfill idempotente (Fase 2): las bases creadas en la Fase 1 ya tienen
+// las lecciones semilla pero sin contenido (columna nueva). Si una
+// lección con el título de la semilla sigue con contenido vacío, se le
+// carga el texto. No toca lecciones con contenido propio ni otros títulos.
+export async function backfillLessonContent(db: AsyncDb) {
+  for (const [title, content] of Object.entries(LESSON_CONTENTS)) {
+    await db.prepare("UPDATE lessons SET content = ? WHERE title = ? AND content = ''").run(content, title)
+  }
+}
+
 export async function seedIfEmpty(db: AsyncDb) {
   const count = await db.prepare('SELECT COUNT(*) AS n FROM tenants').get() as { n: number }
   if (count.n > 0) return
@@ -111,11 +132,19 @@ export async function seedIfEmpty(db: AsyncDb) {
   const mkChapter = async (courseId: number, title: string, sort: number) =>
     insert('INSERT INTO chapters (tenant_id, course_id, title, sort) VALUES (?, ?, ?, ?)', tenantId, courseId, title, sort)
   const mkLesson = async (chapterId: number, title: string, mins: number, free: number, sort: number) =>
-    run('INSERT INTO lessons (tenant_id, chapter_id, title, duration_min, is_free, sort) VALUES (?, ?, ?, ?, ?, ?)', tenantId, chapterId, title, mins, free, sort)
-  const ch1 = await mkChapter(c1, 'Fundamentos', 1); await mkLesson(ch1, 'Qué hace que una comunidad funcione', 9, 1, 1); await mkLesson(ch1, 'Definí tu promesa y tu audiencia', 12, 0, 2)
-  const ch2 = await mkChapter(c1, 'Puesta en marcha', 2); await mkLesson(ch2, 'Canales y reglas claras desde el día uno', 14, 0, 1); await mkLesson(ch2, 'Tu plan de contenido de 90 días', 18, 0, 2)
-  const ch3 = await mkChapter(c2, 'Guion y grabación', 1); await mkLesson(ch3, 'El gancho de los primeros 3 segundos', 8, 1, 1); await mkLesson(ch3, 'Luz y sonido con lo que ya tenés', 11, 0, 2)
-  const ch4 = await mkChapter(c2, 'Edición y publicación', 2); await mkLesson(ch4, 'Cortes que mantienen la atención', 15, 0, 1); await mkLesson(ch4, 'Títulos y portadas que invitan a ver', 10, 0, 2)
+    run('INSERT INTO lessons (tenant_id, chapter_id, title, duration_min, is_free, sort, content) VALUES (?, ?, ?, ?, ?, ?, ?)', tenantId, chapterId, title, mins, free, sort, LESSON_CONTENTS[title] || '')
+  const ch1 = await mkChapter(c1, 'Fundamentos', 1)
+  await mkLesson(ch1, 'Qué hace que una comunidad funcione', 9, 1, 1)
+  await mkLesson(ch1, 'Definí tu promesa y tu audiencia', 12, 0, 2)
+  const ch2 = await mkChapter(c1, 'Puesta en marcha', 2)
+  await mkLesson(ch2, 'Canales y reglas claras desde el día uno', 14, 0, 1)
+  await mkLesson(ch2, 'Tu plan de contenido de 90 días', 18, 0, 2)
+  const ch3 = await mkChapter(c2, 'Guion y grabación', 1)
+  await mkLesson(ch3, 'El gancho de los primeros 3 segundos', 8, 1, 1)
+  await mkLesson(ch3, 'Luz y sonido con lo que ya tenés', 11, 0, 2)
+  const ch4 = await mkChapter(c2, 'Edición y publicación', 2)
+  await mkLesson(ch4, 'Cortes que mantienen la atención', 15, 0, 1)
+  await mkLesson(ch4, 'Títulos y portadas que invitan a ver', 10, 0, 2)
 
   // Eventos futuros
   const mkEvent = async (slug: string, title: string, description: string, start: string, end: string, location: string, category: string, hostId: number) =>
