@@ -8,6 +8,9 @@ const route = useRoute()
 // contador de avisos compartido entre la campana y la barra inferior.
 const { openPanel, closePanel } = useMobilePanel()
 const { refresh: refreshNotif } = useNotifBadge()
+// Corrección: la búsqueda de la barra es SOLO el icono de lupa que
+// abre el diálogo (Cmd+K), como en la referencia — sin caja pegada.
+const { openSearch } = useSearchDialog()
 
 const { data: channelData, refresh: refreshChannels } = await useAsyncData('layout-channels', () =>
   api<{ groups: { id: number, name: string, channels: { id: number, slug: string, name: string, icon: string, type: string, priceCents: number, following: boolean }[] }[] }>('/api/channels'))
@@ -64,13 +67,7 @@ const userMenuItems = computed(() => [
   [{ label: 'Cerrar sesión', icon: 'i-lucide-log-out', onSelect: doLogout }],
 ])
 
-const searchQuery = ref('')
-function doSearch() {
-  const q = searchQuery.value.trim()
-  if (q.length >= 2) router.push({ path: '/search', query: { q } })
-}
-
-// Fase 9: el perfil usa todo el ancho con sus tres zonas propias (como
+{}// Fase 9: el perfil usa todo el ancho con sus tres zonas propias (como
 // la referencia): en /profile/* no se renderiza el riel derecho global.
 const isProfilePage = computed(() => route.path.startsWith('/profile/'))
 </script>
@@ -96,10 +93,7 @@ const isProfilePage = computed(() => route.path.startsWith('/profile/'))
           </NuxtLink>
         </nav>
         <span class="flex-1" />
-        <form class="hidden md:block" @submit.prevent="doSearch">
-          <UInput v-model="searchQuery" placeholder="Buscar en la comunidad…" icon="i-lucide-search" size="sm" class="w-52" />
-        </form>
-        <UButton to="/search" color="neutral" variant="ghost" icon="i-lucide-search" class="md:hidden" aria-label="Buscar" />
+        <UButton color="neutral" variant="ghost" icon="i-lucide-search" aria-label="Buscar (Ctrl+K)" @click="openSearch" />
         <span v-if="user" class="relative hidden sm:inline-flex">
           <UButton to="/messages" color="neutral" variant="ghost" icon="i-lucide-message-circle" aria-label="Mensajes" />
           <span v-if="dmUnread" class="pointer-events-none absolute -top-0.5 -right-0.5 flex h-4.5 min-w-4.5 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">{{ dmUnread }}</span>
@@ -232,5 +226,6 @@ const isProfilePage = computed(() => route.path.startsWith('/profile/'))
 
     <MobilePanel :dm-unread="dmUnread" :groups="channelData?.groups || []" @logout="doLogout" />
     <MobileBottomBar v-if="user" :dm-unread="dmUnread" />
+    <SearchDialog />
   </div>
 </template>

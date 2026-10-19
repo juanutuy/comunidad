@@ -1,4 +1,8 @@
 <script setup lang="ts">
+// Landing del curso. Vive en [slug]/index.vue A PROPÓSITO: si fuera
+// [slug].vue, Nuxt la trataría como componente padre de lessons/ y
+// certificate/ y, sin <NuxtPage />, esas rutas hijas nunca se verían
+// (bug corregido: el visor de lecciones mostraba esta landing).
 const route = useRoute()
 const slug = computed(() => String(route.params.slug))
 const api = useApi()

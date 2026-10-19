@@ -834,6 +834,30 @@ estudio sin perder datos (certificado sigue encendido en ellos);
 `scripts/test-realtime.mjs` en PASS. Datos de prueba solo en
 `.wrangler` local (limpiado al terminar).
 
+## Correcciones post-Fase 8 (hechas)
+
+- **El visor de lecciones y el estudio no renderizaban (rutas
+  anidadas).** Causa raíz: en Nuxt, un archivo `X.vue` que convive con
+  un directorio hermano `X/` se convierte en el componente PADRE de
+  las rutas hijas; sin `<NuxtPage />` adentro, las hijas nunca se
+  muestran y todo cae en el padre. Pasaba dos veces:
+  `courses/[slug].vue` tapaba `lessons/[id]` y `certificate` (el
+  visor servía la landing del curso) y `admin/courses.vue` tapaba
+  `admin/courses/[id]/edit` (el estudio servía el catálogo; el 200 de
+  la verificación anterior no alcanzó para detectarlo: hay que mirar
+  el CONTENIDO servido, no solo el estado). Arreglo: las landings
+  viven como `index.vue` dentro del directorio (`courses/[slug]/index.vue`,
+  `admin/courses/index.vue`) y las hijas quedan como rutas hermanas.
+  Regla para no repetirlo: nunca un `X.vue` junto a un directorio `X/`
+  salvo que el padre renderice `<NuxtPage />` a propósito.
+- **Buscador de la barra superior: solo el icono.** La caja de texto
+  permanente («Buscar en la comunidad…») se pegaba a las pastillas de
+  navegación; como en la referencia, ahora es un botón de lupa que
+  abre un diálogo de búsqueda (`SearchDialog.vue`, también con
+  **Ctrl+K / Cmd+K**) con resultados en vivo de la misma
+  `/api/search` (candados y anonimización intactos, aplicados por el
+  servidor) y enlace a «ver todos los resultados» en `/search`.
+
 ## Pendiente a propósito (fuera de esta fase)
 
 - Migraciones versionadas con `drizzle-kit` para D1 (hoy: esquema

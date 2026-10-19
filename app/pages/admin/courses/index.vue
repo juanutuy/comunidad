@@ -1,5 +1,8 @@
 <script setup lang="ts">
-// Catálogo de cursos del admin (Fase 8). La edición vive en la
+// Catálogo de cursos del admin (Fase 8). Vive en courses/index.vue
+// A PROPÓSITO: como courses.vue sería el padre de [id]/edit y, sin
+// <NuxtPage />, taparía la página-estudio (mismo bug que el visor).
+// La edición vive en la
 // página-estudio (/admin/courses/[id]/edit): currículum por
 // arrastre, drip, inscritos y settings con autoguardado. Acá solo se
 // crea (nace en borrador y se abre el estudio), se entra y se borra.
