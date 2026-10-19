@@ -958,6 +958,46 @@ estudio sin perder datos (certificado sigue encendido en ellos);
   sesión. El panel móvil conserva igualmente su único «Panel de
   administración» y el enlace del lateral de miembro (Enlaces) se
   queda: son entradas únicas, no duplicaciones.
+
+## Fase 13 (hecha) — el Panel como el Dashboard de la referencia
+
+- **Selector de período** arriba del Panel (7 días / 30 días / 90 días
+  / 12 meses; estado en la URL, `?range=`; por defecto 30). Afecta al
+  bloque «En este período», a las gráficas, a los canales más activos
+  y a los principales contribuidores. Los totales y la cola de
+  atención no dependen del período.
+- **«De un vistazo»**: las tarjetas de totales de siempre, ahora con su
+  nota («Lo que la comunidad contiene ahora — no depende del período
+  seleccionado»).
+- **«En este período»**: miembros nuevos, publicaciones, comentarios e
+  ingresos (pagos con estado pagado dentro de la ventana) del rango
+  elegido, con su etiqueta («Los 30 días que elegiste», «Los 12 meses
+  que elegiste»).
+- **Atención, tercer ítem**: «publicaciones sin respuesta» con el
+  conteo total de posts publicados con cero comentarios y, dentro del
+  mismo bloque, la lista corta (máx. 5, las más recientes) con título,
+  autor, canal y antigüedad, cada una enlazando a su post.
+- **Gráficas propias** (`app/components/AdminSeriesChart.vue`, SVG
+  inline, sin librerías): **Miembros nuevos** (serie temporal de
+  altas), **Publicaciones y comentarios** (dos series con leyenda),
+  **Canales más activos** (barras con publicaciones + comentarios del
+  período por canal) y **Principales contribuidores** (puntos ganados
+  en el período según `point_events`, con el nivel actual de cada
+  uno). Todo sale de la base real; sin datos se muestra el estado
+  vacío, nunca una serie inventada.
+- **API**: `GET /api/admin/stats?range=7|30|90|365` (otro valor cae a
+  30) devuelve además `period`, `series`, `busiestChannels`,
+  `topContributors`, `unanswered` {count, items} y `generatedAt`,
+  conservando los campos anteriores. La ventana del período empieza
+  al inicio del primer bucket para que las sumas de las series
+  coincidan con los conteos del período. Regla de buckets: 7/30 días
+  → un bucket por día; 90 días → 13 buckets de 7 días; 12 meses → los
+  últimos 12 meses calendario, un bucket por mes.
+- Pie del Panel: «Datos al {fecha y hora} · se actualizan al abrir
+  esta página.»
+- **Diferencia documentada**: el rango personalizado con calendario
+  de la referencia queda **fuera**; los cuatro presets cubren el uso
+  real del Panel.
 - **Un solo editor de perfil** (corrección posterior, detectada por
   el dueño): el perfil tenía dos editores de los mismos datos — la
   sección «Perfil» de este modal de Ajustes y los modales propios de
