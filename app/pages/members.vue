@@ -24,10 +24,14 @@ const roleTabs = [
   { label: 'Administradores', value: 'admin' },
   { label: 'Miembros', value: 'member' },
 ]
-const { data, refresh } = await useAsyncData('members-directory', () =>
-  user.value
-    ? api<{ members: DirectoryMember[], total: number }>('/api/members/directory', { query: { q: q.value, role: role.value } })
-    : Promise.resolve({ members: [] as DirectoryMember[], total: 0 }))
+// Fase 15: el directorio puede abrirse a visitantes (modo público +
+// audiencia «todos») o cerrarse del todo («desactivado» / «solo
+// pagos»): la página pide siempre y muestra el motivo del servidor
+// cuando no hay acceso, en vez de asumir que falta la sesión.
+interface DirectoryData { members: DirectoryMember[], total: number, error?: string }
+const { data, refresh } = await useAsyncData('members-directory', (): Promise<DirectoryData> =>
+  api<DirectoryData>('/api/members/directory', { query: { q: q.value, role: role.value } })
+    .catch((e: { data?: { message?: string } }) => ({ members: [] as DirectoryMember[], total: 0, error: e?.data?.message || 'No se pudo cargar el directorio.' })))
 
 let debounce: ReturnType<typeof setTimeout> | null = null
 watch(q, () => {
@@ -43,7 +47,12 @@ watch(role, () => refresh())
       <h1 class="text-2xl font-bold">Miembros</h1>
       <p class="text-muted">Conocé a las personas de la comunidad y empezá una conversación.</p>
     </div>
-    <UAlert v-if="!user" color="neutral" variant="soft" title="Iniciá sesión para ver el directorio de miembros" />
+    <UAlert v-if="data?.error" color="neutral" variant="soft" icon="i-lucide-lock" :title="data.error">
+      <template v-if="!user" #actions>
+        <UButton to="/login" size="sm" color="neutral" label="Iniciar sesión" />
+        <UButton to="/register" size="sm" label="Unirse" />
+      </template>
+    </UAlert>
     <template v-else>
       <div class="flex flex-wrap items-center gap-3">
         <UInput v-model="q" placeholder="Buscar por nombre…" icon="i-lucide-search" class="w-64" />

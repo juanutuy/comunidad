@@ -18,18 +18,60 @@ const { data: channelData, refresh: refreshChannels } = await useAsyncData('layo
   api<{ groups: { id: number, name: string, channels: { id: number, slug: string, name: string, icon: string, type: string, priceCents: number, following: boolean }[] }[] }>('/api/channels'))
 
 // Fase 7: navegación principal en pastillas, centrada en la barra
-// superior (Inicio / Cursos / Eventos / Miembros / Ranking). Fase 10:
-// las pastillas solo viven en escritorio amplio (xl); en tableta la
-// navegación está en el lateral fijo y en teléfono en el panel
-// deslizable + la barra inferior (la fila deslizable de la Fase 7
-// desaparece).
-const mainNav = [
-  { label: 'Inicio', to: '/feeds' },
-  { label: 'Cursos', to: '/courses' },
-  { label: 'Eventos', to: '/events' },
-  { label: 'Miembros', to: '/members' },
-  { label: 'Ranking', to: '/leaderboard' },
+// superior. Fase 10: las pastillas solo viven en escritorio amplio
+// (xl); en tableta la navegación está en el lateral fijo y en
+// teléfono en el panel deslizable + la barra inferior.
+// Fase 15: el menú es configurable por el administrador (Ajustes →
+// Menú de navegación): orden, etiquetas, visibilidad y enlaces
+// personalizados llegan resueltos en tenant.navMenu, separados por
+// zona ('header' = pastillas, 'sidebar' = lateral y panel móvil).
+// Sin config (tenants anteriores) se usa la navegación de siempre.
+const FALLBACK_NAV: { id: string, label: string, url: string, visible: boolean, custom: boolean, zone: 'header' | 'sidebar' }[] = [
+  { id: 'inicio', label: 'Inicio', url: '/feeds', visible: true, custom: false, zone: 'header' },
+  { id: 'cursos', label: 'Cursos', url: '/courses', visible: true, custom: false, zone: 'header' },
+  { id: 'eventos', label: 'Eventos', url: '/events', visible: true, custom: false, zone: 'header' },
+  { id: 'miembros', label: 'Miembros', url: '/members', visible: true, custom: false, zone: 'header' },
+  { id: 'ranking', label: 'Ranking', url: '/leaderboard', visible: true, custom: false, zone: 'header' },
+  { id: 'videos', label: 'Videos', url: '/videos', visible: true, custom: false, zone: 'sidebar' },
+  { id: 'biblioteca', label: 'Biblioteca', url: '/library', visible: true, custom: false, zone: 'sidebar' },
+  { id: 'precios', label: 'Precios', url: '/pricing', visible: true, custom: false, zone: 'sidebar' },
+  { id: 'reglas', label: 'Reglas', url: '/guidelines', visible: true, custom: false, zone: 'sidebar' },
+  { id: 'terminos', label: 'Términos', url: '/terms', visible: true, custom: false, zone: 'sidebar' },
+  { id: 'privacidad', label: 'Privacidad', url: '/privacy', visible: true, custom: false, zone: 'sidebar' },
 ]
+const navItems = computed(() => tenant.value?.navMenu?.length ? tenant.value.navMenu : FALLBACK_NAV)
+const headerNav = computed(() => navItems.value.filter(i => i.zone === 'header' && i.visible))
+const sidebarNav = computed(() => navItems.value.filter(i => i.zone === 'sidebar' && i.visible))
+const NAV_ICONS: Record<string, string> = {
+  inicio: 'i-lucide-home', cursos: 'i-lucide-graduation-cap', eventos: 'i-lucide-calendar-days',
+  miembros: 'i-lucide-users', ranking: 'i-lucide-trophy', videos: 'i-lucide-play-square',
+  biblioteca: 'i-lucide-library', precios: 'i-lucide-tag', reglas: 'i-lucide-scroll-text',
+  terminos: 'i-lucide-file-text', privacidad: 'i-lucide-shield',
+}
+function navIcon(id: string) { return NAV_ICONS[id] || 'i-lucide-link' }
+function isExternal(url: string) { return /^https?:\/\//i.test(url) }
+
+// Fase 15: marca del tenant — el logo sigue el tema activo del
+// usuario (claro/oscuro) con respaldo en cascada: logo del tema →
+// icono → inicial + nombre, como en la referencia.
+const colorMode = useColorMode()
+const logoSrc = computed(() => {
+  const t = tenant.value
+  if (!t) return ''
+  return (colorMode.value === 'dark' ? (t.logoDarkUrl || t.logoUrl) : (t.logoUrl || t.logoDarkUrl)) || t.iconUrl || ''
+})
+// Fase 15: favicon propio del tenant cuando el admin lo configuró.
+useHead(() => ({
+  title: tenant.value?.name || 'Comunidad',
+  link: tenant.value?.faviconUrl ? [{ rel: 'icon', href: tenant.value.faviconUrl }] : [],
+}))
+
+// Fase 15: bloque de contacto al pie del lateral, solo si hay datos.
+const SOCIAL_ICONS: Record<string, string> = {
+  Facebook: 'i-lucide-facebook', X: 'i-lucide-twitter', Instagram: 'i-lucide-instagram',
+  LinkedIn: 'i-lucide-linkedin', YouTube: 'i-lucide-youtube', TikTok: 'i-lucide-music-2', Discord: 'i-lucide-messages-square',
+}
+const hasContact = computed(() => !!(tenant.value?.supportEmail || tenant.value?.websiteUrl || tenant.value?.socialLinks?.length))
 
 // Badge de mensajes sin leer en el icono de la barra: suma de los
 // no leídos por conversación (mismo dato que usa /messages).
@@ -76,19 +118,30 @@ const isProfilePage = computed(() => route.path.startsWith('/profile/'))
       <div class="relative mx-auto flex h-14 max-w-[1400px] items-center gap-3 px-4">
         <UButton class="md:hidden" color="neutral" variant="ghost" icon="i-lucide-menu" aria-label="Abrir el menú" @click="openPanel" />
         <NuxtLink to="/feeds" class="flex shrink-0 items-center gap-2">
-          <span class="flex h-8 w-8 items-center justify-center rounded-lg font-bold text-white" :style="{ backgroundColor: tenant?.brandColor || '#2563eb' }">
-            {{ (tenant?.name || 'C').charAt(0) }}
-          </span>
-          <span class="hidden font-bold sm:block">{{ tenant?.name || 'Comunidad' }}</span>
+          <img v-if="logoSrc" :src="logoSrc" :alt="tenant?.name || 'Comunidad'" class="h-8 max-w-44 object-contain">
+          <template v-else>
+            <span class="flex h-8 w-8 items-center justify-center rounded-lg font-bold text-white" :style="{ backgroundColor: tenant?.brandColor || '#2563eb' }">
+              {{ (tenant?.name || 'C').charAt(0) }}
+            </span>
+            <span class="hidden font-bold sm:block">{{ tenant?.name || 'Comunidad' }}</span>
+          </template>
         </NuxtLink>
         <nav class="absolute left-1/2 hidden -translate-x-1/2 items-center gap-1 xl:flex">
-          <NuxtLink
-            v-for="item in mainNav" :key="item.to" :to="item.to"
-            class="rounded-full px-3.5 py-1.5 text-sm font-medium whitespace-nowrap text-muted transition hover:bg-elevated hover:text-highlighted"
-            active-class="bg-elevated font-semibold text-highlighted"
-          >
-            {{ item.label }}
-          </NuxtLink>
+          <template v-for="item in headerNav" :key="item.id">
+            <a
+              v-if="isExternal(item.url)" :href="item.url" target="_blank" rel="noopener"
+              class="rounded-full px-3.5 py-1.5 text-sm font-medium whitespace-nowrap text-muted transition hover:bg-elevated hover:text-highlighted"
+            >
+              {{ item.label }}
+            </a>
+            <NuxtLink
+              v-else :to="item.url"
+              class="rounded-full px-3.5 py-1.5 text-sm font-medium whitespace-nowrap text-muted transition hover:bg-elevated hover:text-highlighted"
+              active-class="bg-elevated font-semibold text-highlighted"
+            >
+              {{ item.label }}
+            </NuxtLink>
+          </template>
         </nav>
         <span class="flex-1" />
         <UButton color="neutral" variant="ghost" icon="i-lucide-search" aria-label="Buscar (Ctrl+K)" @click="openSearch" />
@@ -129,14 +182,15 @@ const isProfilePage = computed(() => route.path.startsWith('/profile/'))
       <aside class="hidden space-y-5 md:block">
         <div>
           <ul class="space-y-0.5">
-            <li>
-              <NuxtLink to="/videos" class="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-elevated" active-class="bg-elevated font-semibold">
-                <UIcon name="i-lucide-play-square" class="shrink-0" /> Videos
-              </NuxtLink>
-            </li>
-            <li>
-              <NuxtLink to="/library" class="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-elevated" active-class="bg-elevated font-semibold">
-                <UIcon name="i-lucide-library" class="shrink-0" /> Biblioteca
+            <li v-for="item in sidebarNav" :key="item.id">
+              <a
+                v-if="isExternal(item.url)" :href="item.url" target="_blank" rel="noopener"
+                class="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-elevated"
+              >
+                <UIcon :name="navIcon(item.id)" class="shrink-0" /> {{ item.label }}
+              </a>
+              <NuxtLink v-else :to="item.url" class="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-elevated" active-class="bg-elevated font-semibold">
+                <UIcon :name="navIcon(item.id)" class="shrink-0" /> {{ item.label }}
               </NuxtLink>
             </li>
           </ul>
@@ -161,37 +215,42 @@ const isProfilePage = computed(() => route.path.startsWith('/profile/'))
             </ul>
           </div>
         </div>
-        <div class="border-t border-default pt-4">
-          <h3 class="mb-1.5 px-2 text-xs font-bold tracking-wider text-muted uppercase">
-            Enlaces
-          </h3>
+        <div v-if="user && ['admin', 'moderator', 'course_manager'].includes(user.role || '')" class="border-t border-default pt-4">
           <ul class="space-y-0.5 text-sm">
             <li>
-              <NuxtLink to="/pricing" class="flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-elevated" active-class="bg-elevated font-semibold">
-                <UIcon name="i-lucide-tag" class="shrink-0" /> Precios
-              </NuxtLink>
-            </li>
-            <li>
-              <NuxtLink to="/guidelines" class="flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-elevated" active-class="bg-elevated font-semibold">
-                <UIcon name="i-lucide-scroll-text" class="shrink-0" /> Reglas
-              </NuxtLink>
-            </li>
-            <li>
-              <NuxtLink to="/terms" class="flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-elevated" active-class="bg-elevated font-semibold">
-                <UIcon name="i-lucide-file-text" class="shrink-0" /> Términos
-              </NuxtLink>
-            </li>
-            <li>
-              <NuxtLink to="/privacy" class="flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-elevated" active-class="bg-elevated font-semibold">
-                <UIcon name="i-lucide-shield" class="shrink-0" /> Privacidad
-              </NuxtLink>
-            </li>
-            <li v-if="user && ['admin', 'moderator', 'course_manager'].includes(user.role || '')">
               <NuxtLink to="/admin" class="flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-elevated" active-class="bg-elevated font-semibold">
                 <UIcon name="i-lucide-settings" class="shrink-0" /> Panel de administración
               </NuxtLink>
             </li>
           </ul>
+        </div>
+        <!-- Fase 15: bloque de contacto, solo si el administrador cargó
+             al menos un dato en Ajustes → Contacto. -->
+        <div v-if="hasContact" class="border-t border-default pt-4">
+          <h3 class="mb-1.5 px-2 text-xs font-bold tracking-wider text-muted uppercase">
+            Contacto
+          </h3>
+          <ul class="space-y-0.5 text-sm">
+            <li v-if="tenant?.supportEmail">
+              <a :href="`mailto:${tenant.supportEmail}`" class="flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-elevated">
+                <UIcon name="i-lucide-mail" class="shrink-0" /> <span class="min-w-0 truncate">{{ tenant.supportEmail }}</span>
+              </a>
+            </li>
+            <li v-if="tenant?.websiteUrl">
+              <a :href="tenant.websiteUrl" target="_blank" rel="noopener" class="flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-elevated">
+                <UIcon name="i-lucide-globe" class="shrink-0" /> Sitio web
+              </a>
+            </li>
+          </ul>
+          <div v-if="tenant?.socialLinks?.length" class="mt-2 flex flex-wrap gap-1 px-2">
+            <a
+              v-for="s in tenant.socialLinks" :key="s.platform + s.url" :href="s.url" target="_blank" rel="noopener"
+              :title="s.platform" :aria-label="s.platform"
+              class="flex h-8 w-8 items-center justify-center rounded-md hover:bg-elevated"
+            >
+              <UIcon :name="SOCIAL_ICONS[s.platform] || 'i-lucide-link'" />
+            </a>
+          </div>
         </div>
         <UCard v-if="!user" class="text-sm">
           <p class="font-semibold">Sumate a la conversación</p>

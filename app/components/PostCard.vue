@@ -10,6 +10,10 @@ export interface PostView {
   bodyHtml?: string
   teaser: string
   locked: boolean
+  // Fase 15: leer no es participar (anticipo completo) y conteo de
+  // adjuntos sin entregar el archivo (null = ni el conteo sale).
+  canInteract?: boolean
+  mediaCount?: number | null
   mediaType: string
   mediaUrl: string
   attachmentName?: string
@@ -217,8 +221,14 @@ async function deletePost() {
         </h1>
 
         <div v-if="post.locked" class="mt-3 rounded-lg border border-dashed border-default p-4">
-          <p class="text-sm text-muted">
+          <!-- Fase 15: con el anticipo en modo «solo título» no llega
+               ni una línea del cuerpo: el párrafo no se pinta. -->
+          <p v-if="post.teaser" class="text-sm text-muted">
             {{ post.teaser }}
+          </p>
+          <p v-if="post.mediaCount" class="mt-2 flex items-center gap-1.5 text-xs text-muted">
+            <UIcon name="i-lucide-paperclip" />
+            {{ post.mediaCount }} archivo{{ post.mediaCount === 1 ? '' : 's' }} adjunto{{ post.mediaCount === 1 ? '' : 's' }} en la publicación completa
           </p>
           <div class="mt-3 flex items-center gap-2 text-sm font-medium">
             <UIcon name="i-lucide-lock" />

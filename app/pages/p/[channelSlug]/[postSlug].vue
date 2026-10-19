@@ -12,7 +12,7 @@ const toast = useToast()
 interface CommentView { id: number, body: string, createdAt: string, author: { name: string, slug: string, avatarUrl?: string } }
 const { data, refresh } = await useAsyncData(
   () => `post-${channelSlug.value}-${postSlug.value}`,
-  () => api<{ post: PostView, comments: CommentView[] }>('/api/post', { query: { channel: channelSlug.value, post: postSlug.value } }),
+  () => api<{ post: PostView, comments: CommentView[], commentsWithheld?: boolean }>('/api/post', { query: { channel: channelSlug.value, post: postSlug.value } }),
   { watch: [channelSlug, postSlug] },
 )
 
@@ -76,9 +76,17 @@ function commentMenuItems(c: CommentView) {
             <p class="mt-1 whitespace-pre-line text-sm">{{ c.body }}</p>
           </div>
         </div>
-        <p v-if="!data.comments.length" class="text-sm text-muted">Todavía no hay comentarios. ¡Empezá la conversación!</p>
+        <p v-if="!data.comments.length && data.commentsWithheld" class="text-sm text-muted">Los comentarios son conversación de miembros: iniciá sesión para leerlos y participar.</p>
+        <p v-else-if="!data.comments.length" class="text-sm text-muted">Todavía no hay comentarios. ¡Empezá la conversación!</p>
       </div>
       <UAlert v-if="data.post.allowComments === false" class="mt-5" color="neutral" variant="soft" icon="i-lucide-lock" title="Los comentarios están desactivados" description="El autor desactivó los comentarios en esta publicación." />
+      <!-- Fase 15: anticipo completo = solo lectura. Se puede leer la
+           publicación entera, pero participar requiere el acceso. -->
+      <UAlert v-else-if="data.post.canInteract === false" class="mt-5" color="neutral" variant="soft" icon="i-lucide-lock" title="Estás leyendo con acceso de lectura" description="Podés leer esta publicación completa, pero comentar y reaccionar requiere acceso al canal.">
+        <template #actions>
+          <UButton :to="`/channels/${channelSlug}`" size="sm" label="Obtener acceso" />
+        </template>
+      </UAlert>
       <div v-else-if="user" class="mt-5 flex gap-2">
         <UTextarea v-model="newComment" :rows="2" placeholder="Escribí un comentario…" class="flex-1" />
         <UButton label="Comentar" icon="i-lucide-send" :loading="sending" @click="sendComment" />

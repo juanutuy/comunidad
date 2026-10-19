@@ -43,5 +43,11 @@ export default defineEventHandler(async (event) => {
         .filter(c => !blocked.has(Number(c.author_id)))
         .map(c => ({ id: c.id, body: c.body, createdAt: c.created_at, author: { name: c.author_name, slug: c.author_slug, avatarUrl: c.author_avatar || '' } }))
     : []
-  return { post: await serializePost(event, row, user?.id ?? null, readAccess, role, { canInteract: access }), comments }
+  return {
+    post: await serializePost(event, row, user?.id ?? null, readAccess, role, { canInteract: access }),
+    comments,
+    // Para que la página no diga «todavía no hay comentarios» cuando
+    // los comentarios existen pero no viajan para este lector.
+    commentsWithheld: visitorPublic,
+  }
 })

@@ -17,7 +17,10 @@ const error = ref('')
 
 const inviteToken = computed(() => String(route.query.invite || ''))
 const { data: joinInfo } = await useAsyncData('join-info', () =>
-  api<{ approval: boolean, questions: string[] }>('/api/join-info').catch(() => ({ approval: false, questions: [] as string[] })))
+  api<{ approval: boolean, questions: string[], registrationClosed?: boolean }>('/api/join-info').catch(() => ({ approval: false, questions: [] as string[], registrationClosed: false })))
+// Fase 15: registro público cerrado — sin enlace de invitación no
+// hay formulario, hay aviso. Con invitación, el registro sigue.
+const registrationClosed = computed(() => !!joinInfo.value?.registrationClosed && !inviteToken.value)
 const questions = computed(() => (inviteToken.value ? [] : (joinInfo.value?.questions || [])))
 const answers = ref<string[]>([])
 watchEffect(() => { answers.value = questions.value.map((_, i) => answers.value[i] || '') })
@@ -48,13 +51,18 @@ async function submit() {
   <UCard>
     <h1 class="text-2xl font-bold">Creá tu cuenta</h1>
     <p class="mt-1 text-sm text-muted">Es gratis y toma menos de un minuto.</p>
+    <UAlert
+      v-if="registrationClosed" class="mt-4" color="warning" variant="soft" icon="i-lucide-lock"
+      title="El registro público está cerrado"
+      description="Esta comunidad crece por invitación. Si un administrador te compartió un enlace de invitación, abrilo para crear tu cuenta; si no, pedile uno a quien te contó de la comunidad."
+    />
     <UAlert v-if="error" class="mt-4" color="error" variant="soft" :title="error" />
     <UAlert
       v-if="joinInfo?.approval && !inviteToken" class="mt-4" color="warning" variant="soft" icon="i-lucide-hourglass"
       title="Esta comunidad revisa los ingresos"
       description="Al crear tu cuenta, un administrador revisa tu solicitud antes de darte acceso. Te avisamos cuando esté aprobada."
     />
-    <form class="mt-5 space-y-4" @submit.prevent="submit">
+    <form v-if="!registrationClosed" class="mt-5 space-y-4" @submit.prevent="submit">
       <UFormField label="Nombre">
         <UInput v-model="form.name" required placeholder="Tu nombre" class="w-full" />
       </UFormField>

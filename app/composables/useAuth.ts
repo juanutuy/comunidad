@@ -11,6 +11,9 @@ export interface SessionUser {
   role: string | null
 }
 
+export interface NavItemInfo { id: string, label: string, url: string, visible: boolean, custom: boolean, zone: 'header' | 'sidebar' }
+export interface SocialLinkInfo { platform: string, url: string }
+
 export interface TenantInfo {
   id: number
   slug: string
@@ -18,6 +21,17 @@ export interface TenantInfo {
   tagline: string
   brandColor: string
   guidelines: string[]
+  // Fase 15: visibilidad, registro, marca, contacto y menú resuelto.
+  visibility?: string
+  anyoneCanRegister?: boolean
+  logoUrl?: string
+  logoDarkUrl?: string
+  iconUrl?: string
+  faviconUrl?: string
+  supportEmail?: string
+  websiteUrl?: string
+  socialLinks?: SocialLinkInfo[]
+  navMenu?: NavItemInfo[]
 }
 
 // Fase 14: estado de una compuerta por nivel para el usuario actual

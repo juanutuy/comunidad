@@ -8,6 +8,7 @@ const { initials } = useFormat()
 const api = useApi()
 
 interface SidebarData {
+  blocks?: { key: string, audience: string }[]
   events: { slug: string, title: string, starts_at: string, host_name: string | null }[]
   recent: { slug: string, title: string, channel_slug: string }[]
   leaders: { id: number, name: string, slug: string, avatarUrl: string, points: number, level: string }[]
@@ -16,6 +17,21 @@ interface SidebarData {
 }
 const { data: sidebar } = await useAsyncData('right-rail', () =>
   api<SidebarData>('/api/sidebar').catch(() => ({ events: [], recent: [], leaders: [], online: [], members: [] }) as SidebarData))
+
+// Fase 15: orden y visibilidad salen de la config del tenant que
+// devuelve el servidor en `blocks` (ya filtrada por audiencia para el
+// visitante del modo público). Sin `blocks` (respuestas viejas) se
+// muestran todos en el orden de siempre.
+const DEFAULT_ORDER = ['upcoming_events', 'recent_posts', 'leaders', 'members', 'online_now']
+function blockOrder(key: string) {
+  const blocks = sidebar.value?.blocks
+  if (!blocks) return DEFAULT_ORDER.indexOf(key)
+  return blocks.findIndex(b => b.key === key)
+}
+function blockVisible(key: string) {
+  const blocks = sidebar.value?.blocks
+  return !blocks || blocks.some(b => b.key === key)
+}
 
 // Cuadrado de fecha del evento próximo: mes corto arriba, día grande
 // y día de semana debajo (como la referencia).
@@ -31,8 +47,8 @@ function dateParts(iso: string) {
 </script>
 
 <template>
-  <div class="space-y-5">
-    <UCard>
+  <div class="flex flex-col gap-5">
+    <UCard v-if="blockVisible('upcoming_events')" :style="{ order: blockOrder('upcoming_events') }">
       <div class="mb-3 flex items-baseline justify-between gap-2">
         <h3 class="text-xs font-bold tracking-wider text-muted uppercase">Próximos eventos</h3>
         <NuxtLink to="/events" class="text-xs font-medium text-primary hover:underline">Ver todo</NuxtLink>
@@ -56,7 +72,7 @@ function dateParts(iso: string) {
       <p v-else class="text-sm text-muted">No hay eventos próximos.</p>
     </UCard>
 
-    <UCard>
+    <UCard v-if="blockVisible('recent_posts')" :style="{ order: blockOrder('recent_posts') }">
       <div class="mb-3 flex items-baseline justify-between gap-2">
         <h3 class="text-xs font-bold tracking-wider text-muted uppercase">Publicaciones recientes</h3>
         <NuxtLink to="/feeds" class="text-xs font-medium text-primary hover:underline">Ver todo</NuxtLink>
@@ -69,7 +85,7 @@ function dateParts(iso: string) {
       <p v-else class="text-sm text-muted">Todavía no hay publicaciones.</p>
     </UCard>
 
-    <UCard>
+    <UCard v-if="blockVisible('leaders')" :style="{ order: blockOrder('leaders') }">
       <div class="mb-3 flex items-baseline justify-between gap-2">
         <h3 class="text-xs font-bold tracking-wider text-muted uppercase">Top líderes</h3>
         <NuxtLink to="/leaderboard" class="text-xs font-medium text-primary hover:underline">Ver todo</NuxtLink>
@@ -88,7 +104,7 @@ function dateParts(iso: string) {
       <p v-else class="text-sm text-muted">Todavía no hay puntajes.</p>
     </UCard>
 
-    <UCard>
+    <UCard v-if="blockVisible('members')" :style="{ order: blockOrder('members') }">
       <div class="mb-3 flex items-baseline justify-between gap-2">
         <h3 class="text-xs font-bold tracking-wider text-muted uppercase">Miembros</h3>
         <NuxtLink to="/members" class="text-xs font-medium text-primary hover:underline">Ver todo</NuxtLink>
@@ -105,7 +121,7 @@ function dateParts(iso: string) {
       <p v-else class="text-sm text-muted">Todavía no hay miembros para mostrar.</p>
     </UCard>
 
-    <UCard>
+    <UCard v-if="blockVisible('online_now')" :style="{ order: blockOrder('online_now') }">
       <div class="mb-3 flex items-baseline justify-between gap-2">
         <h3 class="text-xs font-bold tracking-wider text-muted uppercase">En línea ({{ sidebar?.online?.length || 0 }})</h3>
         <NuxtLink to="/members" class="text-xs font-medium text-primary hover:underline">Ver todo</NuxtLink>
@@ -123,6 +139,6 @@ function dateParts(iso: string) {
       </ul>
       <p v-else class="text-sm text-muted">Nadie en línea en este momento.</p>
     </UCard>
-    <p class="px-1 text-xs text-muted">{{ tenant?.tagline }}</p>
+    <p class="px-1 text-xs text-muted" :style="{ order: 99 }">{{ tenant?.tagline }}</p>
   </div>
 </template>

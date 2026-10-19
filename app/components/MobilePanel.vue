@@ -66,21 +66,42 @@ const themeOptions = [
 ] as const
 function setTheme(v: 'light' | 'dark' | 'system') { colorMode.preference = v }
 
-const mainLinks = computed(() => [
-  { label: 'Inicio', to: '/feeds', icon: 'i-lucide-home' },
-  { label: 'Cursos', to: '/courses', icon: 'i-lucide-graduation-cap' },
-  { label: 'Eventos', to: '/events', icon: 'i-lucide-calendar-days' },
-  { label: 'Miembros', to: '/members', icon: 'i-lucide-users' },
-  { label: 'Ranking', to: '/leaderboard', icon: 'i-lucide-trophy' },
-  { label: 'Videos', to: '/videos', icon: 'i-lucide-play-square' },
-  { label: 'Biblioteca', to: '/library', icon: 'i-lucide-book-open' },
-  ...(user.value
-    ? [
-        { label: 'Mensajes', to: '/messages', icon: 'i-lucide-message-circle', badge: props.dmUnread },
-        { label: 'Borradores', to: '/drafts', icon: 'i-lucide-file-edit' },
+// Fase 15: la navegación principal sale del menú configurable del
+// tenant (tenant.navMenu: primero la zona de cabecera, después la del
+// lateral), con los iconos de siempre por ítem. Sin config se usa la
+// lista histórica. Mensajes y Borradores son de la cuenta, no del
+// menú: se agregan al final cuando hay sesión.
+const PANEL_ICONS: Record<string, string> = {
+  inicio: 'i-lucide-home', cursos: 'i-lucide-graduation-cap', eventos: 'i-lucide-calendar-days',
+  miembros: 'i-lucide-users', ranking: 'i-lucide-trophy', videos: 'i-lucide-play-square',
+  biblioteca: 'i-lucide-book-open', precios: 'i-lucide-tag', reglas: 'i-lucide-scroll-text',
+  terminos: 'i-lucide-file-text', privacidad: 'i-lucide-shield',
+}
+const mainLinks = computed(() => {
+  const items = (tenant.value?.navMenu || [])
+    .filter(i => i.visible)
+    .map(i => ({ label: i.label, to: i.url, icon: PANEL_ICONS[i.id] || 'i-lucide-link', external: /^https?:\/\//i.test(i.url) }))
+  const links = items.length
+    ? items
+    : [
+        { label: 'Inicio', to: '/feeds', icon: 'i-lucide-home', external: false },
+        { label: 'Cursos', to: '/courses', icon: 'i-lucide-graduation-cap', external: false },
+        { label: 'Eventos', to: '/events', icon: 'i-lucide-calendar-days', external: false },
+        { label: 'Miembros', to: '/members', icon: 'i-lucide-users', external: false },
+        { label: 'Ranking', to: '/leaderboard', icon: 'i-lucide-trophy', external: false },
+        { label: 'Videos', to: '/videos', icon: 'i-lucide-play-square', external: false },
+        { label: 'Biblioteca', to: '/library', icon: 'i-lucide-book-open', external: false },
       ]
-    : []),
-])
+  return [
+    ...links,
+    ...(user.value
+      ? [
+          { label: 'Mensajes', to: '/messages', icon: 'i-lucide-message-circle', badge: props.dmUnread, external: false },
+          { label: 'Borradores', to: '/drafts', icon: 'i-lucide-file-edit', external: false },
+        ]
+      : []),
+  ]
+})
 </script>
 
 <template>
@@ -185,8 +206,20 @@ const mainLinks = computed(() => [
         <!-- Navegación principal -->
         <nav aria-label="Navegación principal">
           <ul class="space-y-0.5">
-            <li v-for="item in mainLinks" :key="item.to">
+            <li v-for="item in mainLinks" :key="item.label + item.to">
+              <a
+                v-if="item.external" :href="item.to" target="_blank" rel="noopener"
+                class="flex items-center gap-3 rounded-lg px-2 py-2 text-[15px] hover:bg-elevated"
+                @click="closePanel"
+              >
+                <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-elevated">
+                  <UIcon :name="item.icon" class="text-lg text-primary" />
+                </span>
+                <span class="min-w-0 flex-1 truncate">{{ item.label }}</span>
+                <UIcon name="i-lucide-chevron-right" class="shrink-0 text-muted" />
+              </a>
               <NuxtLink
+                v-else
                 :to="item.to"
                 class="flex items-center gap-3 rounded-lg px-2 py-2 text-[15px] hover:bg-elevated"
                 active-class="bg-elevated font-semibold"
@@ -242,16 +275,8 @@ const mainLinks = computed(() => [
                 <UIcon name="i-lucide-settings" class="shrink-0 text-muted" /> Panel de administración
               </NuxtLink>
             </li>
-            <li>
-              <NuxtLink to="/pricing" class="flex items-center gap-3 rounded-lg px-2 py-2 hover:bg-elevated" active-class="bg-elevated font-semibold" @click="closePanel">
-                <UIcon name="i-lucide-tag" class="shrink-0 text-muted" /> Precios
-              </NuxtLink>
-            </li>
-            <li>
-              <NuxtLink to="/guidelines" class="flex items-center gap-3 rounded-lg px-2 py-2 hover:bg-elevated" active-class="bg-elevated font-semibold" @click="closePanel">
-                <UIcon name="i-lucide-scroll-text" class="shrink-0 text-muted" /> Reglas
-              </NuxtLink>
-            </li>
+            <!-- Fase 15: Precios y Reglas ya no viven acá — salen del
+                 menú configurable en la navegación principal. -->
           </ul>
         </div>
       </div>
