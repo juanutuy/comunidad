@@ -2,13 +2,13 @@
 // Fase 8: acepta el conjunto completo del estudio (tipo y campos por
 // tipo). Sin título se crea como «Sin título», al instante, igual que
 // en la referencia («Add lesson» no pide datos antes de crearla).
-import { requireAdmin, resolveTenant } from '../../../../utils/community'
+import { requireCourseManager, resolveTenant } from '../../../../utils/community'
 import { parseLessonInput } from '../../../../utils/courseAdmin'
 import { dbFor } from '../../../../utils/db'
 
 export default defineEventHandler(async (event) => {
   const tenant = await resolveTenant(event)
-  await requireAdmin(event, tenant.id)
+  await requireCourseManager(event, tenant.id)
   const chapterId = Number(getRouterParam(event, 'id'))
   const body = await readBody<Record<string, unknown>>(event)
   const input = parseLessonInput(body)

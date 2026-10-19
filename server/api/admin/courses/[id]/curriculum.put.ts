@@ -2,7 +2,7 @@
 // manda el orden final de capítulos y de lecciones (una lección puede
 // cambiar de capítulo al arrastrarla). Se valida que todo id
 // pertenezca a ESTE curso antes de tocar nada.
-import { requireAdmin, resolveTenant } from '../../../../utils/community'
+import { requireCourseManager, resolveTenant } from '../../../../utils/community'
 import { dbFor } from '../../../../utils/db'
 
 interface Body {
@@ -12,7 +12,7 @@ interface Body {
 
 export default defineEventHandler(async (event) => {
   const tenant = await resolveTenant(event)
-  await requireAdmin(event, tenant.id)
+  await requireCourseManager(event, tenant.id)
   const courseId = Number(getRouterParam(event, 'id'))
   const body = await readBody<Body>(event)
   const db = await dbFor(event)

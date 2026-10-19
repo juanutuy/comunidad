@@ -1,12 +1,12 @@
 // Quitar la inscripción de un miembro (solo admin, Fase 8). También
 // se borra su avance en este curso: sin inscripción no hay progreso
 // que conservar (los puntos ya otorgados no se revierten).
-import { requireAdmin, resolveTenant } from '../../../../../utils/community'
+import { requireCourseManager, resolveTenant } from '../../../../../utils/community'
 import { dbFor } from '../../../../../utils/db'
 
 export default defineEventHandler(async (event) => {
   const tenant = await resolveTenant(event)
-  await requireAdmin(event, tenant.id)
+  await requireCourseManager(event, tenant.id)
   const courseId = Number(getRouterParam(event, 'id'))
   const userId = Number(getRouterParam(event, 'userId'))
   const db = await dbFor(event)

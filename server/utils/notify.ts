@@ -9,7 +9,7 @@ export interface NotifyInput {
   tenantId: number
   userId: number // destinatario
   actorId: number | null
-  type: 'reaction' | 'comment' | 'new_post' | 'mention' | 'dm' | 'follow' | 'report' | 'moderation'
+  type: 'reaction' | 'comment' | 'new_post' | 'mention' | 'dm' | 'follow' | 'report' | 'moderation' | 'join_request'
   title: string
   link: string
 }

@@ -1,7 +1,8 @@
 // Comentar una publicación (solo miembros con sesión).
 // Se notifica al autor de la publicación y a quienes sean mencionados.
-import { currentAuth, requireUser, resolveTenant } from '../../../utils/community'
+import { currentAuth, requireCanWrite, requireUser, resolveTenant } from '../../../utils/community'
 import { nowIso, dbFor } from '../../../utils/db'
+import { assertGate, containsLink } from '../../../utils/members'
 import { notify, notifyMentions } from '../../../utils/notify'
 
 export default defineEventHandler(async (event) => {
@@ -12,6 +13,9 @@ export default defineEventHandler(async (event) => {
   const body = await readBody<{ body?: string }>(event)
   const text = (body.body || '').trim()
   if (!text) throw createError({ statusCode: 400, message: 'El comentario no puede estar vacío.' })
+  // Fase 14: restricción de escritura y compuerta de enlaces del feed.
+  await requireCanWrite(event, tenant.id, user.id)
+  if (containsLink(text)) await assertGate(event, tenant.id, user.id, role, 'feed_link')
   const db = await dbFor(event)
   const post = await db.prepare(`SELECT p.author_id, p.title, p.slug, p.status, p.allow_comments, c.slug AS channel_slug FROM posts p JOIN channels c ON c.id = p.channel_id WHERE p.id = ? AND p.tenant_id = ?`).get(postId, tenant.id) as { author_id: number, title: string, slug: string, status: string, allow_comments: number, channel_slug: string } | undefined
   if (!post) throw createError({ statusCode: 404, message: 'Publicación no encontrada.' })

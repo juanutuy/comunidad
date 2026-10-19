@@ -2,13 +2,13 @@
 // Enrollments del estudio). Respeta el límite de inscritos del curso
 // igual que la inscripción pública: si el curso está lleno, el admin
 // puede subir el límite desde Settings.
-import { requireAdmin, resolveTenant } from '../../../../utils/community'
+import { requireCourseManager, resolveTenant } from '../../../../utils/community'
 import { nowIso, dbFor } from '../../../../utils/db'
 import { awardPoints } from '../../../../utils/points'
 
 export default defineEventHandler(async (event) => {
   const tenant = await resolveTenant(event)
-  await requireAdmin(event, tenant.id)
+  await requireCourseManager(event, tenant.id)
   const courseId = Number(getRouterParam(event, 'id'))
   const body = await readBody<{ userId?: number }>(event)
   const userId = Number(body.userId || 0)

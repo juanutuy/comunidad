@@ -10,13 +10,14 @@ import { requireAdmin, resolveTenant } from '../../utils/community'
 import { dbFor } from '../../utils/db'
 import { DEFAULT_POINTS, POINT_ACTION_META } from '../../utils/gamification'
 import type { PointAction } from '../../utils/gamification'
+import { GATE_META } from '../../utils/members'
 
 interface LevelInput { name?: unknown, min?: unknown, icon?: unknown }
 
 export default defineEventHandler(async (event) => {
   const tenant = await resolveTenant(event)
   await requireAdmin(event, tenant.id)
-  const body = await readBody<{ levels?: LevelInput[], points?: Record<string, unknown> }>(event)
+  const body = await readBody<{ levels?: LevelInput[], points?: Record<string, unknown>, gates?: Record<string, unknown> }>(event)
 
   const rawLevels = Array.isArray(body.levels) ? body.levels : []
   if (!rawLevels.length) throw createError({ statusCode: 400, message: 'Tiene que haber al menos un nivel.' })
@@ -60,6 +61,23 @@ export default defineEventHandler(async (event) => {
     await db.prepare(`INSERT INTO gamification_points (tenant_id, action, points) VALUES (?, ?, ?)
       ON CONFLICT(tenant_id, action) DO UPDATE SET points = excluded.points`)
       .run(tenant.id, action, value)
+  }
+  // Fase 14: compuertas por nivel — solo si el cliente las manda. Se
+  // guardan por UMBRAL de puntos (único por tenant): el umbral
+  // tiene que ser el de un nivel de la lista que se acaba de guardar.
+  if (body.gates && typeof body.gates === 'object') {
+    const validMins = new Set(levels.map(l => l.min))
+    const gates: Record<string, number> = {}
+    for (const meta of GATE_META) {
+      const v = Number((body.gates as Record<string, unknown>)[meta.action])
+      if (Number.isInteger(v) && v > 0) {
+        if (!validMins.has(v))
+          throw createError({ statusCode: 400, message: `La compuerta de «${meta.label}» apunta a un nivel que no existe.` })
+        gates[meta.action] = v
+      }
+    }
+    await db.prepare('UPDATE tenants SET level_gates = ? WHERE id = ?')
+      .run(JSON.stringify(gates), tenant.id).catch(() => {})
   }
   return { ok: true, levels, points: { ...DEFAULT_POINTS, ...points } }
 })

@@ -1,12 +1,12 @@
 // Detalle completo de un curso para la página-estudio (solo admin,
 // Fase 8): datos, ajustes y currículum con TODOS los campos de cada
 // lección, incluidos los borradores (el catálogo público filtra).
-import { requireAdmin, resolveTenant } from '../../../utils/community'
+import { requireCourseManager, resolveTenant } from '../../../utils/community'
 import { dbFor } from '../../../utils/db'
 
 export default defineEventHandler(async (event) => {
   const tenant = await resolveTenant(event)
-  await requireAdmin(event, tenant.id)
+  await requireCourseManager(event, tenant.id)
   const courseId = Number(getRouterParam(event, 'id'))
   const db = await dbFor(event)
   const c = await db.prepare('SELECT * FROM courses WHERE id = ? AND tenant_id = ?').get(courseId, tenant.id) as Record<string, unknown> | undefined

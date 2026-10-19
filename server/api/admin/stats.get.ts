@@ -160,12 +160,16 @@ export default defineEventHandler(async (event) => {
 
   // Fase 12: contadores de moderación para el bloque «Necesita tu
   // atención» del Panel (reportes pendientes + posts en revisión).
+  // Fase 14: se suman las solicitudes de ingreso pendientes, y el
+  // bloque completo se expone también como `attention`.
   const moderation = {
     pendingReports: await one("SELECT COUNT(*) AS n FROM reports WHERE tenant_id = ? AND status = 'pending'", tenant.id).catch(() => 0),
     inReview: await one("SELECT COUNT(*) AS n FROM posts WHERE tenant_id = ? AND status = 'review'", tenant.id),
+    joinRequests: await one("SELECT COUNT(*) AS n FROM join_requests WHERE tenant_id = ? AND status = 'pending'", tenant.id).catch(() => 0),
   }
+  const attention = { ...moderation, unanswered: unanswered.count }
   return {
-    range, totals, activity30, moderation, period, series, busiestChannels, topContributors, unanswered,
+    range, totals, activity30, moderation, attention, period, series, busiestChannels, topContributors, unanswered,
     generatedAt: new Date().toISOString(),
     postsWithoutComments: unansweredItems,
     recentMembers: memberRows.slice(0, 5).map(r => ({ id: r.id, name: r.name, slug: r.slug, avatarUrl: r.avatar_url || '', role: r.role, createdAt: r.created_at })),

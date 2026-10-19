@@ -5,7 +5,7 @@
 // un miembro NO admin lo manda a 'review' (no a 'published'): así un
 // post rechazado que vuelve a borradores y se reenvía pasa otra vez
 // por la cola. Si quien publica es admin, sale directo.
-import { currentAuth, requireUser, resolveTenant } from '../../../utils/community'
+import { currentAuth, requireCanWrite, requireUser, resolveTenant } from '../../../utils/community'
 import { nowIso, dbFor } from '../../../utils/db'
 import { getReviewEnabled } from '../../../utils/moderation'
 import { notifyNewPost } from '../../../utils/notify'
@@ -21,6 +21,8 @@ export default defineEventHandler(async (event) => {
   if (!post) throw createError({ statusCode: 404, message: 'Publicación no encontrada.' })
   if (post.author_id !== user.id && role !== 'admin')
     throw createError({ statusCode: 403, message: 'Solo el autor puede publicar este borrador.' })
+  // Fase 14: publicar es participar — no con la cuenta restringida.
+  await requireCanWrite(event, tenant.id, user.id)
   if (post.status === 'published') return { ok: true, already: true }
   if (role !== 'admin' && await getReviewEnabled(event, tenant.id)) {
     await db.prepare("UPDATE posts SET status = 'review', scheduled_at = '' WHERE id = ?").run(postId)

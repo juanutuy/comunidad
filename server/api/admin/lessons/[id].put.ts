@@ -5,13 +5,13 @@
 // (recién creada): con contenido cargado es inmutable, como en la
 // referencia. El HTML se sanitiza en el servidor y el texto plano se
 // deriva de él (utils/courseAdmin.parseLessonInput).
-import { requireAdmin, resolveTenant } from '../../../utils/community'
+import { requireCourseManager, resolveTenant } from '../../../utils/community'
 import { lessonHasContent, parseLessonInput } from '../../../utils/courseAdmin'
 import { dbFor } from '../../../utils/db'
 
 export default defineEventHandler(async (event) => {
   const tenant = await resolveTenant(event)
-  await requireAdmin(event, tenant.id)
+  await requireCourseManager(event, tenant.id)
   const lessonId = Number(getRouterParam(event, 'id'))
   const body = await readBody<Record<string, unknown>>(event)
   const db = await dbFor(event)

@@ -122,6 +122,19 @@ CREATE UNIQUE INDEX IF NOT EXISTS gamification_points_tenant_action ON gamificat
 CREATE TABLE IF NOT EXISTS reports (id INTEGER PRIMARY KEY AUTOINCREMENT, tenant_id INTEGER NOT NULL, reporter_id INTEGER NOT NULL, target_type TEXT NOT NULL DEFAULT 'post', target_id INTEGER NOT NULL, reason TEXT NOT NULL DEFAULT 'otro', note TEXT NOT NULL DEFAULT '', status TEXT NOT NULL DEFAULT 'pending', action TEXT NOT NULL DEFAULT 'none', resolved_by INTEGER, resolved_at TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL);
 CREATE INDEX IF NOT EXISTS reports_tenant_status ON reports (tenant_id, status, created_at);
 CREATE INDEX IF NOT EXISTS reports_target ON reports (tenant_id, target_type, target_id, status);
+CREATE TABLE IF NOT EXISTS invitations (id INTEGER PRIMARY KEY AUTOINCREMENT, tenant_id INTEGER NOT NULL, kind TEXT NOT NULL DEFAULT 'email', email TEXT NOT NULL DEFAULT '', token TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'pending', uses INTEGER NOT NULL DEFAULT 0, expires_at TEXT NOT NULL DEFAULT '', created_by INTEGER, accepted_by INTEGER, created_at TEXT NOT NULL);
+CREATE UNIQUE INDEX IF NOT EXISTS invitations_token ON invitations (token);
+CREATE INDEX IF NOT EXISTS invitations_tenant ON invitations (tenant_id, status, created_at);
+CREATE TABLE IF NOT EXISTS join_requests (id INTEGER PRIMARY KEY AUTOINCREMENT, tenant_id INTEGER NOT NULL, user_id INTEGER NOT NULL, answers TEXT NOT NULL DEFAULT '[]', status TEXT NOT NULL DEFAULT 'pending', decided_by INTEGER, decided_at TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL);
+CREATE INDEX IF NOT EXISTS join_requests_tenant ON join_requests (tenant_id, status, created_at);
+CREATE INDEX IF NOT EXISTS join_requests_user ON join_requests (tenant_id, user_id, created_at);
+CREATE TABLE IF NOT EXISTS member_tags (id INTEGER PRIMARY KEY AUTOINCREMENT, tenant_id INTEGER NOT NULL, name TEXT NOT NULL, created_at TEXT NOT NULL);
+CREATE UNIQUE INDEX IF NOT EXISTS member_tags_tenant_name ON member_tags (tenant_id, name);
+CREATE TABLE IF NOT EXISTS member_tag_assignments (id INTEGER PRIMARY KEY AUTOINCREMENT, tenant_id INTEGER NOT NULL, tag_id INTEGER NOT NULL, user_id INTEGER NOT NULL);
+CREATE UNIQUE INDEX IF NOT EXISTS member_tag_assignments_unique ON member_tag_assignments (tenant_id, tag_id, user_id);
+CREATE INDEX IF NOT EXISTS member_tag_assignments_user ON member_tag_assignments (tenant_id, user_id);
+CREATE TABLE IF NOT EXISTS access_links (id INTEGER PRIMARY KEY AUTOINCREMENT, tenant_id INTEGER NOT NULL, user_id INTEGER NOT NULL, token TEXT NOT NULL, expires_at TEXT NOT NULL, used_at TEXT NOT NULL DEFAULT '', created_by INTEGER, created_at TEXT NOT NULL);
+CREATE UNIQUE INDEX IF NOT EXISTS access_links_token ON access_links (token);
 `
 
 // Migraciones aditivas (Fase 2) para bases creadas en la Fase 1 — ya hay
@@ -203,6 +216,24 @@ const MIGRATIONS = [
   // 'review' hasta que un admin los aprueba). La tabla `reports` es
   // nueva y vive en CREATE_SQL (IF NOT EXISTS): no necesita ALTER.
   `ALTER TABLE tenants ADD COLUMN moderation_review INTEGER NOT NULL DEFAULT 0`,
+  // Fase 14: estado de la membresía (active|pending|declined|
+  // suspended|restricted). Las filas existentes quedan 'active'.
+  // pending = esperando aprobación de ingreso; declined = solicitud
+  // rechazada (puede volver a pedir tras el cooldown); suspended =
+  // no puede iniciar sesión; restricted = entra y lee, no escribe.
+  `ALTER TABLE memberships ADD COLUMN status TEXT NOT NULL DEFAULT 'active'`,
+  // Fase 14: ingreso de miembros por tenant — aprobación previa
+  // (0/1), preguntas de ingreso (JSON, hasta 6 textos), días de
+  // espera tras un rechazo, canales de auto-ingreso (JSON, hasta 2
+  // ids) y compuertas por nivel (JSON: acción → umbral de puntos del nivel, 0 =
+  // sin compuerta). Las tablas nuevas (invitations, join_requests,
+  // member_tags, member_tag_assignments, access_links) viven en
+  // CREATE_SQL (IF NOT EXISTS): no necesitan ALTER.
+  `ALTER TABLE tenants ADD COLUMN join_approval INTEGER NOT NULL DEFAULT 0`,
+  `ALTER TABLE tenants ADD COLUMN join_questions TEXT NOT NULL DEFAULT '[]'`,
+  `ALTER TABLE tenants ADD COLUMN join_cooldown_days INTEGER NOT NULL DEFAULT 0`,
+  `ALTER TABLE tenants ADD COLUMN auto_join_channels TEXT NOT NULL DEFAULT '[]'`,
+  `ALTER TABLE tenants ADD COLUMN level_gates TEXT NOT NULL DEFAULT '{}'`,
 ]
 
 async function runMigrations(db: AsyncDb): Promise<void> {

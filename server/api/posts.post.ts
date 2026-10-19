@@ -6,9 +6,10 @@
 //     solo cuando vence, ver publishDuePosts en utils/community.ts).
 // Al publicarse (ahora o después) se notifica a quienes siguen el
 // canal y a los mencionados.
-import { canAccessChannel, channelBySlug, currentAuth, requireUser, resolveTenant } from '../utils/community'
+import { canAccessChannel, channelBySlug, currentAuth, requireCanWrite, requireUser, resolveTenant } from '../utils/community'
 import { nowIso, dbFor, slugify } from '../utils/db'
 import { getReviewEnabled } from '../utils/moderation'
+import { assertGate, containsLink } from '../utils/members'
 import { notifyNewPost } from '../utils/notify'
 import { htmlToText, sanitizeHtml } from '../utils/sanitize'
 
@@ -44,6 +45,10 @@ export default defineEventHandler(async (event) => {
   if (!channel) throw createError({ statusCode: 404, message: 'Canal no encontrado.' })
   if (!(await canAccessChannel(event, user.id, role, channel)))
     throw createError({ statusCode: 403, message: 'No tenés acceso a publicar en este canal.' })
+  // Fase 14: restricción de escritura y compuerta «Crear
+  // publicaciones» (el staff nunca se bloquea).
+  await requireCanWrite(event, tenant.id, user.id)
+  await assertGate(event, tenant.id, user.id, role, 'create_post')
 
   const kind = body.kind === 'poll' ? 'poll' : 'post'
   let title = (body.title || '').trim()
@@ -89,6 +94,10 @@ export default defineEventHandler(async (event) => {
 
   // 'file' (Fase 8): archivo adjunto descargable bajo el cuerpo.
   const mediaType = kind === 'poll' ? 'none' : ['image', 'video', 'file'].includes(body.mediaType || '') ? body.mediaType! : 'none'
+  // Fase 14: compuertas de contenido — enlace en título/cuerpo y
+  // video adjunto exigen su nivel si el tenant las configuró.
+  if (containsLink(`${title} ${text}`)) await assertGate(event, tenant.id, user.id, role, 'feed_link')
+  if (mediaType === 'video') await assertGate(event, tenant.id, user.id, role, 'feed_video')
   const allowComments = body.allowComments === false ? 0 : 1
   // «Publicar como anuncio» solo tiene efecto para el admin: un miembro
   // no puede fijar su propio post mandando pin=true.

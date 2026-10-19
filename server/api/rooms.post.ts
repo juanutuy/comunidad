@@ -1,11 +1,13 @@
 // Crear una sala grupal de chat (Fase 5): nombre + al menos 2
 // miembros más del tenant (además de quien la crea).
-import { requireUser, resolveTenant } from '../utils/community'
+import { requireCanWrite, requireUser, resolveTenant } from '../utils/community'
 import { nowIso, dbFor } from '../utils/db'
 
 export default defineEventHandler(async (event) => {
   const tenant = await resolveTenant(event)
   const me = await requireUser(event, tenant.id)
+  // Fase 14: crear una sala es participar — no con la cuenta restringida.
+  await requireCanWrite(event, tenant.id, me.id)
   const body = await readBody<{ name?: string, memberSlugs?: string[] }>(event)
   const name = (body.name || '').trim()
   if (!name || name.length > 60) throw createError({ statusCode: 400, message: 'La sala necesita un nombre de hasta 60 caracteres.' })

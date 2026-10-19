@@ -1,12 +1,12 @@
 // Gestión de cursos (solo admin, Fase 5): catálogo completo con
 // capítulos y lecciones anidados, en cualquier estado (los borradores
 // no salen en el catálogo público, pero aquí se editan).
-import { requireAdmin, resolveTenant } from '../../utils/community'
+import { requireCourseManager, resolveTenant } from '../../utils/community'
 import { dbFor } from '../../utils/db'
 
 export default defineEventHandler(async (event) => {
   const tenant = await resolveTenant(event)
-  await requireAdmin(event, tenant.id)
+  await requireCourseManager(event, tenant.id)
   const db = await dbFor(event)
   const courseRows = await db.prepare('SELECT * FROM courses WHERE tenant_id = ? ORDER BY created_at').all(tenant.id) as Record<string, unknown>[]
   const courses = []

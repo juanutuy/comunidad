@@ -1,7 +1,7 @@
 // Votar en una encuesta (Fase 5). Un voto por usuario y encuesta;
 // votar de nuevo CAMBIA el voto (no duplica). Solo puede votar quien
 // puede ver el post: sesión válida, post publicado y acceso al canal.
-import { canAccessChannel, currentAuth, requireUser, resolveTenant } from '../../../utils/community'
+import { canAccessChannel, currentAuth, requireCanWrite, requireUser, resolveTenant } from '../../../utils/community'
 import { nowIso, dbFor } from '../../../utils/db'
 
 export default defineEventHandler(async (event) => {
@@ -11,6 +11,8 @@ export default defineEventHandler(async (event) => {
   const postId = Number(getRouterParam(event, 'id'))
   const body = await readBody<{ optionId?: number }>(event)
   const optionId = Number(body.optionId || 0)
+  // Fase 14: votar es participar — un miembro restringido no vota.
+  await requireCanWrite(event, tenant.id, user.id)
   const db = await dbFor(event)
   const post = await db.prepare(`SELECT p.kind, p.status, c.id AS channel_id, c.slug AS channel_slug, c.type AS channel_type, c.tenant_id FROM posts p JOIN channels c ON c.id = p.channel_id WHERE p.id = ? AND p.tenant_id = ?`)
     .get(postId, tenant.id) as Record<string, unknown> | undefined

@@ -1,12 +1,12 @@
 // Inscritos de un curso para la pestaña Enrollments del estudio
 // (solo admin, Fase 8): miembro, fecha y avance real calculado
 // sobre las lecciones publicadas del curso.
-import { requireAdmin, resolveTenant } from '../../../../utils/community'
+import { requireCourseManager, resolveTenant } from '../../../../utils/community'
 import { dbFor } from '../../../../utils/db'
 
 export default defineEventHandler(async (event) => {
   const tenant = await resolveTenant(event)
-  await requireAdmin(event, tenant.id)
+  await requireCourseManager(event, tenant.id)
   const courseId = Number(getRouterParam(event, 'id'))
   const db = await dbFor(event)
   const course = await db.prepare('SELECT id FROM courses WHERE id = ? AND tenant_id = ?').get(courseId, tenant.id)

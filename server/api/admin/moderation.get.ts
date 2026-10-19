@@ -4,7 +4,7 @@
 // reportó) y ordenados con los pendientes primero; la página agrupa
 // los pendientes por objetivo, porque las acciones se aplican al
 // objetivo, no a un reporte suelto.
-import { requireAdmin, resolveTenant } from '../../utils/community'
+import { requireModerator, resolveTenant } from '../../utils/community'
 import { dbFor } from '../../utils/db'
 import { sanitizeHtml } from '../../utils/sanitize'
 
@@ -12,7 +12,7 @@ interface UserMini { id: number, name: string, slug: string, avatarUrl: string }
 
 export default defineEventHandler(async (event) => {
   const tenant = await resolveTenant(event)
-  await requireAdmin(event, tenant.id)
+  await requireModerator(event, tenant.id)
   const db = await dbFor(event)
   const userById = async (id: number | null): Promise<UserMini | null> => {
     if (!id) return null

@@ -1,6 +1,7 @@
 // Enviar un mensaje al chat de un canal (Fase 3): se persiste en
 // chat_messages y se empuja en vivo a la sala del canal (Durable Object).
-import { canAccessChannel, channelBySlug, resolveTenant, currentAuth } from '../../../utils/community'
+import { canAccessChannel, channelBySlug, resolveTenant, currentAuth, requireCanWrite } from '../../../utils/community'
+import { assertGate, containsLink } from '../../../utils/members'
 import { serializeChatMessage, type ChatMessageRow } from '../../../utils/chat'
 import { publishRealtime, roomChannel } from '../../../utils/realtime'
 import { dbFor, nowIso } from '../../../utils/db'
@@ -19,6 +20,11 @@ export default defineEventHandler(async (event) => {
   const text = (body?.body || '').trim()
   if (!text) throw createError({ statusCode: 400, message: 'El mensaje no puede estar vacío.' })
   if (text.length > 2000) throw createError({ statusCode: 400, message: 'El mensaje es demasiado largo (máx. 2000 caracteres).' })
+  // Fase 14: restricción de escritura y compuertas del chat (participar
+  // y pegar enlaces son compuertas separadas, como en la referencia).
+  await requireCanWrite(event, tenant.id, user.id)
+  await assertGate(event, tenant.id, user.id, role, 'chat')
+  if (containsLink(text)) await assertGate(event, tenant.id, user.id, role, 'chat_link')
 
   const db = await dbFor(event)
   const created = nowIso()

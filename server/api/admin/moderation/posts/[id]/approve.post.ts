@@ -3,13 +3,13 @@
 // recién ahí suma los puntos de publicación (memberStats solo cuenta
 // posts 'published'), se avisa a seguidores y mencionados como una
 // publicación nueva, y el autor recibe su notificación 'moderation'.
-import { requireAdmin, resolveTenant } from '../../../../../utils/community'
+import { requireModerator, resolveTenant } from '../../../../../utils/community'
 import { nowIso, dbFor } from '../../../../../utils/db'
 import { notify, notifyNewPost } from '../../../../../utils/notify'
 
 export default defineEventHandler(async (event) => {
   const tenant = await resolveTenant(event)
-  await requireAdmin(event, tenant.id)
+  await requireModerator(event, tenant.id)
   const postId = Number(getRouterParam(event, 'id'))
   const db = await dbFor(event)
   const post = await db.prepare(`SELECT p.*, c.slug AS channel_slug, c.name AS channel_name FROM posts p JOIN channels c ON c.id = p.channel_id WHERE p.id = ? AND p.tenant_id = ?`)

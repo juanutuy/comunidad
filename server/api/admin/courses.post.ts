@@ -1,13 +1,13 @@
 // Crear un curso (solo admin, Fase 5). El precio reutiliza el flujo
 // de la Fase 4: un curso pago no se inscribe directo, lo concede el
 // pago confirmado (webhook de Stripe) o un pago ya registrado.
-import { requireAdmin, resolveTenant } from '../../utils/community'
+import { requireCourseManager, resolveTenant } from '../../utils/community'
 import { parseCourseInput, parseCourseStudioFields } from '../../utils/courseAdmin'
 import { nowIso, dbFor, slugify } from '../../utils/db'
 
 export default defineEventHandler(async (event) => {
   const tenant = await resolveTenant(event)
-  await requireAdmin(event, tenant.id)
+  await requireCourseManager(event, tenant.id)
   const body = await readBody<Record<string, unknown>>(event)
   const input = parseCourseInput(body)
   const studio = parseCourseStudioFields(body)

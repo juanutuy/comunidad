@@ -38,18 +38,37 @@ export function publicUser(u: UserRow) {
   return { id: u.id, name: u.name, slug: u.slug, email: u.email, bio: u.bio, location: u.location, avatarUrl: u.avatar_url || '', memberSince: u.created_at }
 }
 
+// Fase 14 — roles y capacidades. El sistema tiene cuatro roles por
+// tenant (memberships.role): admin (todo), moderator (Moderación y
+// lista de Miembros de la consola; puede borrar contenido ajeno en la
+// comunidad), course_manager (solo Cursos de la consola) y member.
+// El «staff» (los tres primeros) nunca queda bloqueado por las
+// compuertas por nivel ni por la restricción de escritura.
+export const ROLES = ['admin', 'moderator', 'course_manager', 'member'] as const
+export type MemberRole = typeof ROLES[number]
+export const STAFF_ROLES: string[] = ['admin', 'moderator', 'course_manager']
+export function isStaff(role: string | null | undefined): boolean {
+  return !!role && STAFF_ROLES.includes(role)
+}
+export function canModerate(role: string | null | undefined): boolean {
+  return role === 'admin' || role === 'moderator'
+}
+export function canManageCourses(role: string | null | undefined): boolean {
+  return role === 'admin' || role === 'course_manager'
+}
+
 export async function currentAuth(event: H3Event, tenantId: number) {
   const session = readSession(event)
-  if (!session) return { user: null as UserRow | null, role: null as string | null }
+  if (!session) return { user: null as UserRow | null, role: null as string | null, status: null as string | null }
   const db = await dbFor(event)
   const user = await db.prepare('SELECT * FROM users WHERE id = ?').get(session.uid) as (UserRow & { token_version?: number }) | undefined
-  if (!user) return { user: null, role: null }
+  if (!user) return { user: null, role: null, status: null }
   // Fase 5: si la contraseña cambió después de emitida esta sesión, la
   // versión ya no coincide y la sesión deja de valer (las sesiones sin
   // versión — anteriores a la Fase 5 — valen 0, como la columna nueva).
-  if ((session.v ?? 0) !== (user.token_version ?? 0)) return { user: null, role: null }
-  const m = await db.prepare('SELECT role FROM memberships WHERE tenant_id = ? AND user_id = ?').get(tenantId, user.id) as { role: string } | undefined
-  return { user, role: m?.role ?? null }
+  if ((session.v ?? 0) !== (user.token_version ?? 0)) return { user: null, role: null, status: null }
+  const m = await db.prepare('SELECT role, status FROM memberships WHERE tenant_id = ? AND user_id = ?').get(tenantId, user.id) as { role: string, status?: string } | undefined
+  return { user, role: m?.role ?? null, status: m ? (m.status || 'active') : null }
 }
 
 export async function ensureMembership(event: H3Event, tenantId: number, userId: number, role = 'member') {
@@ -59,17 +78,55 @@ export async function ensureMembership(event: H3Event, tenantId: number, userId:
 }
 
 export async function requireUser(event: H3Event, tenantId: number): Promise<UserRow> {
-  const { user } = await currentAuth(event, tenantId)
+  const { user, status } = await currentAuth(event, tenantId)
   if (!user) throw createError({ statusCode: 401, message: 'Iniciá sesión para continuar.' })
   await ensureMembership(event, tenantId, user.id)
+  // Fase 14: estados que NO dan acceso a la comunidad. 'pending' =
+  // solicitud de ingreso en revisión; 'declined' = solicitud
+  // rechazada; 'suspended' = cuenta suspendida por un administrador.
+  // ('restricted' SÍ entra: lee todo, pero no escribe — eso lo corta
+  // requireCanWrite en cada endpoint de escritura.)
+  if (status === 'pending')
+    throw createError({ statusCode: 403, message: 'Tu solicitud de ingreso está en revisión. Te avisaremos cuando un administrador la resuelva.' })
+  if (status === 'declined')
+    throw createError({ statusCode: 403, message: 'Tu solicitud de ingreso no fue aprobada. Podés volver a solicitar el ingreso desde el registro cuando pase el tiempo de espera.' })
+  if (status === 'suspended')
+    throw createError({ statusCode: 403, message: 'Tu cuenta está suspendida en esta comunidad. Si creés que es un error, escribile a un administrador.' })
+  return user
+}
+
+// Fase 14: escritura (publicar, comentar, reaccionar, chatear). Un
+// miembro 'restricted' puede entrar y leer, pero no participar; el
+// staff nunca se restringe a sí mismo por esta vía.
+export async function requireCanWrite(event: H3Event, tenantId: number, userId: number): Promise<void> {
+  const db = await dbFor(event)
+  const m = await db.prepare('SELECT role, status FROM memberships WHERE tenant_id = ? AND user_id = ?').get(tenantId, userId) as { role: string, status?: string } | undefined
+  if (m && (m.status || 'active') === 'restricted' && !isStaff(m.role))
+    throw createError({ statusCode: 403, message: 'Tu cuenta está restringida: podés leer la comunidad, pero no publicar ni participar por ahora. Si creés que es un error, escribile a un administrador.' })
+}
+
+async function requireRole(event: H3Event, tenantId: number, roles: string[], message: string): Promise<UserRow> {
+  const { user, role, status } = await currentAuth(event, tenantId)
+  if (!user) throw createError({ statusCode: 401, message: 'Iniciá sesión para continuar.' })
+  if (!role || !roles.includes(role) || (status !== null && status !== 'active'))
+    throw createError({ statusCode: 403, message })
   return user
 }
 
 export async function requireAdmin(event: H3Event, tenantId: number): Promise<UserRow> {
-  const { user, role } = await currentAuth(event, tenantId)
-  if (!user) throw createError({ statusCode: 401, message: 'Iniciá sesión para continuar.' })
-  if (role !== 'admin') throw createError({ statusCode: 403, message: 'Solo un administrador puede hacer esto.' })
-  return user
+  return requireRole(event, tenantId, ['admin'], 'Solo un administrador puede hacer esto.')
+}
+
+// Fase 14: la consola de Moderación (reportes y revisión previa) es de
+// administradores y moderadores.
+export async function requireModerator(event: H3Event, tenantId: number): Promise<UserRow> {
+  return requireRole(event, tenantId, ['admin', 'moderator'], 'Solo un administrador o un moderador puede hacer esto.')
+}
+
+// Fase 14: la gestión de cursos de la consola es de administradores y
+// encargados de cursos (course_manager).
+export async function requireCourseManager(event: H3Event, tenantId: number): Promise<UserRow> {
+  return requireRole(event, tenantId, ['admin', 'course_manager'], 'Solo un administrador o un encargado de cursos puede hacer esto.')
 }
 
 export async function canAccessChannel(event: H3Event, userId: number | null, role: string | null, channel: ChannelRow): Promise<boolean> {

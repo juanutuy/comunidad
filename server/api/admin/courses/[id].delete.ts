@@ -1,12 +1,12 @@
 // Borrar un curso (solo admin, Fase 5): se limpian en cascada sus
 // capítulos, lecciones, progresos e inscripciones. Los pagos ya
 // registrados NO se borran (son el historial financiero del tenant).
-import { requireAdmin, resolveTenant } from '../../../utils/community'
+import { requireCourseManager, resolveTenant } from '../../../utils/community'
 import { dbFor } from '../../../utils/db'
 
 export default defineEventHandler(async (event) => {
   const tenant = await resolveTenant(event)
-  await requireAdmin(event, tenant.id)
+  await requireCourseManager(event, tenant.id)
   const courseId = Number(getRouterParam(event, 'id'))
   const db = await dbFor(event)
   const course = await db.prepare('SELECT id FROM courses WHERE id = ? AND tenant_id = ?').get(courseId, tenant.id)

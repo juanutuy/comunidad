@@ -1,10 +1,10 @@
 // Borrar una lección (solo admin, Fase 5) y su progreso asociado.
-import { requireAdmin, resolveTenant } from '../../../utils/community'
+import { requireCourseManager, resolveTenant } from '../../../utils/community'
 import { dbFor } from '../../../utils/db'
 
 export default defineEventHandler(async (event) => {
   const tenant = await resolveTenant(event)
-  await requireAdmin(event, tenant.id)
+  await requireCourseManager(event, tenant.id)
   const lessonId = Number(getRouterParam(event, 'id'))
   const db = await dbFor(event)
   const lesson = await db.prepare('SELECT id FROM lessons WHERE id = ? AND tenant_id = ?').get(lessonId, tenant.id)

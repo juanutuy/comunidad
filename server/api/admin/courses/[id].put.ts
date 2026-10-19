@@ -5,13 +5,13 @@
 // drip y certificado) SOLO si vienen en el body — actualización
 // parcial, para que el autoguardado toque una cosa por vez y el
 // formulario clásico siga funcionando.
-import { requireAdmin, resolveTenant } from '../../../utils/community'
+import { requireCourseManager, resolveTenant } from '../../../utils/community'
 import { parseCourseInput, parseCourseStudioFields } from '../../../utils/courseAdmin'
 import { dbFor } from '../../../utils/db'
 
 export default defineEventHandler(async (event) => {
   const tenant = await resolveTenant(event)
-  await requireAdmin(event, tenant.id)
+  await requireCourseManager(event, tenant.id)
   const courseId = Number(getRouterParam(event, 'id'))
   const body = await readBody<Record<string, unknown>>(event)
   const studio = parseCourseStudioFields(body)

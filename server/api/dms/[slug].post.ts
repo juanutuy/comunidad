@@ -2,7 +2,8 @@
 // en vivo a la sala de la conversación (Durable Object) y crea la
 // notificación in-app del destinatario (que además empuja su campana
 // en vivo vía notify()).
-import { requireUser, resolveTenant } from '../../utils/community'
+import { currentAuth, requireCanWrite, requireUser, resolveTenant } from '../../utils/community'
+import { assertGate } from '../../utils/members'
 import { otherMember, serializeChatMessage, type ChatMessageRow } from '../../utils/chat'
 import { publishRealtime, roomDm } from '../../utils/realtime'
 import { notify } from '../../utils/notify'
@@ -12,6 +13,10 @@ import { blockBetween } from '../../utils/blocks'
 export default defineEventHandler(async (event) => {
   const tenant = await resolveTenant(event)
   const me = await requireUser(event, tenant.id)
+  const { role } = await currentAuth(event, tenant.id)
+  // Fase 14: restricción de escritura y compuerta de mensajes directos.
+  await requireCanWrite(event, tenant.id, me.id)
+  await assertGate(event, tenant.id, me.id, role, 'dm')
   const slug = getRouterParam(event, 'slug')!
   const other = await otherMember(event, tenant.id, slug, me.id)
 

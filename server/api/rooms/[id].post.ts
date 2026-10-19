@@ -2,7 +2,8 @@
 // chat_room_messages y empuja en vivo a la sala del Durable Object
 // (`room:{tenant}:{roomId}`); sin tiempo real, los clientes lo
 // levantan por polling contra el mismo GET.
-import { requireUser, resolveTenant } from '../../utils/community'
+import { currentAuth, requireCanWrite, requireUser, resolveTenant } from '../../utils/community'
+import { assertGate, containsLink } from '../../utils/members'
 import { roomOrThrow } from '../../utils/rooms'
 import { serializeChatMessage, type ChatMessageRow } from '../../utils/chat'
 import { publishRealtime, roomGroup } from '../../utils/realtime'
@@ -17,6 +18,11 @@ export default defineEventHandler(async (event) => {
   const text = (body?.body || '').trim()
   if (!text) throw createError({ statusCode: 400, message: 'El mensaje no puede estar vacío.' })
   if (text.length > 2000) throw createError({ statusCode: 400, message: 'El mensaje es demasiado largo (máx. 2000 caracteres).' })
+  // Fase 14: restricción de escritura y compuertas del chat de salas.
+  const { role } = await currentAuth(event, tenant.id)
+  await requireCanWrite(event, tenant.id, me.id)
+  await assertGate(event, tenant.id, me.id, role, 'chat')
+  if (containsLink(text)) await assertGate(event, tenant.id, me.id, role, 'chat_link')
   const db = await dbFor(event)
   const created = nowIso()
   const res = await db.prepare('INSERT INTO chat_room_messages (tenant_id, room_id, author_id, body, created_at) VALUES (?, ?, ?, ?, ?)')

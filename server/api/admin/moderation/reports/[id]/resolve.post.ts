@@ -7,13 +7,13 @@
 //     que el borrado normal) y quedan resueltos con
 //     action='content_removed'. Si el contenido ya no existe, la API
 //     lo rechaza: en ese caso solo se puede cerrar el reporte.
-import { requireAdmin, resolveTenant } from '../../../../../utils/community'
+import { requireModerator, resolveTenant } from '../../../../../utils/community'
 import { nowIso, dbFor } from '../../../../../utils/db'
 import { deletePostCascade } from '../../../../../utils/moderation'
 
 export default defineEventHandler(async (event) => {
   const tenant = await resolveTenant(event)
-  const admin = await requireAdmin(event, tenant.id)
+  const admin = await requireModerator(event, tenant.id)
   const reportId = Number(getRouterParam(event, 'id'))
   const body = await readBody<{ outcome?: string }>(event)
   const outcome = body.outcome

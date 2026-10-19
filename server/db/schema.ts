@@ -36,7 +36,11 @@ export const memberships = sqliteTable('memberships', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   tenantId: integer('tenant_id').notNull().references(() => tenants.id),
   userId: integer('user_id').notNull().references(() => users.id),
-  role: text('role', { enum: ['admin', 'member'] }).notNull().default('member'),
+  // Fase 14: roles ampliados (moderator y course_manager, además de
+  // admin y member). El enum es solo documental: la columna es texto.
+  role: text('role', { enum: ['admin', 'member', 'moderator', 'course_manager'] }).notNull().default('member'),
+  // Fase 14 (migración aditiva): active|pending|declined|suspended|restricted.
+  status: text('status').notNull().default('active'),
 }, t => [uniqueIndex('memberships_tenant_user').on(t.tenantId, t.userId)])
 
 export const channelGroups = sqliteTable('channel_groups', {
@@ -204,7 +208,7 @@ export const notifications = sqliteTable('notifications', {
   tenantId: integer('tenant_id').notNull(),
   userId: integer('user_id').notNull().references(() => users.id), // destinatario
   actorId: integer('actor_id'), // quién originó la acción (puede ser null)
-  type: text('type', { enum: ['reaction', 'comment', 'new_post', 'mention', 'dm'] }).notNull(),
+  type: text('type').notNull(), // reaction|comment|new_post|mention|dm|follow|report|moderation|join_request (Fase 14)
   title: text('title').notNull(),
   link: text('link').notNull().default(''),
   isRead: integer('is_read', { mode: 'boolean' }).notNull().default(false),
@@ -356,3 +360,59 @@ export const gamificationPoints = sqliteTable('gamification_points', {
 // x3, reacciones recibidas x2) y se suman los point_events de la Fase 5
 // (inscripción a curso +5, curso completo +50, RSVP a evento +10).
 // Desde la Fase 9 los multiplicadores salen de gamification_points.
+
+// Fase 14 — miembros a fondo. Los ajustes del tenant (join_approval,
+// join_questions, join_cooldown_days, auto_join_channels, level_gates)
+// son columnas aditivas de `tenants` (ver utils/db.ts), como ya pasó
+// con terms/privacy/moderation_review: no se declaran acá.
+export const invitations = sqliteTable('invitations', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  tenantId: integer('tenant_id').notNull(),
+  kind: text('kind', { enum: ['email', 'link'] }).notNull().default('email'),
+  email: text('email').notNull().default(''), // solo kind='email'
+  token: text('token').notNull(),
+  status: text('status', { enum: ['pending', 'accepted', 'expired', 'revoked'] }).notNull().default('pending'),
+  uses: integer('uses').notNull().default(0), // solo kind='link' (reutilizable)
+  expiresAt: text('expires_at').notNull().default(''),
+  createdBy: integer('created_by'),
+  acceptedBy: integer('accepted_by'),
+  createdAt: text('created_at').notNull(),
+}, t => [uniqueIndex('invitations_token').on(t.token)])
+
+export const joinRequests = sqliteTable('join_requests', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  tenantId: integer('tenant_id').notNull(),
+  userId: integer('user_id').notNull().references(() => users.id),
+  answers: text('answers').notNull().default('[]'), // JSON: string[] en el orden de las preguntas
+  status: text('status', { enum: ['pending', 'approved', 'declined'] }).notNull().default('pending'),
+  decidedBy: integer('decided_by'),
+  decidedAt: text('decided_at').notNull().default(''),
+  createdAt: text('created_at').notNull(),
+})
+
+export const memberTags = sqliteTable('member_tags', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  tenantId: integer('tenant_id').notNull(),
+  name: text('name').notNull(),
+  createdAt: text('created_at').notNull(),
+}, t => [uniqueIndex('member_tags_tenant_name').on(t.tenantId, t.name)])
+
+export const memberTagAssignments = sqliteTable('member_tag_assignments', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  tenantId: integer('tenant_id').notNull(),
+  tagId: integer('tag_id').notNull().references(() => memberTags.id),
+  userId: integer('user_id').notNull().references(() => users.id),
+}, t => [uniqueIndex('member_tag_assignments_unique').on(t.tenantId, t.tagId, t.userId)])
+
+// Enlaces de acceso de un solo uso («Enviar enlace de acceso» del
+// admin): token con vencimiento corto; al usarse queda used_at.
+export const accessLinks = sqliteTable('access_links', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  tenantId: integer('tenant_id').notNull(),
+  userId: integer('user_id').notNull().references(() => users.id),
+  token: text('token').notNull(),
+  expiresAt: text('expires_at').notNull(),
+  usedAt: text('used_at').notNull().default(''),
+  createdBy: integer('created_by'),
+  createdAt: text('created_at').notNull(),
+}, t => [uniqueIndex('access_links_token').on(t.token)])

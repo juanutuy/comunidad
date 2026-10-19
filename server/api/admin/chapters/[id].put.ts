@@ -1,10 +1,10 @@
 // Editar un capítulo (solo admin, Fase 5): título y orden.
-import { requireAdmin, resolveTenant } from '../../../utils/community'
+import { requireCourseManager, resolveTenant } from '../../../utils/community'
 import { dbFor } from '../../../utils/db'
 
 export default defineEventHandler(async (event) => {
   const tenant = await resolveTenant(event)
-  await requireAdmin(event, tenant.id)
+  await requireCourseManager(event, tenant.id)
   const chapterId = Number(getRouterParam(event, 'id'))
   const body = await readBody<{ title?: string, sort?: number }>(event)
   const title = (body.title || '').trim()

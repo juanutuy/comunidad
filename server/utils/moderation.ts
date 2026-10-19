@@ -30,12 +30,15 @@ export async function getReviewEnabled(event: H3Event, tenantId: number): Promis
 // Avisar a TODOS los admins del tenant menos a quien actúa (regla
 // general de no auto-notificación). Se usa al crear un reporte: un
 // admin que reporta contenido ajeno no se notifica a sí mismo.
-export async function notifyAdmins(event: H3Event, tenantId: number, actorId: number | null, title: string, link: string): Promise<void> {
+// Fase 14: también avisa de solicitudes de ingreso nuevas, con su
+// propio tipo ('join_request'); ambos son avisos operativos sin
+// preferencia de usuario, como 'report'.
+export async function notifyAdmins(event: H3Event, tenantId: number, actorId: number | null, title: string, link: string, type: 'report' | 'join_request' = 'report'): Promise<void> {
   const db = await dbFor(event)
   const admins = await db.prepare('SELECT user_id FROM memberships WHERE tenant_id = ? AND role = \'admin\'').all(tenantId) as { user_id: number }[]
   for (const a of admins) {
     if (actorId && a.user_id === actorId) continue
-    await notify(event, { tenantId, userId: a.user_id, actorId, type: 'report', title, link })
+    await notify(event, { tenantId, userId: a.user_id, actorId, type, title, link })
   }
 }
 
