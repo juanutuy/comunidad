@@ -1094,6 +1094,96 @@ JSON en `tenants` (`join_approval`, `join_questions`,
   se puede copiar desde la consola). Nadie puede suspenderse ni
   restringirse a sí mismo, y el último administrador tampoco.
 
+## Fase 15 (hecha) — privacidad y presentación
+
+La comunidad gana las superficies de Settings → Community Privacy,
+Feed Sidebar, Navigation Menu, General y Contact de la referencia
+(auditoría profunda de la consola, 19-oct-2026), con código y textos
+propios. Migración **aditiva** sobre `tenants` (19 columnas): todos
+los defaults reproducen el comportamiento anterior — comunidad
+privada, directorio y biblioteca de miembros, anticipo como el de
+siempre, registro abierto, sin marca — y nada cambia hasta que un
+administrador toca un ajuste. Todo se administra desde Ajustes de la
+comunidad, en subsecciones nuevas: «Privacidad», «Barra lateral del
+feed», «Menú de navegación» y «Contacto», más la marca y el
+interruptor de registro en «General».
+
+- **Visibilidad pública opcional** (`visibility`): con la comunidad
+  `public`, un visitante sin sesión puede LEER el feed (solo
+  publicaciones `published` de canales abiertos y las tarjetas de
+  anticipo de los pagos), el detalle de esos posts, las páginas de
+  canales abiertos y — según audiencia — el directorio y la
+  biblioteca. Los canales **privados** no existen para el visitante:
+  fuera de los listados, su página y el detalle de sus posts
+  devuelven 404 (este endurecimiento aplica también con la comunidad
+  privada: antes la página de un canal privado sin acceso mostraba su
+  nombre y un post con anticipo). La búsqueda NO se abre a
+  visitantes.
+- **Decisión propia registrada**: en modo público el visitante ve la
+  publicación pero NO los comentarios (son conversación de miembros)
+  ni puede interactuar; la página lo dice y ofrece registrarse.
+- **Anticipo granular de canales pagos**, calculado en el único
+  serializador de posts (`serializePost`), así feed, detalle, canal,
+  búsqueda y videos cuentan la misma historia: modo `preview` /
+  `full` / `title`; corte por porcentaje (5–50 %, default 25) y tope
+  de caracteres (150–2000, default 350; gana el menor; 0 = sin tope);
+  adjuntos como conteo o invisibles (`paid_media_mode`, que además
+  dejó de filtrar la URL real del archivo en las tarjetas
+  bloqueadas); título completo o acortado a 40/60/80/120; y dónde
+  aparecen las publicaciones bloqueadas (`feed` / `channel` /
+  `hidden`). Con `full`, **leer no es participar**: el servidor
+  separa `canRead` de `canInteract` y comentar, reaccionar o votar
+  sin acceso al canal devuelve 403 (antes comentar y reaccionar no
+  verificaban el acceso al canal del post).
+- **Audiencias**: directorio (`members` / `everyone` / `paid` =
+  acceso a un canal pago o suscripción activa / `disabled` = solo
+  administración) y biblioteca (`members` / `everyone`). Para el
+  visitante el directorio viaja en forma reducida: sin correos y sin
+  presencia en vivo.
+- **Barra lateral del feed configurable**: orden, visibilidad y
+  audiencia (`members` / `everyone`) de los 5 bloques reales del riel
+  (Próximos eventos, Publicaciones recientes, Top líderes, Miembros,
+  En línea). El servidor solo envía los bloques visibles y filtra
+  los datos por audiencia. **Diferencia menor documentada**: acá se
+  guarda con el botón «Guardar ajustes», como el resto de la página;
+  la referencia guarda al cambio.
+- **Menú de navegación editable**: cabecera y lateral salen de una
+  sola config (`nav_menu`): renombrar, reordenar, ocultar/mostrar y
+  mover de zona los 11 enlaces integrados (no se borran) y agregar
+  enlaces personalizados (los externos abren en pestaña nueva). El
+  panel móvil usa la misma lista. **Diferencias documentadas**: no
+  hay menú separado para website/blog (esa pieza quedó fuera por
+  decisión del dueño) y la barra inferior del teléfono conserva sus
+  5 acciones funcionales (Inicio, Mensajes, Crear, Avisos, Menú)
+  porque son acciones de uso, no enlaces del menú.
+- **Marca y registro**: `logo_url` / `logo_dark_url` (la barra
+  superior elige según el tema de cada persona, con respaldo icono →
+  inicial), `icon_url` y `favicon_url` (el `<head>` lo usa vía
+  `useHead` en el layout), subidos por la vía de archivos de siempre
+  con validación de imagen (tipo nuevo `branding`). Y
+  `anyone_can_register`: apagado, `POST /api/auth/register`
+  responde 403 y la página de registro muestra el aviso de cierre —
+  salvo que el registro traiga una invitación válida de la Fase 14,
+  que sigue entrando.
+- **Contacto**: correo de soporte, sitio web y hasta 10 redes
+  (Facebook, X, Instagram, LinkedIn, YouTube, TikTok, Discord) en un
+  bloque al pie del lateral, visible solo si hay al menos un dato.
+
+Verificación local por contenido (60 chequeos contra el dev server):
+defaults intactos; negativas de filtración en ambos modos (canal
+privado invisible y 404, cuerpo premium jamás servido a no
+compradores, comentarios retenidos al visitante); anticipo medido
+con un post de 2 759 caracteres (tope 350 + elipsis; sin tope manda
+el 25 %); modos `title` y `full` (con 403 al comentar/reaccionar);
+`hidden`/`channel` consistentes en feed, canal y búsqueda; título
+acortado a 40 + elipsis; audiencias del directorio (everyone /
+disabled / paid) y de la biblioteca; riel oculto y reordenado;
+menú con enlace personalizado y «Eventos» oculto; registro cerrado
+403 y con invitación 200 activo; favicon presente en el `<head>`
+servido. Build 0, typecheck 0, suite `test-realtime.mjs` 5/5 PASS.
+Datos de prueba eliminados y ajustes locales restaurados a los
+defaults.
+
 ## Pendiente a propósito (fuera de esta fase)
 
 - Migraciones versionadas con `drizzle-kit` para D1 (hoy: esquema
