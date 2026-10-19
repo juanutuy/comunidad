@@ -29,6 +29,8 @@ interface SettingsData {
     feedSidebar?: SidebarBlockForm[], navMenu?: NavItemForm[], anyoneCanRegister?: boolean
     logoUrl?: string, logoDarkUrl?: string, iconUrl?: string, faviconUrl?: string
     supportEmail?: string, websiteUrl?: string, socialLinks?: SocialLinkForm[]
+    // Fase 17: pagos.
+    currency?: string, manualPaymentsEnabled?: boolean
   }
   channels: { id: number, name: string, slug: string, type: string }[]
 }
@@ -49,6 +51,8 @@ const form = reactive({
   anyoneCanRegister: true,
   logoUrl: '', logoDarkUrl: '', iconUrl: '', faviconUrl: '',
   supportEmail: '', websiteUrl: '', socialLinks: [] as SocialLinkForm[],
+  // Fase 17: pagos.
+  currency: 'USD', manualPaymentsEnabled: false,
 })
 watchEffect(() => {
   if (data.value?.settings) {
@@ -83,6 +87,8 @@ watchEffect(() => {
     form.supportEmail = data.value.settings.supportEmail || ''
     form.websiteUrl = data.value.settings.websiteUrl || ''
     form.socialLinks = (data.value.settings.socialLinks || []).map(s => ({ ...s }))
+    form.currency = data.value.settings.currency || 'USD'
+    form.manualPaymentsEnabled = !!data.value.settings.manualPaymentsEnabled
   }
 })
 
@@ -92,11 +98,63 @@ const subItems = [
   { value: 'barra', label: 'Barra lateral del feed', icon: 'i-lucide-panel-right' },
   { value: 'menu', label: 'Menú de navegación', icon: 'i-lucide-menu' },
   { value: 'contacto', label: 'Contacto', icon: 'i-lucide-mail' },
+  { value: 'pagos', label: 'Pagos', icon: 'i-lucide-banknote' },
   { value: 'legales', label: 'Textos legales', icon: 'i-lucide-scale' },
   { value: 'moderacion', label: 'Moderación', icon: 'i-lucide-shield-alert' },
   { value: 'ingreso', label: 'Ingreso de miembros', icon: 'i-lucide-user-plus' },
 ]
-const TAB_VALUES = ['general', 'privacidad', 'barra', 'menu', 'contacto', 'legales', 'moderacion', 'ingreso']
+const TAB_VALUES = ['general', 'privacidad', 'barra', 'menu', 'contacto', 'pagos', 'legales', 'moderacion', 'ingreso']
+
+// Fase 17: moneda del tenant y métodos de pago manual. La moneda se
+// guarda con el botón general de la página; los métodos tienen su
+// propio CRUD inmediato contra /api/admin/manual-methods.
+const CURRENCY_OPTIONS = [
+  { label: 'USD · Dólar estadounidense', value: 'USD' },
+  { label: 'GTQ · Quetzal guatemalteco', value: 'GTQ' },
+  { label: 'MXN · Peso mexicano', value: 'MXN' },
+  { label: 'EUR · Euro', value: 'EUR' },
+  { label: 'COP · Peso colombiano', value: 'COP' },
+  { label: 'PEN · Sol peruano', value: 'PEN' },
+  { label: 'ARS · Peso argentino', value: 'ARS' },
+  { label: 'CLP · Peso chileno', value: 'CLP' },
+  { label: 'BRL · Real brasileño', value: 'BRL' },
+  { label: 'DOP · Peso dominicano', value: 'DOP' },
+]
+interface ManualMethodForm { id: number, type: string, title: string, details: string, active: boolean }
+const { data: payStatus } = await useAsyncData('admin-pay-status', () =>
+  user.value?.role === 'admin' ? api<{ enabled: boolean }>('/api/billing/status') : Promise.resolve(null))
+const { data: methodsData, refresh: refreshMethods } = await useAsyncData('admin-manual-methods', () =>
+  user.value?.role === 'admin' ? api<{ methods: ManualMethodForm[] }>('/api/admin/manual-methods') : Promise.resolve(null))
+const METHOD_TYPE_OPTIONS = [
+  { label: 'Transferencia bancaria', value: 'transferencia' },
+  { label: 'Billetera / dinero móvil', value: 'billetera' },
+  { label: 'Enlace de pago', value: 'enlace' },
+  { label: 'Otro', value: 'otro' },
+]
+const methodTypeLabel = (t: string) => METHOD_TYPE_OPTIONS.find(o => o.value === t)?.label || 'Otro'
+const newMethod = reactive({ type: 'transferencia', title: '', details: '' })
+const creatingMethod = ref(false)
+async function createMethod() {
+  creatingMethod.value = true
+  try {
+    await api('/api/admin/manual-methods', { method: 'POST', body: { ...newMethod } })
+    toast.add({ title: 'Método creado', color: 'success' })
+    newMethod.title = ''; newMethod.details = ''
+    await refreshMethods()
+  }
+  catch (e) { toast.add({ title: 'No se pudo crear el método', description: (e as { data?: { message?: string } }).data?.message || '', color: 'error' }) }
+  finally { creatingMethod.value = false }
+}
+async function toggleMethod(m: ManualMethodForm) {
+  await api(`/api/admin/manual-methods/${m.id}`, { method: 'PUT', body: { type: m.type, title: m.title, details: m.details, active: !m.active } })
+  await refreshMethods()
+}
+async function removeMethod(m: ManualMethodForm) {
+  if (!confirm(`¿Borrar el método «${m.title}»? Los pagos ya registrados no se tocan.`)) return
+  await api(`/api/admin/manual-methods/${m.id}`, { method: 'DELETE' })
+  toast.add({ title: 'Método borrado', color: 'success' })
+  await refreshMethods()
+}
 const tab = computed(() => (TAB_VALUES.includes(String(route.query.tab || '')) ? String(route.query.tab) : 'general'))
 
 // Fase 15: etiquetas y opciones de los bloques nuevos.
@@ -218,6 +276,9 @@ async function save() {
         supportEmail: form.supportEmail,
         websiteUrl: form.websiteUrl,
         socialLinks: form.socialLinks.filter(s => s.url.trim()),
+        // Fase 17: pagos.
+        currency: form.currency,
+        manualPaymentsEnabled: form.manualPaymentsEnabled,
       },
     })
     toast.add({ title: 'Ajustes guardados', color: 'success' })
@@ -577,6 +638,75 @@ async function save() {
               <UFormField label="Canal 2">
                 <USelect v-model="form.autoJoin2" :items="channelOptions" class="w-full" />
               </UFormField>
+            </div>
+          </div>
+        </div>
+      </UCard>
+
+      <UCard v-else-if="tab === 'pagos'">
+        <div class="space-y-6">
+          <div>
+            <p class="font-semibold">Moneda de la comunidad</p>
+            <p class="mt-1 text-sm text-muted">
+              La moneda en la que se leen y se muestran todos los precios de la comunidad: planes, canales,
+              cursos, ingresos y órdenes.
+            </p>
+            <div class="mt-3 max-w-sm">
+              <USelect v-model="form.currency" :items="CURRENCY_OPTIONS" class="w-full" />
+            </div>
+            <UAlert
+              class="mt-3" color="warning" variant="soft" icon="i-lucide-triangle-alert"
+              title="Cambiar la moneda no convierte los montos"
+              description="Los precios ya cargados quedan con el mismo número: solo cambia la moneda en la que se interpretan y se muestran. Si tus precios estaban pensados en otra moneda, ajustalos en Planes, Canales y Cursos después de cambiar."
+            />
+          </div>
+
+          <div class="border-t border-default pt-5">
+            <p class="font-semibold">Pagos con tarjeta (Stripe)</p>
+            <p class="mt-1 text-sm text-muted">
+              <template v-if="payStatus?.enabled">Los pagos en línea están <strong>activos</strong>: el checkout cobra con Stripe y el acceso se concede al confirmarse el pago.</template>
+              <template v-else>Los pagos en línea están <strong>en oscuro</strong>: todavía no hay claves de Stripe cargadas en el servidor, así que ningún checkout cobra con tarjeta. Mientras tanto, la comunidad puede vender con pagos manuales (abajo) sin esperar a Stripe.</template>
+            </p>
+          </div>
+
+          <div class="border-t border-default pt-5">
+            <div class="flex items-start justify-between gap-4">
+              <div class="min-w-0">
+                <p class="font-semibold">Pagos manuales</p>
+                <p class="mt-1 text-sm text-muted">
+                  El comprador paga por fuera (transferencia, billetera, tu propio enlace), declara el pago
+                  y queda <strong>en revisión</strong>: recién cuando lo aprobás desde
+                  <NuxtLink to="/admin/earnings" class="text-primary hover:underline">Ingresos → Pagos pendientes</NuxtLink>
+                  se concede el acceso. Declarar un pago no concede nada por sí solo.
+                </p>
+              </div>
+              <USwitch v-model="form.manualPaymentsEnabled" aria-label="Activar los pagos manuales" />
+            </div>
+
+            <div class="mt-4 space-y-2">
+              <div v-for="m in methodsData?.methods || []" :key="m.id" class="flex flex-wrap items-start gap-3 rounded-lg border border-default p-3">
+                <div class="min-w-0 flex-1">
+                  <p class="font-medium">{{ m.title }} <UBadge color="neutral" variant="subtle">{{ methodTypeLabel(m.type) }}</UBadge> <UBadge v-if="!m.active" color="warning" variant="subtle">Inactivo</UBadge></p>
+                  <p class="mt-0.5 whitespace-pre-line text-sm text-muted">{{ m.details }}</p>
+                </div>
+                <UButton size="sm" color="neutral" variant="soft" :label="m.active ? 'Desactivar' : 'Activar'" @click="toggleMethod(m)" />
+                <UButton size="sm" color="error" variant="ghost" icon="i-lucide-trash-2" aria-label="Borrar método" @click="removeMethod(m)" />
+              </div>
+              <p v-if="!methodsData?.methods.length" class="text-sm text-muted">Todavía no hay métodos cargados: sin al menos uno activo, el pago manual no aparece en el checkout aunque el interruptor esté encendido.</p>
+            </div>
+
+            <div class="mt-4 rounded-lg bg-elevated/50 p-3">
+              <p class="text-sm font-semibold">Agregar método</p>
+              <div class="mt-2 grid gap-3 sm:grid-cols-2">
+                <UFormField label="Tipo"><USelect v-model="newMethod.type" :items="METHOD_TYPE_OPTIONS" class="w-full" /></UFormField>
+                <UFormField label="Título (lo ve el comprador)"><UInput v-model="newMethod.title" class="w-full" placeholder="Ej.: Transferencia Banco Industrial" /></UFormField>
+              </div>
+              <UFormField class="mt-3" label="Instrucciones (lo que ve el comprador al pagar)">
+                <UTextarea v-model="newMethod.details" :rows="3" class="w-full" placeholder="Ej.: Cuenta monetaria 123-456789-0 a nombre de… Al pagar, anotá tu nombre en el concepto." />
+              </UFormField>
+              <div class="mt-3 flex justify-end">
+                <UButton size="sm" label="Agregar método" icon="i-lucide-plus" :loading="creatingMethod" :disabled="!newMethod.title.trim() || !newMethod.details.trim()" @click="createMethod" />
+              </div>
             </div>
           </div>
         </div>

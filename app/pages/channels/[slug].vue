@@ -34,7 +34,10 @@ async function demoAccess() {
   catch { toast.add({ title: 'No se pudo activar el acceso', color: 'error' }) }
 }
 
-const { data: billing } = await useAsyncData('billing-status-channel', () => api<{ enabled: boolean }>('/api/billing/status'))
+const { data: billing } = await useAsyncData('billing-status-channel', () => api<{ enabled: boolean, manualEnabled: boolean }>('/api/billing/status'))
+// Fase 17: pago manual del acceso a este canal (queda en revisión
+// hasta que un admin lo aprueba: no concede nada al declararlo).
+const manualOpen = ref(false)
 const buying = ref(false)
 async function buyAccess() {
   buying.value = true
@@ -83,9 +86,10 @@ async function buyAccess() {
           />
         </div>
       </div>
-      <UAlert v-if="data.channel.type === 'paid' && !data.channel.hasAccess" class="mx-5 mb-4" color="warning" variant="soft" icon="i-lucide-lock" title="Este es un canal pago" :description="billing?.enabled ? 'Con acceso ves todas las publicaciones completas y participás en la conversación. El pago se procesa con Stripe y el acceso se activa al confirmarse.' : 'Con acceso ves todas las publicaciones completas y participás en la conversación. Los pagos en línea todavía no están activados en esta comunidad (próximamente); mientras tanto podés activar el acceso de demostración.'">
+      <UAlert v-if="data.channel.type === 'paid' && !data.channel.hasAccess" class="mx-5 mb-4" color="warning" variant="soft" icon="i-lucide-lock" title="Este es un canal pago" :description="billing?.enabled ? 'Con acceso ves todas las publicaciones completas y participás en la conversación. El pago se procesa con Stripe y el acceso se activa al confirmarse.' : billing?.manualEnabled ? 'Con acceso ves todas las publicaciones completas y participás en la conversación. Podés pagar por fuera (pago manual): la administración verifica tu pago y recién ahí se activa el acceso.' : 'Con acceso ves todas las publicaciones completas y participás en la conversación. Los pagos todavía no están activados en esta comunidad (próximamente); mientras tanto podés activar el acceso de demostración.'">
         <template #actions>
           <UButton v-if="user && billing?.enabled" size="sm" color="warning" :label="`Comprar acceso · ${fmtMoney(data.channel.priceCents)}`" icon="i-lucide-credit-card" :loading="buying" @click="buyAccess" />
+          <UButton v-if="user && billing?.manualEnabled" size="sm" color="warning" variant="soft" :label="`Pago manual · ${fmtMoney(data.channel.priceCents)}`" icon="i-lucide-hand-coins" @click="manualOpen = true" />
           <UButton v-if="user" size="sm" color="warning" variant="soft" label="Acceso demo" icon="i-lucide-key-round" @click="demoAccess" />
           <UButton v-if="user" size="sm" to="/pricing" color="neutral" variant="soft" label="Ver planes" />
           <UButton v-else size="sm" to="/login" label="Iniciar sesión" />
@@ -118,5 +122,10 @@ async function buyAccess() {
         </UCard>
       </template>
     </UTabs>
+
+    <ManualPaymentDialog
+      v-model:open="manualOpen" kind="channel" :slug="slug" :item-id="data.channel.id"
+      :product-name="`Acceso al canal ${data.channel.name}`" :amount-cents="data.channel.priceCents"
+    />
   </div>
 </template>

@@ -32,6 +32,7 @@ const sections = [
   { label: 'Moderación', icon: 'i-lucide-shield-alert', to: '/admin/moderation', roles: ['admin', 'moderator'] },
   { label: 'Gamificación', icon: 'i-lucide-trophy', to: '/admin/gamification', roles: ['admin'] },
   { label: 'Planes', icon: 'i-lucide-credit-card', to: '/admin/plans', roles: ['admin'] },
+  { label: 'Ingresos', icon: 'i-lucide-chart-line', to: '/admin/earnings', roles: ['admin', 'moderator'] },
   { label: 'Dominios', icon: 'i-lucide-globe', to: '/admin/domains', roles: ['admin'] },
   { label: 'Correos', icon: 'i-lucide-mail', to: '/admin/emails', roles: ['admin'] },
   { label: 'Ajustes de la comunidad', icon: 'i-lucide-settings', to: '/admin/settings', roles: ['admin'] },

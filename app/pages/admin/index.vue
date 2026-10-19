@@ -63,7 +63,7 @@ const statCards = computed(() => {
     { label: 'Cursos publicados', value: t.courses, icon: 'i-lucide-graduation-cap', to: '/admin/courses' },
     { label: 'Eventos', value: t.events, icon: 'i-lucide-calendar-days', to: '/admin/events' },
     { label: 'Membresías activas', value: t.activeSubscriptions, icon: 'i-lucide-credit-card', to: '/admin/plans' },
-    { label: 'Ingresos confirmados', value: fmtMoney(t.revenueCents), icon: 'i-lucide-banknote', to: '/admin/plans' },
+    { label: 'Ingresos confirmados', value: fmtMoney(t.revenueCents), icon: 'i-lucide-banknote', to: '/admin/earnings' },
   ]
 })
 

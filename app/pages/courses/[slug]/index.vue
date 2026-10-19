@@ -33,7 +33,14 @@ async function enroll() {
   }
 }
 
-const { data: billing } = await useAsyncData('billing-status-course', () => api<{ enabled: boolean }>('/api/billing/status'))
+const { data: billing } = await useAsyncData('billing-status-course', () => api<{ enabled: boolean, manualEnabled: boolean }>('/api/billing/status'))
+// Fase 17: pago manual de la inscripción (queda en revisión hasta
+// que un admin lo aprueba en Ingresos: declarar no inscribe).
+const manualOpen = ref(false)
+function openManual() {
+  if (!user.value) { toast.add({ title: 'Iniciá sesión para comprar', color: 'warning' }); return }
+  manualOpen.value = true
+}
 const buying = ref(false)
 async function buyCourse() {
   if (!user.value) { toast.add({ title: 'Iniciá sesión para comprar', color: 'warning' }); return }
@@ -66,13 +73,13 @@ async function buyCourse() {
       <p v-else-if="!data.course.shortDescription" class="mt-2 whitespace-pre-line text-muted">{{ data.course.description }}</p>
       <div v-if="!data.course.enrolled" class="mt-4 flex flex-wrap items-center gap-2">
         <UButton v-if="!(data.course.priceCents > 0)" label="Inscribirme" icon="i-lucide-graduation-cap" @click="enroll" />
-        <template v-else-if="billing?.enabled">
-          <UButton :label="`Comprar curso · ${fmtMoney(data.course.priceCents)}`" icon="i-lucide-credit-card" :loading="buying" @click="buyCourse" />
-          <span class="text-sm text-muted">La inscripción se activa automáticamente al confirmarse el pago.</span>
-        </template>
         <template v-else>
-          <UButton label="Comprar curso" icon="i-lucide-credit-card" disabled />
-          <span class="text-sm text-muted">Pagos en línea próximamente: esta comunidad todavía no activó los pagos con tarjeta.</span>
+          <UButton v-if="billing?.enabled" :label="`Comprar curso · ${fmtMoney(data.course.priceCents)}`" icon="i-lucide-credit-card" :loading="buying" @click="buyCourse" />
+          <UButton v-if="billing?.manualEnabled" :label="`Pago manual · ${fmtMoney(data.course.priceCents)}`" color="neutral" variant="soft" icon="i-lucide-hand-coins" @click="openManual" />
+          <UButton v-if="!billing?.enabled && !billing?.manualEnabled" label="Comprar curso" icon="i-lucide-credit-card" disabled />
+          <span v-if="billing?.enabled" class="text-sm text-muted">La inscripción se activa automáticamente al confirmarse el pago.</span>
+          <span v-else-if="billing?.manualEnabled" class="text-sm text-muted">Pagás por fuera y la administración verifica el pago: la inscripción se activa al aprobarlo.</span>
+          <span v-else class="text-sm text-muted">Pagos próximamente: esta comunidad todavía no activó ningún medio de pago.</span>
         </template>
       </div>
       <template v-else>
@@ -87,6 +94,10 @@ async function buyCourse() {
           <UProgress :model-value="data.course.progress.pct" />
         </div>
       </template>
+      <ManualPaymentDialog
+        v-model:open="manualOpen" kind="course" :slug="slug" :item-id="data.course.id"
+        :product-name="`Curso ${data.course.title}`" :amount-cents="data.course.priceCents"
+      />
     </UCard>
 
     <UCard>

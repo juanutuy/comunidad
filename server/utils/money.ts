@@ -34,7 +34,9 @@ export function normalizeCurrency(code: unknown): string {
 export function formatMoney(cents: number, currency = 'USD'): string {
   if (!cents) return 'Gratis'
   try {
-    return new Intl.NumberFormat('es', { style: 'currency', currency: normalizeCurrency(currency) }).format(cents / 100)
+    // 'es-419' (español latinoamericano) con símbolo angosto: USD se
+    // ve «$22.00» y GTQ «Q 22.00», como los escribe la audiencia.
+    return new Intl.NumberFormat('es-419', { style: 'currency', currency: normalizeCurrency(currency), currencyDisplay: 'narrowSymbol' }).format(cents / 100)
   }
   catch {
     return `$${(cents / 100).toFixed(2)}`
