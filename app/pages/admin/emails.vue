@@ -2,6 +2,7 @@
 // Registro de correos (solo admin, Fase 4): transparencia de la capa
 // de correo. 'skipped_no_provider' = el correo se generó pero NO se
 // envió porque el servidor no tiene proveedor configurado.
+definePageMeta({ layout: 'admin' })
 const { user, tenant } = useAuth()
 const api = useApi()
 
@@ -23,7 +24,6 @@ const statusLabel = (s: string) => s === 'sent' ? 'Enviado' : s === 'failed' ? '
     <UAlert v-if="user && user.role !== 'admin'" color="warning" variant="soft" title="Solo administradores" />
     <UAlert v-else-if="!user" color="neutral" variant="soft" title="Iniciá sesión con una cuenta administradora" />
     <template v-else>
-      <AdminNav />
       <UAlert v-if="!data?.providerConfigured" color="warning" variant="soft" icon="i-lucide-mail-warning" title="Proveedor de correo no configurado" description="La capa de correo está completa, pero el servidor no tiene un proveedor configurado (variable NUXT_EMAIL_PROVIDER_URL). Los correos se generan y quedan registrados aquí como «No enviado (sin proveedor)»; nadie finge envíos que no ocurrieron. El resumen semanal se dispara por cron contra /api/cron/digest con el secreto NUXT_CRON_SECRET." />
       <UAlert v-else color="success" variant="soft" icon="i-lucide-mail-check" title="Proveedor de correo activo" description="Los correos se están despachando por el proveedor configurado en el servidor." />
       <UCard>

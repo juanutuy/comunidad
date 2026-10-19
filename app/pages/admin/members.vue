@@ -1,5 +1,6 @@
 <script setup lang="ts">
 // Gestión de miembros (solo admin): rol y membresía de cada persona.
+definePageMeta({ layout: 'admin' })
 const { user, tenant } = useAuth()
 const api = useApi()
 const toast = useToast()
@@ -56,7 +57,6 @@ async function removeMember() {
     <UAlert v-else-if="!user" color="neutral" variant="soft" title="Iniciá sesión con una cuenta administradora" />
     <template v-else>
       <div class="flex flex-wrap gap-2">
-        <AdminNav />
       </div>
       <UCard :ui="{ body: 'p-0 sm:p-0' }">
         <ul class="divide-y divide-default">

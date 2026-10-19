@@ -8,6 +8,8 @@ const route = useRoute()
 // contador de avisos compartido entre la campana y la barra inferior.
 const { openPanel, closePanel } = useMobilePanel()
 const { refresh: refreshNotif } = useNotifBadge()
+// Fase 11: los ajustes de cuenta son un modal (no una página).
+const { openSettings: openUserSettings } = useUserSettings()
 // Corrección: la búsqueda de la barra es SOLO el icono de lupa que
 // abre el diálogo (Cmd+K), como en la referencia — sin caja pegada.
 const { openSearch } = useSearchDialog()
@@ -48,11 +50,12 @@ const userMenuItems = computed(() => [
   [
     { label: 'Mi perfil', icon: 'i-lucide-user', to: `/profile/${user.value?.slug}` },
     { label: 'Mis borradores', icon: 'i-lucide-file-edit', to: '/drafts' },
-    { label: 'Ajustes de cuenta', icon: 'i-lucide-settings-2', to: '/settings' },
+    { label: 'Ajustes de cuenta', icon: 'i-lucide-settings-2', onSelect: () => openUserSettings() },
     { label: 'Notificaciones', icon: 'i-lucide-bell', to: '/notifications' },
     ...(user.value?.role === 'admin'
       ? [
-          { label: 'Ajustes de la comunidad', icon: 'i-lucide-settings', to: '/admin' },
+          { label: 'Panel de administración', icon: 'i-lucide-settings', to: '/admin' },
+          { label: 'Ajustes de la comunidad', icon: 'i-lucide-settings-2', to: '/admin/settings' },
           { label: 'Miembros', icon: 'i-lucide-users', to: '/admin/members' },
           { label: 'Administrar canales', icon: 'i-lucide-hash', to: '/admin/channels' },
           { label: 'Cursos', icon: 'i-lucide-graduation-cap', to: '/admin/courses' },
@@ -227,5 +230,6 @@ const isProfilePage = computed(() => route.path.startsWith('/profile/'))
     <MobilePanel :dm-unread="dmUnread" :groups="channelData?.groups || []" @logout="doLogout" />
     <MobileBottomBar v-if="user" :dm-unread="dmUnread" />
     <SearchDialog />
+    <UserSettingsModal />
   </div>
 </template>

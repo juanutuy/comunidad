@@ -1,6 +1,7 @@
 <script setup lang="ts">
 // Planes de membresía (solo admin, Fase 4): CRUD simple por tenant.
 // Los planes incluyen acceso a todos los canales pagos del tenant.
+definePageMeta({ layout: 'admin' })
 const { user, tenant } = useAuth()
 const api = useApi()
 const toast = useToast()
@@ -51,7 +52,6 @@ async function remove(plan: Plan) {
     <UAlert v-if="user && user.role !== 'admin'" color="warning" variant="soft" title="Solo administradores" />
     <UAlert v-else-if="!user" color="neutral" variant="soft" title="Iniciá sesión con una cuenta administradora" />
     <template v-else>
-      <AdminNav />
       <UAlert v-if="!billing?.enabled" color="warning" variant="soft" icon="i-lucide-credit-card" title="Pagos en línea en oscuro" description="Los planes se pueden crear y se muestran en la página de Precios, pero las suscripciones se activan recién cuando se carguen las claves de Stripe en el servidor (ver README, sección Fase 4). Hoy la UI lo muestra como «Pagos en línea próximamente»." />
       <UCard>
         <h2 class="mb-3 font-bold">Crear plan</h2>

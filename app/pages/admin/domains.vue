@@ -2,6 +2,7 @@
 // Dominios personalizados (solo admin, Fase 4): la app resuelve el
 // tenant por el host exacto. La activación del dominio en Cloudflare
 // for Platforms es un paso de cuenta aparte y esta página lo dice.
+definePageMeta({ layout: 'admin' })
 const { user, tenant } = useAuth()
 const api = useApi()
 const toast = useToast()
@@ -39,7 +40,6 @@ async function remove(d: Domain) {
     <UAlert v-if="user && user.role !== 'admin'" color="warning" variant="soft" title="Solo administradores" />
     <UAlert v-else-if="!user" color="neutral" variant="soft" title="Iniciá sesión con una cuenta administradora" />
     <template v-else>
-      <AdminNav />
       <UAlert color="neutral" variant="soft" icon="i-lucide-info" title="Cómo funciona" description="Al agregar un dominio aquí, la plataforma empieza a reconocerlo como la dirección de ESTA comunidad. Para que el tráfico llegue, además tenés que apuntar el DNS y activar el dominio en la cuenta de la plataforma (Cloudflare for Platforms): ese paso lo hace la administración de la plataforma, no se completa solo desde esta pantalla." />
       <UCard>
         <h2 class="mb-3 font-bold">Dominios de {{ tenant?.name }}</h2>

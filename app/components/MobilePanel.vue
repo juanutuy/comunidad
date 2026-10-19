@@ -19,6 +19,12 @@ const { user, tenant } = useAuth()
 const { initials } = useFormat()
 const api = useApi()
 const { open, closePanel } = useMobilePanel()
+// Fase 11: «Ajustes de cuenta» abre el modal de ajustes (y cierra el panel).
+const { openSettings: openUserSettings } = useUserSettings()
+function openSettingsFromPanel() {
+  closePanel()
+  openUserSettings()
+}
 const colorMode = useColorMode()
 
 // Nivel y puntos reales del usuario: el mismo payload que alimenta la
@@ -227,9 +233,9 @@ const mainLinks = computed(() => [
         <div class="border-t border-default pt-3">
           <ul class="space-y-0.5 text-[15px]">
             <li v-if="user">
-              <NuxtLink to="/settings" class="flex items-center gap-3 rounded-lg px-2 py-2 hover:bg-elevated" active-class="bg-elevated font-semibold" @click="closePanel">
+              <button type="button" class="flex w-full items-center gap-3 rounded-lg px-2 py-2 text-left hover:bg-elevated" @click="openSettingsFromPanel">
                 <UIcon name="i-lucide-settings-2" class="shrink-0 text-muted" /> Ajustes de cuenta
-              </NuxtLink>
+              </button>
             </li>
             <li v-if="user?.role === 'admin'">
               <NuxtLink to="/admin" class="flex items-center gap-3 rounded-lg px-2 py-2 hover:bg-elevated" active-class="bg-elevated font-semibold" @click="closePanel">

@@ -7,6 +7,7 @@
 // referencia (video, texto, audio, PDF, slides, descarga, incrustado)
 // — no hay quiz porque la referencia tampoco lo tiene. El tipo de una
 // lección con contenido es inmutable (el servidor lo enforce también).
+definePageMeta({ layout: 'admin' })
 const route = useRoute()
 const courseId = computed(() => String(route.params.id))
 const { user, tenant } = useAuth()

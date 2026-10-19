@@ -3,9 +3,21 @@
 // puntos por acción, editables por comunidad. Los niveles se guardan
 // como lista completa (editar / agregar / eliminar en un solo guardado)
 // y el servidor valida las guardas (base en 0, umbrales crecientes).
+// Fase 11: la sección gana sub-navegación real con pestañas
+// (?tab=niveles | ?tab=puntos), como «Badges & Levels / Activity XP»
+// de la referencia; el guardado sigue siendo uno solo para ambas
+// vistas, contra PUT /api/admin/gamification.
+definePageMeta({ layout: 'admin' })
 const { user, tenant } = useAuth()
 const api = useApi()
 const toast = useToast()
+const route = useRoute()
+
+const subItems = [
+  { value: 'niveles', label: 'Niveles e insignias', icon: 'i-lucide-trophy' },
+  { value: 'puntos', label: 'Puntos por acción', icon: 'i-lucide-coins' },
+]
+const tab = computed(() => (route.query.tab === 'puntos' ? 'puntos' : 'niveles'))
 
 interface GamLevel { id: number, name: string, min: number, icon: string }
 interface GamPoint { action: string, label: string, description: string, points: number }
@@ -61,9 +73,9 @@ async function save() {
     <UAlert v-if="user && user.role !== 'admin'" color="warning" variant="soft" title="Solo administradores" />
     <UAlert v-else-if="!user" color="neutral" variant="soft" title="Iniciá sesión con una cuenta administradora" />
     <template v-else>
-      <AdminNav />
+      <AdminSubNav :items="subItems" />
 
-      <UCard>
+      <UCard v-if="tab === 'niveles'">
         <template #header>
           <div class="flex flex-wrap items-center gap-3">
             <h2 class="flex flex-1 items-center gap-2 font-bold"><UIcon name="i-lucide-trophy" /> Niveles e insignias</h2>
@@ -100,7 +112,7 @@ async function save() {
         <p class="mt-3 text-xs text-muted">El orden de las insignias sale del umbral: al guardar, la lista se ordena de menor a mayor.</p>
       </UCard>
 
-      <UCard>
+      <UCard v-else>
         <template #header>
           <h2 class="flex items-center gap-2 font-bold"><UIcon name="i-lucide-coins" /> Puntos por acción</h2>
         </template>

@@ -6,6 +6,7 @@
 // página-estudio (/admin/courses/[id]/edit): currículum por
 // arrastre, drip, inscritos y settings con autoguardado. Acá solo se
 // crea (nace en borrador y se abre el estudio), se entra y se borra.
+definePageMeta({ layout: 'admin' })
 const { user } = useAuth()
 const isAdmin = computed(() => user.value?.role === 'admin')
 const api = useApi()
@@ -64,7 +65,6 @@ async function confirmDelete() {
 <template>
   <div class="space-y-5">
     <h1 class="text-2xl font-bold">Administración</h1>
-    <AdminNav />
     <UAlert v-if="!user" color="warning" variant="soft" icon="i-lucide-lock" title="Iniciá sesión" description="Necesitás una cuenta de administrador para gestionar los cursos.">
       <template #actions><UButton to="/" label="Ir al inicio" size="sm" /></template>
     </UAlert>

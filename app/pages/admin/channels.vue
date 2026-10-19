@@ -1,6 +1,7 @@
 <script setup lang="ts">
 // Gestión de canales (solo admin): crear, editar y borrar canales.
 // Borrar un canal elimina también sus publicaciones y accesos (server).
+definePageMeta({ layout: 'admin' })
 const { user, tenant } = useAuth()
 const api = useApi()
 const toast = useToast()
@@ -97,7 +98,6 @@ async function deleteChannel() {
     <UAlert v-else-if="!user" color="neutral" variant="soft" title="Iniciá sesión con una cuenta administradora" />
     <template v-else>
       <div class="flex flex-wrap gap-2">
-        <AdminNav />
       </div>
 
       <UCard>

@@ -858,6 +858,49 @@ estudio sin perder datos (certificado sigue encendido en ellos);
   `/api/search` (candados y anonimización intactos, aplicados por el
   servidor) y enlace a «ver todos los resultados» en `/search`.
 
+## Fase 11 (hecha) — consola de administración dedicada y ajustes de usuario como modal
+
+- **Layout de consola propio (`app/layouts/admin.vue`)** para todo
+  `/admin/**` (cada página lo declara con `definePageMeta`): ya no se
+  monta dentro del layout de miembro. Barra superior mínima («← Volver
+  a la comunidad» + nombre de la comunidad + distintivo
+  «Administración», menú de usuario con cerrar sesión) y **riel de
+  secciones** a la izquierda con solo las secciones que existen:
+  Panel, Miembros, Canales, Cursos, Eventos, Gamificación, Planes,
+  Dominios, Correos y Ajustes de la comunidad. Sin lateral de canales,
+  sin RightRail, sin barra inferior ni panel móvil. Responsive del
+  riel: completo desde `lg`, solo iconos en `md–lg`, panel deslizable
+  en teléfono. La autorización no cambió: las APIs siguen exigiendo
+  admin con `requireAdmin` (un miembro recibe 403 igual que antes) y
+  el riel solo se pinta para administradores.
+- **Sub-navegación por sección** (`AdminSubNav.vue`, pestañas por
+  `?tab=`), solo donde hay subsecciones reales: Gamificación se partió
+  en **Niveles e insignias / Puntos por acción** (un solo guardado,
+  como antes) y los ajustes de la comunidad salieron del pie del Panel
+  a su propia sección **`/admin/settings`** con pestañas **General**
+  (nombre, lema, color, reglas) y **Textos legales** (términos y
+  privacidad), también con un solo guardado contra
+  `PUT /api/admin/settings`.
+- El estudio de cursos (`/admin/courses/[id]/edit`) hereda la consola
+  conservando su cabecera propia. Desaparece el viejo `AdminNav` de
+  botones en pastilla. La **moderación** sigue sin sección propia a
+  propósito: vive en contexto, en el menú de cada publicación
+  (fijar/eliminar como admin), así que no se inventó una entrada de
+  menú sin página detrás.
+- **Ajustes de cuenta como modal** (`UserSettingsModal.vue` + estado
+  compartido en `useUserSettings.ts`), como el «Profile Settings» de
+  la referencia: navegación vertical de secciones (Perfil,
+  Notificaciones, Privacidad, Bloqueados y ocultos, Seguridad) y la
+  misma lógica/endpoints que tenía la página (`/api/settings*`,
+  `/api/uploads`), guardando sin salir de donde estás. Se abre desde
+  el menú del avatar, desde el panel móvil y desde la barra de la
+  consola; en teléfono va a pantalla completa. Convive con el modal
+  «Editar perfil» de la Fase 9: ese queda para la edición rápida de
+  los datos públicos desde el perfil; ambos escriben contra los
+  mismos endpoints (una sola fuente de verdad). La ruta `/settings`
+  queda como compatibilidad: abre el modal (acepta `?section=`) y
+  vuelve a `/feeds`, para no romper enlaces guardados.
+
 ## Pendiente a propósito (fuera de esta fase)
 
 - Migraciones versionadas con `drizzle-kit` para D1 (hoy: esquema

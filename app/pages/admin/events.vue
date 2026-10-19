@@ -2,6 +2,7 @@
 // Gestión de eventos (solo admin, Fase 5): crear, editar y borrar.
 // Los eventos aparecen en el calendario/lista pública y usan el
 // RSVP existente; aquí se ve cuántos confirmaron asistencia.
+definePageMeta({ layout: 'admin' })
 const { user, tenant } = useAuth()
 const { fmtDateTime } = useFormat()
 const api = useApi()
@@ -92,7 +93,6 @@ async function confirmDelete() {
     <UAlert v-if="user && user.role !== 'admin'" color="warning" variant="soft" title="Solo administradores" />
     <UAlert v-else-if="!user" color="neutral" variant="soft" title="Iniciá sesión con una cuenta administradora" />
     <template v-else>
-      <AdminNav />
       <UCard>
         <template #header>
           <h2 class="font-bold">{{ editing ? `Editar: ${editing.title}` : 'Nuevo evento' }}</h2>

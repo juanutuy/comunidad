@@ -1,11 +1,12 @@
 <script setup lang="ts">
-// Panel de administración (Fase 5): estadísticas reales del tenant,
-// actividad reciente, listas de atención y — abajo — los ajustes de
-// la comunidad (nombre, lema, color, reglas y textos legales).
-const { user, tenant, fetchMe } = useAuth()
+// Panel de administración (Fase 5; consola dedicada en la Fase 11):
+// estadísticas reales del tenant, actividad reciente y listas de
+// atención. Los ajustes de la comunidad viven en su propia sección
+// (/admin/settings) desde la Fase 11.
+definePageMeta({ layout: 'admin' })
+const { user, tenant } = useAuth()
 const { fmtDateTime, fmtMoney, initials } = useFormat()
 const api = useApi()
-const toast = useToast()
 
 interface Stats {
   totals: { members: number, onlineNow: number, channels: number, posts: number, comments: number, courses: number, events: number, activeSubscriptions: number, revenueCents: number }
@@ -15,48 +16,6 @@ interface Stats {
 }
 const { data: stats } = await useAsyncData('admin-stats', () =>
   user.value?.role === 'admin' ? api<Stats>('/api/admin/stats') : Promise.resolve(null))
-
-const { data } = await useAsyncData('admin-settings', () =>
-  user.value?.role === 'admin'
-    ? api<{ settings: { name: string, tagline: string, brandColor: string, guidelines: string[], terms: string, privacy: string } }>('/api/admin/settings')
-    : Promise.resolve(null))
-
-const form = reactive({ name: '', tagline: '', brandColor: '#2563eb', guidelinesText: '', terms: '', privacy: '' })
-watchEffect(() => {
-  if (data.value?.settings) {
-    form.name = data.value.settings.name
-    form.tagline = data.value.settings.tagline
-    form.brandColor = data.value.settings.brandColor
-    form.guidelinesText = data.value.settings.guidelines.join('\n')
-    form.terms = data.value.settings.terms || ''
-    form.privacy = data.value.settings.privacy || ''
-  }
-})
-
-const saving = ref(false)
-async function save() {
-  saving.value = true
-  try {
-    await api('/api/admin/settings', {
-      method: 'PUT',
-      body: {
-        name: form.name,
-        tagline: form.tagline,
-        brandColor: form.brandColor,
-        guidelines: form.guidelinesText.split('\n').map(g => g.trim()).filter(Boolean),
-        terms: form.terms,
-        privacy: form.privacy,
-      },
-    })
-    toast.add({ title: 'Ajustes guardados', color: 'success' })
-    await fetchMe()
-    await refreshNuxtData('layout-channels')
-  }
-  catch (e) {
-    toast.add({ title: 'No se pudieron guardar los ajustes', description: (e as { data?: { message?: string } }).data?.message || '', color: 'error' })
-  }
-  finally { saving.value = false }
-}
 
 const statCards = computed(() => {
   const t = stats.value?.totals
@@ -78,13 +37,12 @@ const statCards = computed(() => {
 <template>
   <div class="space-y-5">
     <div>
-      <h1 class="text-2xl font-bold">Administración</h1>
-      <p class="text-muted">El pulso de {{ tenant?.name }}: cifras reales de la comunidad y sus ajustes.</p>
+      <h1 class="text-2xl font-bold">Panel</h1>
+      <p class="text-muted">El pulso de {{ tenant?.name }}: cifras reales de la comunidad.</p>
     </div>
     <UAlert v-if="user && user.role !== 'admin'" color="warning" variant="soft" title="Solo administradores" description="Tu cuenta no tiene rol de administrador en esta comunidad." />
     <UAlert v-else-if="!user" color="neutral" variant="soft" title="Iniciá sesión con una cuenta administradora" />
     <template v-else>
-      <AdminNav />
       <div class="grid grid-cols-2 gap-3 lg:grid-cols-3">
         <NuxtLink v-for="card in statCards" :key="card.label" :to="card.to">
           <UCard class="h-full transition hover:bg-elevated">
@@ -124,39 +82,6 @@ const statCards = computed(() => {
           <p v-else class="text-sm text-muted">Ninguna: todas las publicaciones recibieron comentarios.</p>
         </UCard>
       </div>
-
-      <UCard>
-        <template #header>
-          <h2 class="flex items-center gap-2 font-bold"><UIcon name="i-lucide-settings" /> Ajustes de la comunidad</h2>
-        </template>
-        <div class="space-y-4">
-          <UFormField label="Nombre de la comunidad">
-            <UInput v-model="form.name" class="w-full" />
-          </UFormField>
-          <UFormField label="Lema / descripción corta">
-            <UInput v-model="form.tagline" class="w-full" />
-          </UFormField>
-          <UFormField label="Color de marca">
-            <div class="flex items-center gap-3">
-              <input v-model="form.brandColor" type="color" class="h-10 w-16 cursor-pointer rounded-md border border-default bg-transparent">
-              <UInput v-model="form.brandColor" class="w-32" />
-              <span class="flex h-8 w-8 items-center justify-center rounded-lg font-bold text-white" :style="{ backgroundColor: form.brandColor }">{{ (form.name || 'C').charAt(0) }}</span>
-            </div>
-          </UFormField>
-          <UFormField label="Reglas de la comunidad" description="Una regla por línea. Se muestran en la página de Reglas.">
-            <UTextarea v-model="form.guidelinesText" :rows="6" class="w-full" />
-          </UFormField>
-          <UFormField label="Términos y condiciones" description="Se muestran en /terms. Si queda vacío se usa un texto por defecto.">
-            <UTextarea v-model="form.terms" :rows="6" class="w-full" placeholder="Texto de términos de tu comunidad…" />
-          </UFormField>
-          <UFormField label="Política de privacidad" description="Se muestra en /privacy. Si queda vacío se usa un texto por defecto.">
-            <UTextarea v-model="form.privacy" :rows="6" class="w-full" placeholder="Texto de privacidad de tu comunidad…" />
-          </UFormField>
-          <div class="flex justify-end">
-            <UButton label="Guardar ajustes" icon="i-lucide-save" :loading="saving" :disabled="!form.name.trim()" @click="save" />
-          </div>
-        </div>
-      </UCard>
     </template>
   </div>
 </template>
