@@ -22,9 +22,22 @@ const api = useApi()
 const toast = useToast()
 
 const { data: channelData } = await useAsyncData('composer-channels', () =>
-  api<{ groups: { channels: { slug: string, name: string, type: string, hasAccess: boolean }[] }[] }>('/api/channels'))
+  api<{ groups: { channels: { slug: string, name: string, type: string, hasAccess: boolean, postPermission?: string }[] }[] }>('/api/channels'))
+// Fase 16: «quién puede publicar» — en un canal de «solo el equipo»
+// los miembros no publican (la API también devuelve 403). Esos
+// canales salen de la lista publicable para los miembros; y si el
+// compositor está DENTRO de ese canal, se reemplaza por el aviso.
+const isStaffUser = computed(() => ['admin', 'moderator', 'course_manager'].includes(user.value?.role || ''))
 const publishable = computed(() =>
-  (channelData.value?.groups || []).flatMap(g => g.channels).filter(c => c.type === 'free' || c.hasAccess))
+  (channelData.value?.groups || []).flatMap(g => g.channels)
+    .filter(c => c.type === 'free' || c.hasAccess)
+    .filter(c => c.postPermission !== 'staff' || isStaffUser.value))
+const staffOnlyChannel = computed(() => {
+  if (!props.channelSlug || isStaffUser.value) return null
+  const all = (channelData.value?.groups || []).flatMap(g => g.channels)
+  const ch = all.find(c => c.slug === props.channelSlug)
+  return ch && ch.postPermission === 'staff' ? ch : null
+})
 
 const open = ref(false)
 const isPhone = useIsPhone()
@@ -130,6 +143,13 @@ function insertEmoji(e: string) {
 const pendingPreset = ref<'photo' | 'video' | 'poll' | null>(null)
 function openModal(preset?: 'photo' | 'video' | 'poll') {
   if (!user.value) { toast.add({ title: 'Iniciá sesión para publicar', color: 'warning' }); return }
+  // Fase 16: dentro de un canal de «solo el equipo», un miembro no
+  // abre el editor: el aviso (en la variante de barra es la alerta
+  // fija; en la «bare» va como toast).
+  if (staffOnlyChannel.value) {
+    toast.add({ title: 'Solo el equipo puede publicar en este canal', description: 'Podés leer, comentar y reaccionar como siempre.', color: 'warning' })
+    return
+  }
   // Fase 14: con la compuerta de publicación activa para este
   // miembro, el modal ni se abre: el aviso va como toast (la variante
   // de barra además pinta la alerta fija en el lugar del compositor).
@@ -253,6 +273,13 @@ const chevronItems = computed(() => [
     v-if="user && createGate && variant === 'bar'" color="warning" variant="soft" icon="i-lucide-lock"
     :title="`Necesitás el nivel ${createGate.levelName} para publicar`"
     :description="`Esta comunidad reserva la publicación a quienes alcanzan ese nivel. Tenés ${createGate.myPoints} puntos y el nivel se alcanza con ${createGate.neededPoints}: participá comentando y reaccionando para llegar.`"
+  />
+  <!-- Fase 16: canal de «solo el equipo» — el compositor se
+       reemplaza por el aviso para los miembros sin permiso. -->
+  <UAlert
+    v-else-if="user && staffOnlyChannel && variant === 'bar'" color="neutral" variant="soft" icon="i-lucide-lock"
+    title="Solo el equipo puede publicar en este canal"
+    description="Las publicaciones nuevas de este canal las hace el equipo de la comunidad. Podés leer, comentar y reaccionar como siempre."
   />
   <div v-else-if="user" :class="variant === 'bare' ? 'contents' : undefined">
     <!-- Disparador externo (variante «bare», Fase 10): la barra

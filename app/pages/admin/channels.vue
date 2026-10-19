@@ -6,9 +6,9 @@ const { user, tenant } = useAuth()
 const api = useApi()
 const toast = useToast()
 
-interface ChannelRow { id: number, slug: string, name: string, icon?: string, description?: string, type: string, priceCents: number }
+interface ChannelRow { id: number, slug: string, name: string, icon?: string, description?: string, type: string, priceCents: number, archived?: boolean }
 const { data, refresh } = await useAsyncData('admin-channels', () =>
-  api<{ groups: { id: number, name: string, channels: ChannelRow[] }[] }>('/api/channels'))
+  api<{ groups: { id: number, name: string, channels: ChannelRow[] }[] }>('/api/channels?includeArchived=1'))
 const allChannels = computed(() => (data.value?.groups || []).flatMap(g => g.channels))
 const groupOptions = computed(() => (data.value?.groups || []).map(g => ({ label: g.name, value: g.id })))
 
@@ -133,6 +133,7 @@ async function deleteChannel() {
           <ul class="divide-y divide-default">
             <li v-for="ch in g.channels" :key="ch.id" class="flex flex-wrap items-center gap-2 py-2 text-sm">
               <NuxtLink :to="`/channels/${ch.slug}`" class="flex-1 font-medium hover:underline">{{ ch.name }}</NuxtLink>
+              <UBadge v-if="ch.archived" color="neutral" variant="solid">Archivado</UBadge>
               <UBadge color="neutral" variant="subtle">{{ ch.type === 'paid' ? `Pago $${(ch.priceCents / 100).toFixed(2)}` : ch.type === 'private' ? 'Privado' : 'Gratuito' }}</UBadge>
               <UButton size="xs" color="neutral" variant="ghost" icon="i-lucide-pencil" label="Editar" @click="openEdit(ch, g.id)" />
               <UButton size="xs" color="error" variant="ghost" icon="i-lucide-trash-2" label="Borrar" @click="toDelete = ch" />

@@ -9,7 +9,7 @@ const api = useApi()
 const toast = useToast()
 
 interface ChannelDetail {
-  channel: { id: number, slug: string, name: string, icon: string, description: string, type: string, priceCents: number, following: boolean, hasAccess: boolean }
+  channel: { id: number, slug: string, name: string, icon: string, description: string, type: string, priceCents: number, following: boolean, hasAccess: boolean, archived?: boolean, postPermission?: string }
   posts: PostView[]
 }
 const { data, refresh } = await useAsyncData(() => `channel-${slug.value}`, () => api<ChannelDetail>(`/api/channels/${slug.value}`), { watch: [slug] })
@@ -92,6 +92,13 @@ async function buyAccess() {
         </template>
       </UAlert>
     </UCard>
+
+    <UAlert
+      v-if="data.channel.archived" color="neutral" variant="soft" icon="i-lucide-archive"
+      title="Este canal está archivado"
+      description="Solo vos lo ves, como administrador: para los miembros desapareció de la navegación, el feed, la búsqueda y el chat. Podés desarchivarlo desde Contenido → Canales en la consola."
+      class="mb-4"
+    />
 
     <UTabs v-model="tab" :items="tabItems">
       <template #content="{ item }">

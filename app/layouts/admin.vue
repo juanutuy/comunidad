@@ -26,6 +26,7 @@ const sections = [
   { label: 'Panel', icon: 'i-lucide-layout-dashboard', to: '/admin', exact: true, roles: ['admin'] },
   { label: 'Miembros', icon: 'i-lucide-users', to: '/admin/members', roles: ['admin', 'moderator'] },
   { label: 'Canales', icon: 'i-lucide-hash', to: '/admin/channels', roles: ['admin'] },
+  { label: 'Contenido', icon: 'i-lucide-folder-open', to: '/admin/content', roles: ['admin', 'moderator'] },
   { label: 'Cursos', icon: 'i-lucide-graduation-cap', to: '/admin/courses', roles: ['admin', 'course_manager'] },
   { label: 'Eventos', icon: 'i-lucide-calendar-days', to: '/admin/events', roles: ['admin'] },
   { label: 'Moderación', icon: 'i-lucide-shield-alert', to: '/admin/moderation', roles: ['admin', 'moderator'] },

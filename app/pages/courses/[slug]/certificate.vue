@@ -1,17 +1,28 @@
 <script setup lang="ts">
 // Certificado de finalización (Fase 2): solo con el 100% del curso.
-// Diseño simple listo para imprimir: al imprimir se oculta el resto de
-// la página (ver el bloque <style> al final).
+// Fase 16: el certificado se EMITE con un diseño (blueprint del curso
+// o el diseño por defecto del sistema) y un código único: lo que se
+// ve acá es la foto del diseño al emitirse — editar el diseño
+// después no cambia este certificado — y cualquiera puede
+// verificarlo en /verify con el código. Diseño listo para imprimir:
+// al imprimir se oculta el resto de la página (ver <style>).
 const route = useRoute()
 const slug = computed(() => String(route.params.slug))
 const api = useApi()
 const { fmtDate } = useFormat()
 
+interface CertDesign {
+  blueprintId: number | null, blueprintName: string, accentColor: string, headingText: string
+  bodyText: string, signerName: string, signerTitle: string, showLogo: boolean
+}
 interface CertData {
   eligible: boolean
   certificateEnabled: boolean
   progress: { completed: number, total: number, pct: number }
-  certificate: { memberName: string, courseTitle: string, communityName: string, finishedAt: string | null } | null
+  certificate: {
+    memberName: string, courseTitle: string, communityName: string, finishedAt: string | null
+    code: string, issuedAt: string, design: CertDesign, logoUrl: string
+  } | null
 }
 const { data } = await useAsyncData(() => `certificate-${slug.value}`, () => api<CertData>(`/api/courses/${slug.value}/certificate`), { watch: [slug] })
 
@@ -41,15 +52,29 @@ function printCert() {
       :description="`Tu avance es ${data.progress.completed}/${data.progress.total} lecciones (${data.progress.pct}%). El certificado se habilita al llegar al 100%.`"
     />
 
-    <div v-if="data?.certificate" id="certificate" class="mx-auto max-w-3xl rounded-xl border-4 border-double border-primary bg-white p-10 text-center text-neutral-900 shadow-sm dark:bg-neutral-900 dark:text-neutral-50">
-      <UIcon name="i-lucide-award" class="mx-auto text-5xl text-primary" />
-      <p class="mt-4 text-sm font-bold tracking-[0.3em] uppercase">Certificado de finalización</p>
+    <div
+      v-if="data?.certificate" id="certificate"
+      class="mx-auto max-w-3xl rounded-xl border-4 border-double bg-white p-10 text-center text-neutral-900 shadow-sm dark:bg-neutral-900 dark:text-neutral-50"
+      :style="{ borderColor: data.certificate.design.accentColor }"
+    >
+      <img v-if="data.certificate.design.showLogo && data.certificate.logoUrl" :src="data.certificate.logoUrl" alt="" class="mx-auto h-14 w-auto object-contain">
+      <UIcon name="i-lucide-award" class="mx-auto text-5xl" :style="{ color: data.certificate.design.accentColor, marginTop: data.certificate.design.showLogo && data.certificate.logoUrl ? '1rem' : undefined }" />
+      <p class="mt-4 text-sm font-bold tracking-[0.3em] uppercase" :style="{ color: data.certificate.design.accentColor }">{{ data.certificate.design.headingText }}</p>
       <p class="mt-6 text-muted">Se otorga a</p>
       <p class="mt-1 font-serif text-4xl font-bold">{{ data.certificate.memberName }}</p>
-      <p class="mt-6 text-muted">por haber completado el curso</p>
-      <p class="mt-1 text-2xl font-bold">{{ data.certificate.courseTitle }}</p>
+      <p class="mx-auto mt-6 max-w-xl leading-relaxed">{{ data.certificate.design.bodyText }}</p>
+      <div v-if="data.certificate.design.signerName" class="mx-auto mt-10 max-w-56">
+        <div class="border-t border-neutral-400 pt-2">
+          <p class="font-semibold">{{ data.certificate.design.signerName }}</p>
+          <p v-if="data.certificate.design.signerTitle" class="text-sm text-muted">{{ data.certificate.design.signerTitle }}</p>
+        </div>
+      </div>
       <p class="mt-8 text-sm text-muted">
         {{ data.certificate.communityName }} · {{ data.certificate.finishedAt ? fmtDate(data.certificate.finishedAt) : '' }}
+      </p>
+      <p class="mt-3 text-xs text-muted">
+        Código de verificación: <span class="font-mono font-semibold text-default">{{ data.certificate.code }}</span>
+        · Verificalo en <span class="font-medium text-default">/verify</span>
       </p>
     </div>
   </div>

@@ -26,6 +26,7 @@ interface CourseFull {
   id: number, slug: string, title: string, description: string, shortDescription: string, descriptionHtml: string,
   level: string, priceCents: number, status: string, imageUrl: string, bannerUrl: string,
   visibility: string, enrollLimit: number, dripMode: string, certificateEnabled: boolean, enrolled: number,
+  certificateBlueprintId: number | null,
 }
 interface StudioData { course: CourseFull, chapters: ChapterFull[] }
 
@@ -36,7 +37,21 @@ const courseForm = reactive({
   title: '', level: 'Principiante', price: 0, status: 'published', imageUrl: '',
   shortDescription: '', descriptionHtml: '', bannerUrl: '', visibility: 'public',
   enrollLimit: 0, dripMode: 'none', certificateEnabled: false, slug: '',
+  certificateBlueprintId: 0,
 })
+
+// Fase 16: diseños de certificado elegibles en el selector (los
+// activos, más el actualmente elegido aunque esté desactivado, para
+// no perder la selección al abrir el estudio). 0 = por defecto.
+interface BlueprintMini { id: number, name: string, active: boolean }
+const { data: blueprintsData } = await useAsyncData('studio-blueprints', () =>
+  ['admin', 'course_manager'].includes(user.value?.role || '') ? api<{ blueprints: BlueprintMini[] }>('/api/admin/certificate-blueprints') : Promise.resolve({ blueprints: [] as BlueprintMini[] }))
+const blueprintOptions = computed(() => [
+  { label: 'Diseño por defecto del sistema', value: 0 },
+  ...(blueprintsData.value?.blueprints || [])
+    .filter(b => b.active || b.id === courseForm.certificateBlueprintId)
+    .map(b => ({ label: b.active ? b.name : `${b.name} (desactivado)`, value: b.id })),
+])
 const chapters = ref<ChapterFull[]>([])
 const saveState = ref<'saved' | 'dirty' | 'saving' | 'error'>('saved')
 let syncing = false
@@ -50,6 +65,7 @@ function syncFromData() {
     shortDescription: c.shortDescription, descriptionHtml: c.descriptionHtml, bannerUrl: c.bannerUrl,
     visibility: c.visibility, enrollLimit: c.enrollLimit, dripMode: c.dripMode,
     certificateEnabled: c.certificateEnabled, slug: c.slug,
+    certificateBlueprintId: c.certificateBlueprintId ?? 0,
   })
   chapters.value = JSON.parse(JSON.stringify(data.value.chapters)) as ChapterFull[]
   syncing = false
@@ -73,6 +89,7 @@ async function saveCourse() {
         bannerUrl: courseForm.bannerUrl, visibility: courseForm.visibility,
         enrollLimit: courseForm.enrollLimit, dripMode: courseForm.dripMode,
         certificateEnabled: courseForm.certificateEnabled,
+        certificateBlueprintId: courseForm.certificateBlueprintId || null,
       },
     })
     saveState.value = 'saved'
@@ -770,6 +787,14 @@ const visibilityOptions = [
                 <p class="mt-1 text-xs text-muted">Los cursos nuevos nacen con el certificado apagado: es una opción por curso, como en la referencia.</p>
               </div>
               <USwitch v-model="courseForm.certificateEnabled" />
+            </div>
+            <div v-if="courseForm.certificateEnabled" class="mt-4 border-t border-default pt-4">
+              <UFormField label="Diseño del certificado" hint="El diseño se crea una vez y se reutiliza en varios cursos. Al emitirse, cada certificado guarda una foto del diseño: editarlo después no cambia los ya emitidos.">
+                <USelect v-model="courseForm.certificateBlueprintId" :items="blueprintOptions" class="w-full" />
+              </UFormField>
+              <p class="mt-2 text-xs text-muted">
+                Gestioná los diseños en <NuxtLink to="/admin/courses/blueprints" class="text-primary hover:underline">Cursos → Certificados</NuxtLink>.
+              </p>
             </div>
           </UCard>
         </div>
