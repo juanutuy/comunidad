@@ -1345,6 +1345,70 @@ prueba eliminados por completo (conteos de vuelta a la semilla) y
 snapshot `scripts/d1-init.sql` regenerado con las tablas y
 columnas nuevas.
 
+## Fase 16-B (hecha) — menú y acciones de la publicación
+
+El menú «…» de la tarjeta (`PostCard`, el componente único de feed,
+canal, detalle, perfil, búsqueda y guardados) quedó con la
+composición completa de la referencia, **todo funcional y
+sincronizado** entre superficies — nada de entradas decorativas:
+
+- **Siempre** (con sesión): **Guardar publicación / Quitar de
+  guardados** (la MISMA función y el mismo estado local que el
+  icono de marcador de la cabecera: guardar en un lado se refleja
+  en el otro y en la pestaña Guardados del perfil), **Copiar
+  enlace** (copia la URL real del detalle — origen actual +
+  `/p/<canal>/<slug>` — con toast de confirmación; sin clipboard
+  API ofrece la URL en un prompt para copiarla a mano) y **Ver
+  publicación** (navega al detalle).
+- **Del autor**: **Editar publicación** — abre en la propia tarjeta
+  el editor rico con «/» (el mismo de «Mis borradores»; las
+  encuestas editan su pregunta como texto). El `PUT
+  /api/posts/[id]` ahora acepta también posts **ya publicados** del
+  autor (antes era solo borradores/programados): sanitiza el cuerpo
+  y marca `edited_at`, así la tarjeta muestra «Editado». El cambio
+  se aplica al instante en la tarjeta (override local) y el padre
+  refresca con `@changed` cuando escucha; feed, canal y detalle
+  sirven el contenido nuevo.
+- **Del autor y del staff**: **Desactivar comentarios / Activar
+  comentarios** — nuevo `POST /api/posts/[id]/comments-toggle`
+  (autor o `canModerate`; el resto, 403). No hay columna nueva:
+  alterna la `allow_comments` que ya existía desde la Fase 7 (el
+  autor podía cerrarlos al publicar) — una sola fuente de verdad.
+  La API de comentarios ya respondía 403 «Los comentarios están
+  desactivados en esta publicación.»; el detalle muestra el aviso
+  y conserva visibles los comentarios previos; la tarjeta muestra
+  el indicador «Comentarios desactivados» en el pie y su estado se
+  actualiza sin recargar.
+- **Del staff que modera** (admin y moderador): **Fijar
+  publicación / Desfijar publicación** (antes «Fijar (anuncio)»,
+  solo admin). El endpoint de fijar pasó de `requireAdmin` a
+  `requireModerator`; la insignia «Fijado» y el comportamiento de
+  anuncio se conservan intactos.
+- **Eliminar publicación** (autor o staff, con su confirmación y
+  la cascada de siempre) y, en posts ajenos, **Ocultar publicación**
+  y **Reportar** (Fases 5 y 12) en el mismo menú, sin duplicar.
+
+**Verificación (local, por contenido)**: build 0, typecheck 0,
+suite `test-realtime.mjs` 5/5 PASS. Batería propia de 33 chequeos
+contra `wrangler dev`, todos PASS: el autor edita su post
+publicado y el feed y el detalle sirven el título/cuerpo nuevos
+con la marca «Editado»; un miembro ajeno recibe 403 al editar,
+cerrar comentarios o fijar por API (y el autor no-staff tampoco
+fija); cerrar comentarios → comentar responde 403 con el mensaje,
+el detalle muestra el aviso y el comentario previo sigue visible,
+la tarjeta del feed muestra el indicador; reabrir → comentar
+vuelve a funcionar; guardar se refleja en el feed
+(`bookmarked=true`) y en la pestaña Guardados; el moderador fija y
+cierra comentarios en un post ajeno y el fijado se refleja con
+`pinned=true`; la URL del enlace sirve el detalle editado; el
+autor elimina su post y el detalle responde 404. Datos de prueba
+borrados y la semilla local restaurada (el post de bienvenida
+quedó fijado y con comentarios abiertos, como al principio). Los
+dos únicos FAIL iniciales fueron de la propia batería (asumió que
+el post de bienvenida partía sin fijar, y venía fijado de la
+semilla): se corrigió la prueba con un ciclo completo sobre un
+post nuevo, no el producto.
+
 ## Pendiente a propósito (fuera de esta fase)
 
 - Migraciones versionadas con `drizzle-kit` para D1 (hoy: esquema
