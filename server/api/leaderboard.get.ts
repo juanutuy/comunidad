@@ -1,12 +1,12 @@
 // Ranking por puntos calculados de actividad real:
 // publicación = 10, comentario = 3, reacción recibida = 2.
 import { resolveTenant } from '../utils/community'
-import { rawDb } from '../utils/db'
+import { dbFor } from '../utils/db'
 
-export default defineEventHandler((event) => {
-  const tenant = resolveTenant(event)
-  const db = rawDb()
-  const rows = db.prepare(`
+export default defineEventHandler(async (event) => {
+  const tenant = await resolveTenant(event)
+  const db = await dbFor(event)
+  const rows = await db.prepare(`
     SELECT u.id, u.name, u.slug,
       (SELECT COUNT(*) FROM posts p WHERE p.author_id = u.id AND p.tenant_id = ?) AS post_count,
       (SELECT COUNT(*) FROM comments c WHERE c.author_id = u.id AND c.tenant_id = ?) AS comment_count,

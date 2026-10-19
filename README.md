@@ -11,7 +11,7 @@ Canales con feed, publicaciones con reacciones y comentarios, cursos, eventos, b
 | Framework | Nuxt 4 (Vue 3 + TypeScript) |
 | UI | Plantilla oficial gratuita de **Nuxt UI v4** (`@nuxt/ui`, MIT) — layout de 3 columnas tipo hub: sidebar de canales, feed central, rail derecho con eventos y recientes. Dark mode y responsive |
 | Iconos | Lucide empaquetados localmente (`@iconify-json/lucide`, bundle local, sin CDN en runtime) |
-| Datos | **Drizzle ORM** (esquema en `server/db/schema.ts`) sobre SQLite local en desarrollo; el mismo esquema corre en **Cloudflare D1** en producción |
+| Datos | Capa asíncrona propia (`server/utils/db.ts`, interfaz `prepare().get/all/run`) sobre **Cloudflare D1** en producción (binding `DB`) y **SQLite local** (better-sqlite3) en desarrollo. El esquema Drizzle en `server/db/schema.ts` queda como referencia de tipos |
 | Archivos | **Cloudflare R2** (binding preparado en `wrangler.jsonc`; la subida real es fase 2) |
 | Deploy | Cloudflare Workers, preset Nitro `cloudflare_module` |
 | Auth | Propia: correo + contraseña con **scrypt** (crypto de Node), sesión en cookie httpOnly firmada con HMAC |
@@ -62,8 +62,9 @@ app/
   pages/                  feeds, channels/[slug], p/[canal]/[post], courses, events,
                           library, leaderboard, profile, videos, guidelines, admin
 server/
-  db/schema.ts            esquema Drizzle (fuente de verdad; compatible con D1)
-  utils/db.ts             conexión local (better-sqlite3 + Drizzle) y creación de tablas
+  db/schema.ts            esquema Drizzle (referencia de tipos; compatible con D1)
+  utils/db.ts             capa de datos asíncrona unificada (D1 ⇄ SQLite local),
+                          CREATE_SQL, auto-creación de tablas y disparo del seed
   utils/seed.ts           semilla original en español (tenant, 4 usuarios, 5 canales,
                           7 publicaciones, 2 cursos, 2 eventos, 6 recursos)
   utils/auth.ts           scrypt + cookie de sesión firmada
@@ -73,20 +74,67 @@ server/
 wrangler.jsonc            Worker + bindings D1 y R2 (IDs placeholder)
 ```
 
-## Preparado para Cloudflare (sin desplegar todavía)
+## Capa de datos: D1 real (producción) y SQLite (desarrollo)
 
-- `nuxt.config.ts` usa el preset `cloudflare_module` y el build pasa limpio.
-- `wrangler.jsonc` declara el Worker `comunidad-mvp`, binding D1 `DB` (base `comunidad-db`) y bucket R2 `FILES` (`comunidad-files`) con IDs de ejemplo.
-- La clave de sesión se sobrescribe con el secreto del Worker `NUXT_SESSION_SECRET` (nunca en el código).
-- Nota de arquitectura: `better-sqlite3` es solo el driver local de desarrollo y queda como dependencia externa en el build (no se empaqueta). Para producción, la capa de datos debe apuntar al binding D1 usando el mismo esquema Drizzle (driver `drizzle-orm/d1`).
+`server/utils/db.ts` expone `dbFor(event)`: una interfaz asíncrona única
+(`prepare(sql).get/all/run`, con `run` devolviendo `{ changes, lastInsertRowId }`)
+y dos adaptadores:
 
-### Antes del primer deploy
+- **D1**: si el request trae el binding (`event.context.cloudflare.env.DB`,
+  o `event.context._platform.cloudflare.env.DB`, o `globalThis.__env__.DB`
+  — este último es el que setea el entry de Nitro en cada fetch y el único
+  que sobrevive a los subrequests internos del SSR), usa D1:
+  `prepare(sql).bind(...).first()/all()/run()`, mapeando `meta.last_row_id`
+  a `lastInsertRowId`.
+- **SQLite local**: sin binding ( `npm run dev` en Node), envuelve
+  better-sqlite3 — importado de forma **perezosa solo en ese camino**, así
+  el binario nativo nunca se ejecuta (ni se necesita) en el Worker.
+
+Todos los handlers y helpers (`server/api/**`, `server/utils/community.ts`,
+`server/utils/seed.ts`) son `async` y usan esta capa: el mismo código corre
+en local y en Cloudflare. **Verificado en ambos modos** (rutas 200 con el
+seed, login y escrituras OK), incluido `npx wrangler dev` con D1 local
+(miniflare) sobre el build de producción.
+
+### Inicialización y seed en D1
+
+Decisión del MVP: la app **auto-crea el esquema y siembra si está vacío**
+al primer request de cada isolate (`CREATE TABLE/INDEX IF NOT EXISTS` +
+`seedIfEmpty`), igual que en local. El costo es despreciable a esta escala
+y elimina pasos manuales. Como alternativa (o para recrear la base), está
+generado `scripts/d1-init.sql` (esquema + los 74 INSERT del seed), que se
+aplica con `wrangler d1 execute` y se regenera desde la base local con
+`node scripts/gen-d1-init.mjs`.
+
+## Deploy en Cloudflare (pasos exactos)
+
+`wrangler.jsonc` ya declara el Worker `comunidad-mvp`, el binding D1 `DB`
+(base `comunidad-db`) y el bucket R2 `FILES` (`comunidad-files`); el
+`database_id` está como placeholder y hay que reemplazarlo por el real.
 
 ```bash
-wrangler d1 create comunidad-db      # y pegar el ID real en wrangler.jsonc
-wrangler r2 bucket create comunidad-files
-wrangler secret put NUXT_SESSION_SECRET
+# 1. Crear la base D1 y pegar el database_id que devuelve en wrangler.jsonc
+npx wrangler d1 create comunidad-db
+
+# 2. (Opcional — la app también auto-crea y siembra al primer request)
+npx wrangler d1 execute comunidad-db --remote --file=scripts/d1-init.sql
+
+# 3. Crear el bucket R2
+npx wrangler r2 bucket create comunidad-files
+
+# 4. Secreto de sesión (NUXT_SESSION_SECRET sobrescribe el runtime config;
+#    nunca va en el código ni en wrangler.jsonc)
+npx wrangler secret put NUXT_SESSION_SECRET
+
+# 5. Build y deploy
 npm run build && npx wrangler deploy
+```
+
+Probar el build localmente contra D1 emulado antes de desplegar:
+
+```bash
+npm run build
+npx wrangler dev .output/server/index.mjs --assets .output/public --port 8787
 ```
 
 ## Fase 2 (pendiente, a propósito)

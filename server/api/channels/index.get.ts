@@ -1,18 +1,18 @@
 // Grupos y canales del tenant, con estado de seguimiento del usuario.
 import { currentAuth, resolveTenant } from '../../utils/community'
-import { rawDb } from '../../utils/db'
+import { dbFor } from '../../utils/db'
 
-export default defineEventHandler((event) => {
-  const tenant = resolveTenant(event)
-  const { user } = currentAuth(event, tenant.id)
-  const db = rawDb()
-  const groups = db.prepare('SELECT * FROM channel_groups WHERE tenant_id = ? ORDER BY sort').all(tenant.id) as { id: number, name: string }[]
-  const channels = db.prepare('SELECT * FROM channels WHERE tenant_id = ? ORDER BY sort').all(tenant.id) as Record<string, unknown>[]
+export default defineEventHandler(async (event) => {
+  const tenant = await resolveTenant(event)
+  const { user } = await currentAuth(event, tenant.id)
+  const db = await dbFor(event)
+  const groups = await db.prepare('SELECT * FROM channel_groups WHERE tenant_id = ? ORDER BY sort').all(tenant.id) as unknown as { id: number, name: string }[]
+  const channels = await db.prepare('SELECT * FROM channels WHERE tenant_id = ? ORDER BY sort').all(tenant.id) as Record<string, unknown>[]
   const follows = new Set(user
-    ? (db.prepare('SELECT channel_id FROM follows WHERE tenant_id = ? AND user_id = ?').all(tenant.id, user.id) as { channel_id: number }[]).map(f => f.channel_id)
+    ? (await db.prepare('SELECT channel_id FROM follows WHERE tenant_id = ? AND user_id = ?').all(tenant.id, user.id) as unknown as { channel_id: number }[]).map(f => f.channel_id)
     : [])
   const access = new Set(user
-    ? (db.prepare('SELECT channel_id FROM channel_access WHERE tenant_id = ? AND user_id = ?').all(tenant.id, user.id) as { channel_id: number }[]).map(f => f.channel_id)
+    ? (await db.prepare('SELECT channel_id FROM channel_access WHERE tenant_id = ? AND user_id = ?').all(tenant.id, user.id) as unknown as { channel_id: number }[]).map(f => f.channel_id)
     : [])
   return {
     groups: groups.map(g => ({

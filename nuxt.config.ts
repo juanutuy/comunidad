@@ -19,9 +19,10 @@ export default defineNuxtConfig({
   nitro: {
     preset: 'cloudflare_module',
     externals: {
-      // better-sqlite3 es el driver LOCAL (dev). En Cloudflare la capa de
-      // datos usa el mismo esquema Drizzle contra D1 (ver server/db/schema.ts
-      // y README): el binario nativo nunca se empaqueta en el Worker.
+      // better-sqlite3 es el driver LOCAL (dev): la capa de datos
+      // (server/utils/db.ts) lo importa de forma perezosa solo cuando NO
+      // hay binding D1. En Cloudflare nunca se ejecuta ese camino ni se
+      // necesita el binario nativo.
       external: ['better-sqlite3'],
     },
   },
