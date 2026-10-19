@@ -89,6 +89,7 @@ CREATE TABLE IF NOT EXISTS member_subscriptions (id INTEGER PRIMARY KEY AUTOINCR
 CREATE UNIQUE INDEX IF NOT EXISTS member_subscriptions_unique ON member_subscriptions (tenant_id, user_id, plan_id);
 CREATE TABLE IF NOT EXISTS payments (id INTEGER PRIMARY KEY AUTOINCREMENT, tenant_id INTEGER NOT NULL, user_id INTEGER NOT NULL, kind TEXT NOT NULL, item_id INTEGER NOT NULL DEFAULT 0, plan_id INTEGER NOT NULL DEFAULT 0, amount_cents INTEGER NOT NULL DEFAULT 0, currency TEXT NOT NULL DEFAULT 'usd', status TEXT NOT NULL DEFAULT 'pending', stripe_session_id TEXT NOT NULL DEFAULT '', stripe_payment_intent TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
 CREATE UNIQUE INDEX IF NOT EXISTS payments_session_unique ON payments (stripe_session_id);
+CREATE TABLE IF NOT EXISTS manual_payment_methods (id INTEGER PRIMARY KEY AUTOINCREMENT, tenant_id INTEGER NOT NULL, type TEXT NOT NULL DEFAULT 'transferencia', title TEXT NOT NULL, details TEXT NOT NULL DEFAULT '', active INTEGER NOT NULL DEFAULT 1, sort INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS stripe_events (id TEXT PRIMARY KEY, type TEXT NOT NULL, processed_at TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS email_log (id INTEGER PRIMARY KEY AUTOINCREMENT, tenant_id INTEGER NOT NULL, user_id INTEGER, to_email TEXT NOT NULL, kind TEXT NOT NULL, subject TEXT NOT NULL, status TEXT NOT NULL, detail TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL);
 CREATE INDEX IF NOT EXISTS email_log_tenant ON email_log (tenant_id, created_at);
@@ -276,6 +277,24 @@ const MIGRATIONS = [
   // NULL = diseño por defecto del sistema. Las tablas
   // certificate_blueprints y certificates viven en CREATE_SQL.
   `ALTER TABLE courses ADD COLUMN certificate_blueprint_id INTEGER`,
+  // Fase 17: dinero visible. Moneda del tenant (default 'USD': el
+  // comportamiento de siempre) y pagos manuales APAGADOS por defecto:
+  // nada cambia hasta que el admin elige moneda o enciende los
+  // manuales. En payments: pasarela ('stripe'|'manual'; las filas
+  // viejas son de Stripe), referencia/nota del comprador manual,
+  // método elegido y quién/cuándo decidió la revisión. En plans:
+  // orden de exhibición en la página de planes y plan destacado
+  // (display_order se espeja con sort al reordenar; el backfill de
+  // initDb lo inicializa desde sort en bases anteriores).
+  `ALTER TABLE tenants ADD COLUMN currency TEXT NOT NULL DEFAULT 'USD'`,
+  `ALTER TABLE tenants ADD COLUMN manual_payments_enabled INTEGER NOT NULL DEFAULT 0`,
+  `ALTER TABLE payments ADD COLUMN gateway TEXT NOT NULL DEFAULT 'stripe'`,
+  `ALTER TABLE payments ADD COLUMN reference TEXT NOT NULL DEFAULT ''`,
+  `ALTER TABLE payments ADD COLUMN method_id INTEGER NOT NULL DEFAULT 0`,
+  `ALTER TABLE payments ADD COLUMN decided_by INTEGER`,
+  `ALTER TABLE payments ADD COLUMN decided_at TEXT NOT NULL DEFAULT ''`,
+  `ALTER TABLE plans ADD COLUMN display_order INTEGER NOT NULL DEFAULT 0`,
+  `ALTER TABLE plans ADD COLUMN featured INTEGER NOT NULL DEFAULT 0`,
 ]
 
 async function runMigrations(db: AsyncDb): Promise<void> {
@@ -299,6 +318,13 @@ async function initDb(db: AsyncDb): Promise<void> {
   // sobre el contenido vacío hace que nunca reclasifique una lección
   // de texto real en arranques posteriores.
   try { await db.prepare("UPDATE lessons SET kind = 'video' WHERE kind = 'text' AND video_url != '' AND content = '' AND content_html = ''").run() }
+  catch { /* bases sin la columna todavía */ }
+  // Fase 17: el orden de exhibición de planes nace del orden (sort)
+  // que ya tenían; solo toca filas sin reordenar (display_order = 0
+  // con sort distinto de 0). Al reordenar desde la consola se
+  // escriben AMBOS campos con el mismo índice, así este backfill
+  // nunca deshace un orden elegido por el admin.
+  try { await db.prepare('UPDATE plans SET display_order = sort WHERE display_order = 0 AND sort <> 0').run() }
   catch { /* bases sin la columna todavía */ }
   const { seedIfEmpty, backfillLessonContent, backfillPlans } = await import('./seed')
   await seedIfEmpty(db)

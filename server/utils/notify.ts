@@ -9,7 +9,7 @@ export interface NotifyInput {
   tenantId: number
   userId: number // destinatario
   actorId: number | null
-  type: 'reaction' | 'comment' | 'new_post' | 'mention' | 'dm' | 'follow' | 'report' | 'moderation' | 'join_request'
+  type: 'reaction' | 'comment' | 'new_post' | 'mention' | 'dm' | 'follow' | 'report' | 'moderation' | 'join_request' | 'payment'
   title: string
   link: string
 }
@@ -22,6 +22,8 @@ export interface NotifyInput {
 // 'moderation' (aprobación/rechazo de una publicación en revisión) NO
 // tienen preferencia propia a propósito: son avisos operativos de
 // moderación, no sociales, y siempre llegan.
+// Fase 17: 'payment' (aprobación/rechazo de un pago manual) sigue el
+// mismo criterio operativo: no está en PREF_BY_TYPE y siempre llega.
 const PREF_BY_TYPE: Partial<Record<NotifyInput['type'], string>> = {
   reaction: 'notify_reaction',
   comment: 'notify_comment',

@@ -14,7 +14,7 @@ export default defineEventHandler(async (event) => {
   const interval = INTERVALS.includes(body.interval || '') ? body.interval! : 'month'
   const db = await dbFor(event)
   const sort = ((await db.prepare('SELECT COALESCE(MAX(sort), 0) AS m FROM plans WHERE tenant_id = ?').get(tenant.id)) as { m: number }).m + 1
-  const r = await db.prepare('INSERT INTO plans (tenant_id, name, description, price_cents, interval, active, sort, created_at) VALUES (?, ?, ?, ?, ?, 1, ?, ?)')
-    .run(tenant.id, name, (body.description || '').trim(), priceCents, interval, sort, nowIso())
+  const r = await db.prepare('INSERT INTO plans (tenant_id, name, description, price_cents, interval, active, sort, display_order, created_at) VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?)')
+    .run(tenant.id, name, (body.description || '').trim(), priceCents, interval, sort, sort, nowIso())
   return { plan: { id: Number(r.lastInsertRowId), name, priceCents, interval, active: true } }
 })

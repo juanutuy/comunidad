@@ -8,6 +8,7 @@
 //   - plan    → member_subscriptions activa
 // La vuelta del navegador a /billing/return nunca concede nada.
 import { dbFor, nowIso } from '../../utils/db'
+import { grantPaymentAccess } from '../../utils/payments'
 import { stripeConfig, verifyStripeSignature } from '../../utils/stripe'
 
 export default defineEventHandler(async (event) => {
@@ -41,23 +42,14 @@ export default defineEventHandler(async (event) => {
       const paymentIntent = typeof obj.payment_intent === 'string' ? obj.payment_intent : ''
       await db.prepare("UPDATE payments SET status = 'paid', stripe_payment_intent = ?, updated_at = ? WHERE id = ?")
         .run(paymentIntent, now, payment.id)
-      const tenantId = Number(payment.tenant_id)
-      const userId = Number(payment.user_id)
-      if (payment.kind === 'channel') {
-        await db.prepare('INSERT OR IGNORE INTO channel_access (tenant_id, user_id, channel_id, source, created_at) VALUES (?, ?, ?, ?, ?)')
-          .run(tenantId, userId, Number(payment.item_id), 'stripe', now)
-      }
-      else if (payment.kind === 'course') {
-        await db.prepare('INSERT OR IGNORE INTO enrollments (tenant_id, course_id, user_id, created_at) VALUES (?, ?, ?, ?)')
-          .run(tenantId, Number(payment.item_id), userId, now)
-      }
-      else if (payment.kind === 'plan') {
-        const planId = Number(payment.plan_id || payment.item_id)
-        await db.prepare(`INSERT INTO member_subscriptions (tenant_id, user_id, plan_id, status, source, stripe_subscription_id, stripe_customer_id, created_at, updated_at)
-          VALUES (?, ?, ?, 'active', 'stripe', ?, ?, ?, ?)
-          ON CONFLICT(tenant_id, user_id, plan_id) DO UPDATE SET status = 'active', stripe_subscription_id = excluded.stripe_subscription_id, stripe_customer_id = excluded.stripe_customer_id, updated_at = excluded.updated_at`)
-          .run(tenantId, userId, planId, typeof obj.subscription === 'string' ? obj.subscription : '', typeof obj.customer === 'string' ? obj.customer : '', now, now)
-      }
+      // Fase 17: la concesión vive en grantPaymentAccess, compartida
+      // con la aprobación de pagos manuales (mismo acceso, dos vías
+      // de confirmación).
+      await grantPaymentAccess(db, payment, {
+        source: 'stripe',
+        stripeSubscriptionId: typeof obj.subscription === 'string' ? obj.subscription : '',
+        stripeCustomerId: typeof obj.customer === 'string' ? obj.customer : '',
+      })
     }
   }
   else if (evt.type === 'checkout.session.expired' || evt.type === 'checkout.session.async_payment_failed') {

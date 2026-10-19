@@ -8,7 +8,7 @@ export default defineEventHandler(async (event) => {
   const tenant = await resolveTenant(event)
   const user = await requireUser(event, tenant.id)
   const db = await dbFor(event)
-  const payments = await db.prepare(`SELECT p.id, p.kind, p.item_id, p.amount_cents, p.status, p.created_at,
+  const payments = await db.prepare(`SELECT p.id, p.kind, p.item_id, p.amount_cents, p.status, p.gateway, p.created_at,
       COALESCE(c.name, co.title, pl.name, '') AS item_name
     FROM payments p
     LEFT JOIN channels c ON p.kind = 'channel' AND c.id = p.item_id
@@ -19,7 +19,7 @@ export default defineEventHandler(async (event) => {
     FROM member_subscriptions s JOIN plans pl ON pl.id = s.plan_id
     WHERE s.tenant_id = ? AND s.user_id = ? ORDER BY s.id DESC`).all(tenant.id, user.id) as Record<string, unknown>[]
   return {
-    payments: payments.map(p => ({ id: p.id, kind: p.kind, itemName: p.item_name, amountCents: p.amount_cents, status: p.status, createdAt: p.created_at })),
+    payments: payments.map(p => ({ id: p.id, kind: p.kind, itemName: p.item_name, amountCents: p.amount_cents, status: p.status, gateway: p.gateway || 'stripe', createdAt: p.created_at })),
     subscriptions: subscriptions.map(s => ({ id: s.id, planName: s.plan_name, interval: s.plan_interval, status: s.status, currentPeriodEnd: s.current_period_end })),
   }
 })

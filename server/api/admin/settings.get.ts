@@ -4,6 +4,7 @@
 // canales para los selectores de auto-ingreso.
 import { requireAdmin, resolveTenant } from '../../utils/community'
 import { getJoinSettings } from '../../utils/members'
+import { getPaymentSettings } from '../../utils/payments'
 import { getPrivacySettings } from '../../utils/privacy'
 import { dbFor } from '../../utils/db'
 
@@ -14,6 +15,7 @@ export default defineEventHandler(async (event) => {
   const row = await db.prepare('SELECT terms, privacy, moderation_review FROM tenants WHERE id = ?').get(tenant.id).catch(() => undefined) as { terms: string, privacy: string, moderation_review?: number } | undefined
   const join = await getJoinSettings(event, tenant.id)
   const priv = await getPrivacySettings(event, tenant.id)
+  const pay = await getPaymentSettings(event, tenant.id)
   const channels = await db.prepare('SELECT id, name, slug, type FROM channels WHERE tenant_id = ? ORDER BY sort, name').all(tenant.id) as { id: number, name: string, slug: string, type: string }[]
   return {
     settings: {
@@ -46,6 +48,9 @@ export default defineEventHandler(async (event) => {
       iconUrl: priv.iconUrl, faviconUrl: priv.faviconUrl,
       supportEmail: priv.supportEmail, websiteUrl: priv.websiteUrl,
       socialLinks: priv.socialLinks,
+      // Fase 17: pagos — moneda del tenant y pagos manuales.
+      currency: pay.currency,
+      manualPaymentsEnabled: pay.manualPaymentsEnabled,
     },
     channels: channels.map(c => ({ id: c.id, name: c.name, slug: c.slug, type: c.type })),
   }

@@ -32,6 +32,10 @@ export interface TenantInfo {
   websiteUrl?: string
   socialLinks?: SocialLinkInfo[]
   navMenu?: NavItemInfo[]
+  // Fase 17: moneda del tenant (formato de todos los precios) y
+  // pagos manuales encendidos/apagados.
+  currency?: string
+  manualPaymentsEnabled?: boolean
 }
 
 // Fase 14: estado de una compuerta por nivel para el usuario actual

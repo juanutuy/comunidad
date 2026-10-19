@@ -7,6 +7,7 @@
 // ofrecer el compositor o los mensajes directos.
 import { currentAuth, publicUser, resolveTenant } from '../utils/community'
 import { myGateStates } from '../utils/members'
+import { getPaymentSettings } from '../utils/payments'
 import { getPrivacySettings } from '../utils/privacy'
 
 export default defineEventHandler(async (event) => {
@@ -19,10 +20,15 @@ export default defineEventHandler(async (event) => {
   // (logos por tema, favicon, navegación y bloque de contacto) se
   // alimenta de acá.
   const priv = await getPrivacySettings(event, tenant.id)
+  // Fase 17: moneda del tenant (el formato de precios de TODA la UI
+  // sale de acá) y si los pagos manuales están encendidos.
+  const pay = await getPaymentSettings(event, tenant.id)
   return {
     tenant: {
       id: tenant.id, slug: tenant.slug, name: tenant.name, tagline: tenant.tagline,
       brandColor: tenant.brand_color,
+      currency: pay.currency,
+      manualPaymentsEnabled: pay.manualPaymentsEnabled,
       guidelines: JSON.parse(tenant.guidelines || '[]') as string[],
       visibility: priv.visibility,
       anyoneCanRegister: priv.anyoneCanRegister,

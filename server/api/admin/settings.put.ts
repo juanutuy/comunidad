@@ -3,6 +3,7 @@
 // sale de la fila del tenant.
 import { requireAdmin, resolveTenant } from '../../utils/community'
 import { dbFor } from '../../utils/db'
+import { CURRENCIES } from '../../utils/money'
 import { resolveNavMenu, resolveSidebar, resolveSocialLinks } from '../../utils/privacy'
 import type { NavItem, SidebarBlock, SocialLink } from '../../utils/privacy'
 
@@ -17,6 +18,8 @@ interface SettingsBody {
   feedSidebar?: SidebarBlock[], navMenu?: NavItem[], anyoneCanRegister?: boolean
   logoUrl?: string, logoDarkUrl?: string, iconUrl?: string, faviconUrl?: string
   supportEmail?: string, websiteUrl?: string, socialLinks?: SocialLink[]
+  // Fase 17: pagos.
+  currency?: string, manualPaymentsEnabled?: boolean
 }
 
 export default defineEventHandler(async (event) => {
@@ -142,6 +145,19 @@ export default defineEventHandler(async (event) => {
   if (Array.isArray(body.socialLinks)) {
     await db.prepare('UPDATE tenants SET social_links = ? WHERE id = ?')
       .run(JSON.stringify(resolveSocialLinks(body.socialLinks)), tenant.id).catch(() => {})
+  }
+  // Fase 17: pagos — moneda del tenant e interruptor de pagos
+  // manuales, mismo patrón (cada campo solo si viene en el cuerpo).
+  // La moneda NO convierte montos: cambia cómo se interpretan y se
+  // muestran los precios ya cargados (la UI lo advierte).
+  if (body.currency !== undefined) {
+    if (!CURRENCIES.some(c => c.code === body.currency))
+      throw createError({ statusCode: 400, message: 'Moneda no válida.' })
+    await db.prepare('UPDATE tenants SET currency = ? WHERE id = ?').run(body.currency, tenant.id).catch(() => {})
+  }
+  if (typeof body.manualPaymentsEnabled === 'boolean') {
+    await db.prepare('UPDATE tenants SET manual_payments_enabled = ? WHERE id = ?')
+      .run(body.manualPaymentsEnabled ? 1 : 0, tenant.id).catch(() => {})
   }
   return { ok: true, settings: { name, tagline: (body.tagline || '').trim(), brandColor, guidelines } }
 })
