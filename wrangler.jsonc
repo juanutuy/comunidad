@@ -1,0 +1,27 @@
+{
+  // Configuración del Worker — IDs de ejemplo (placeholder).
+  // Antes del primer deploy: `wrangler d1 create comunidad-db` y
+  // `wrangler r2 bucket create comunidad-files` y reemplazar los IDs.
+  "name": "comunidad-mvp",
+  "main": ".output/server/index.mjs",
+  "compatibility_date": "2025-07-15",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": { "enabled": true },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "comunidad-db",
+      "database_id": "00000000-0000-0000-0000-000000000000"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "FILES",
+      "bucket_name": "comunidad-files"
+    }
+  ],
+  "vars": {
+    "NUXT_PUBLIC_APP_NAME": "Comunidad"
+  }
+  // El secreto de sesión NO va aquí: `wrangler secret put NUXT_SESSION_SECRET`
+}
