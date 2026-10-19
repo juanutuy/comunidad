@@ -2,7 +2,7 @@
 // Sin acceso al canal: solo anticipo (locked), según las reglas del
 // tenant (Fase 15). Un canal privado, para quien no tiene acceso, no
 // existe: ni su nombre ni sus publicaciones salen por esta ruta.
-import { POST_SELECT, canAccessChannel, channelBySlug, currentAuth, resolveTenant, serializePost } from '../utils/community'
+import { POST_SELECT, canAccessChannel, channelBySlug, currentAuth, isChannelArchived, resolveTenant, serializePost } from '../utils/community'
 import { dbFor } from '../utils/db'
 import { getPrivacySettings, requireSessionUnlessPublic } from '../utils/privacy'
 import { blockedByMe } from '../utils/blocks'
@@ -16,6 +16,10 @@ export default defineEventHandler(async (event) => {
   const row = await db.prepare(`${POST_SELECT} WHERE p.channel_id = ? AND p.slug = ?`).get(channel.id, String(q.post || '')) as Record<string, unknown> | undefined
   if (!row) throw createError({ statusCode: 404, message: 'Publicación no encontrada.' })
   const { user, role } = await currentAuth(event, tenant.id)
+  // Fase 16: una publicación de un canal archivado tampoco se abre
+  // por enlace directo para los miembros (el canal está cerrado).
+  if (isChannelArchived(channel) && role !== 'admin')
+    throw createError({ statusCode: 404, message: 'Publicación no encontrada.' })
   // Endurecimiento Fase 15: comunidad privada = el detalle no se lee sin sesión.
   await requireSessionUnlessPublic(event, tenant.id, user)
   // Fase 5: borradores y programados SOLO los abre su autor.

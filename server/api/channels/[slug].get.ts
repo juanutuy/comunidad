@@ -1,7 +1,7 @@
 // Detalle de un canal: datos, seguimiento, acceso y sus publicaciones.
 // Si el canal es pago/privado y el usuario no tiene acceso, las
 // publicaciones se devuelven bloqueadas (solo teaser).
-import { POST_SELECT, canAccessChannel, channelBySlug, currentAuth, publishDuePosts, resolveTenant, serializePost } from '../../utils/community'
+import { POST_SELECT, canAccessChannel, channelBySlug, currentAuth, isChannelArchived, publishDuePosts, resolveTenant, serializePost } from '../../utils/community'
 import { dbFor } from '../../utils/db'
 import { getPrivacySettings, requireSessionUnlessPublic } from '../../utils/privacy'
 import { hiddenFilterSql } from '../../utils/blocks'
@@ -12,6 +12,11 @@ export default defineEventHandler(async (event) => {
   const channel = await channelBySlug(event, tenant.id, slug)
   if (!channel) throw createError({ statusCode: 404, message: 'Canal no encontrado.' })
   const { user, role } = await currentAuth(event, tenant.id)
+  // Fase 16: un canal archivado no está disponible para los miembros
+  // (ni por enlace directo). El admin lo sigue abriendo para
+  // gestionarlo desde la consola.
+  if (isChannelArchived(channel) && role !== 'admin')
+    throw createError({ statusCode: 404, message: 'Canal no encontrado.' })
   // Endurecimiento Fase 15: comunidad privada = el detalle del canal
   // no se lee sin sesión.
   await requireSessionUnlessPublic(event, tenant.id, user)
@@ -43,6 +48,8 @@ export default defineEventHandler(async (event) => {
     channel: {
       id: channel.id, slug: channel.slug, name: channel.name, icon: channel.icon,
       description: channel.description, type: channel.type, priceCents: channel.price_cents,
+      archived: isChannelArchived(channel),
+      postPermission: channel.post_permission || 'members',
       following, hasAccess: access,
     },
     posts: hideLockedPosts

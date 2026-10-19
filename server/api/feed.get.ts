@@ -1,6 +1,6 @@
 // Feed principal: publicaciones de canales públicos + seguidos por el
 // usuario. Las de canales pagos/privados sin acceso van como teaser.
-import { POST_SELECT, canAccessChannel, channelBySlug, currentAuth, publishDuePosts, resolveTenant, serializePost } from '../utils/community'
+import { POST_SELECT, canAccessChannel, channelBySlug, currentAuth, isChannelArchived, publishDuePosts, resolveTenant, serializePost } from '../utils/community'
 import { dbFor } from '../utils/db'
 import { getPrivacySettings, requireSessionUnlessPublic } from '../utils/privacy'
 import { hiddenFilterSql } from '../utils/blocks'
@@ -39,6 +39,9 @@ export default defineEventHandler(async (event) => {
   const posts = []
   for (const r of rows) {
     const channel = (await channelBySlug(event, tenant.id, r.channel_slug as string))!
+    // Fase 16: los posts de un canal archivado salen del feed de los
+    // miembros (quedan guardados; el admin los sigue viendo).
+    if (isChannelArchived(channel) && role !== 'admin') continue
     const access = await canAccessChannel(event, user?.id ?? null, role, channel)
     if (channel.type === 'paid' && !access && r.status === 'published') {
       // Fase 15 — tarjeta bloqueada de un canal pago según el ajuste

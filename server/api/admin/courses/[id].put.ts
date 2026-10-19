@@ -43,6 +43,7 @@ export default defineEventHandler(async (event) => {
   if (studio.enrollLimit !== undefined) { sets.push('enroll_limit = ?'); params.push(studio.enrollLimit) }
   if (studio.dripMode !== undefined) { sets.push('drip_mode = ?'); params.push(studio.dripMode) }
   if (studio.certificateEnabled !== undefined) { sets.push('certificate_enabled = ?'); params.push(studio.certificateEnabled) }
+  if (studio.certificateBlueprintId !== undefined) { sets.push('certificate_blueprint_id = ?'); params.push(studio.certificateBlueprintId) }
   if (sets.length) {
     await db.prepare(`UPDATE courses SET ${sets.join(', ')} WHERE id = ?`).run(...params, courseId)
   }

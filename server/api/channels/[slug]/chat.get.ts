@@ -1,7 +1,7 @@
 // Historial del chat de un canal (Fase 3). El chat es solo para
 // miembros con acceso al canal: visitantes y miembros sin acceso
 // (canal pago/privado) reciben 401/403, igual que el WebSocket.
-import { canAccessChannel, channelBySlug, resolveTenant, currentAuth } from '../../../utils/community'
+import { canAccessChannel, channelBySlug, isChannelArchived, resolveTenant, currentAuth } from '../../../utils/community'
 import { CHAT_SELECT, serializeChatMessage, type ChatMessageRow } from '../../../utils/chat'
 import { dbFor } from '../../../utils/db'
 
@@ -12,6 +12,9 @@ export default defineEventHandler(async (event) => {
   if (!channel) throw createError({ statusCode: 404, message: 'Canal no encontrado.' })
   const { user, role } = await currentAuth(event, tenant.id)
   if (!user) throw createError({ statusCode: 401, message: 'Iniciá sesión para ver el chat.' })
+  // Fase 16: el chat de un canal archivado se cierra para los miembros.
+  if (isChannelArchived(channel) && role !== 'admin')
+    throw createError({ statusCode: 404, message: 'Canal no encontrado.' })
   const access = await canAccessChannel(event, user.id, role, channel)
   if (!access) throw createError({ statusCode: 403, message: 'No tenés acceso al chat de este canal.' })
   const db = await dbFor(event)

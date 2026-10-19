@@ -2,7 +2,7 @@
 // Respeta el acceso a canales: las publicaciones de canales pagos o
 // privados sin acceso aparecen SOLO como teaser (igual que en el feed),
 // nunca con el cuerpo completo.
-import { POST_SELECT, canAccessChannel, channelBySlug, currentAuth, resolveTenant, serializePost } from '../utils/community'
+import { POST_SELECT, canAccessChannel, channelBySlug, currentAuth, isChannelArchived, resolveTenant, serializePost } from '../utils/community'
 import type { ChannelRow } from '../utils/community'
 import { getPrivacySettings } from '../utils/privacy'
 import { courseListed } from '../utils/courses'
@@ -38,6 +38,9 @@ export default defineEventHandler(async (event) => {
   const posts = []
   for (const r of postRows) {
     const ch = (await channelBySlug(event, tenant.id, r.channel_slug as string))!
+    // Fase 16: un canal archivado no aparece en la búsqueda de los
+    // miembros — ni el canal ni sus publicaciones.
+    if (isChannelArchived(ch) && role !== 'admin') continue
     const access = await canAccessChannel(event, user?.id ?? null, role, ch)
     if (ch.type === 'private' && !access) continue // privado sin acceso: ni el teaser sale del canal
     // Fase 15: «dónde aparecen» también limpia la búsqueda — con
@@ -50,6 +53,7 @@ export default defineEventHandler(async (event) => {
   const channelRows = await db.prepare('SELECT * FROM channels WHERE tenant_id = ? AND (name LIKE ? OR description LIKE ?) ORDER BY sort LIMIT 10').all(tenant.id, like, like) as Record<string, unknown>[]
   const channels = []
   for (const c of channelRows) {
+    if (isChannelArchived(c as { archived_at?: string }) && role !== 'admin') continue
     const access = user ? await canAccessChannel(event, user.id, role, c as unknown as ChannelRow) : c.type === 'free'
     if (c.type === 'private' && !access) continue
     channels.push({ id: c.id, slug: c.slug, name: c.name, icon: c.icon, description: c.description, type: c.type, priceCents: c.price_cents, hasAccess: access })

@@ -135,6 +135,11 @@ CREATE UNIQUE INDEX IF NOT EXISTS member_tag_assignments_unique ON member_tag_as
 CREATE INDEX IF NOT EXISTS member_tag_assignments_user ON member_tag_assignments (tenant_id, user_id);
 CREATE TABLE IF NOT EXISTS access_links (id INTEGER PRIMARY KEY AUTOINCREMENT, tenant_id INTEGER NOT NULL, user_id INTEGER NOT NULL, token TEXT NOT NULL, expires_at TEXT NOT NULL, used_at TEXT NOT NULL DEFAULT '', created_by INTEGER, created_at TEXT NOT NULL);
 CREATE UNIQUE INDEX IF NOT EXISTS access_links_token ON access_links (token);
+CREATE TABLE IF NOT EXISTS certificate_blueprints (id INTEGER PRIMARY KEY AUTOINCREMENT, tenant_id INTEGER NOT NULL, name TEXT NOT NULL, accent_color TEXT NOT NULL DEFAULT '#2563eb', heading_text TEXT NOT NULL DEFAULT '', body_text TEXT NOT NULL DEFAULT '', signer_name TEXT NOT NULL DEFAULT '', signer_title TEXT NOT NULL DEFAULT '', show_logo INTEGER NOT NULL DEFAULT 0, active INTEGER NOT NULL DEFAULT 1, created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
+CREATE INDEX IF NOT EXISTS certificate_blueprints_tenant ON certificate_blueprints (tenant_id, active);
+CREATE TABLE IF NOT EXISTS certificates (id INTEGER PRIMARY KEY AUTOINCREMENT, tenant_id INTEGER NOT NULL, user_id INTEGER NOT NULL, course_id INTEGER NOT NULL, blueprint_id INTEGER, code TEXT NOT NULL, member_name TEXT NOT NULL DEFAULT '', course_title TEXT NOT NULL DEFAULT '', community_name TEXT NOT NULL DEFAULT '', finished_at TEXT NOT NULL DEFAULT '', design_snapshot TEXT NOT NULL DEFAULT '{}', issued_at TEXT NOT NULL);
+CREATE UNIQUE INDEX IF NOT EXISTS certificates_code ON certificates (code);
+CREATE UNIQUE INDEX IF NOT EXISTS certificates_unique ON certificates (tenant_id, user_id, course_id);
 `
 
 // Migraciones aditivas (Fase 2) para bases creadas en la Fase 1 — ya hay
@@ -259,6 +264,18 @@ const MIGRATIONS = [
   `ALTER TABLE tenants ADD COLUMN support_email TEXT NOT NULL DEFAULT ''`,
   `ALTER TABLE tenants ADD COLUMN website_url TEXT NOT NULL DEFAULT ''`,
   `ALTER TABLE tenants ADD COLUMN social_links TEXT NOT NULL DEFAULT '[]'`,
+  // Fase 16: canales archivables y «quién puede publicar». archived_at
+  // vacío = canal activo; con fecha = archivado (desaparece de la
+  // navegación, el feed y la búsqueda de los miembros; sus posts
+  // quedan guardados). post_permission: 'members' (publican los
+  // miembros con acceso, como siempre) | 'staff' (solo el equipo
+  // publica posts nuevos; comentar y reaccionar no se tocan).
+  `ALTER TABLE channels ADD COLUMN archived_at TEXT NOT NULL DEFAULT ''`,
+  `ALTER TABLE channels ADD COLUMN post_permission TEXT NOT NULL DEFAULT 'members'`,
+  // Fase 16: diseño de certificado (blueprint) elegido por curso;
+  // NULL = diseño por defecto del sistema. Las tablas
+  // certificate_blueprints y certificates viven en CREATE_SQL.
+  `ALTER TABLE courses ADD COLUMN certificate_blueprint_id INTEGER`,
 ]
 
 async function runMigrations(db: AsyncDb): Promise<void> {

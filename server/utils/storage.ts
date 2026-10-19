@@ -16,6 +16,7 @@ interface R2ObjectLike { body: unknown, httpMetadata?: { contentType?: string } 
 interface R2BucketLike {
   put: (key: string, value: unknown, options?: { httpMetadata?: { contentType?: string } }) => Promise<unknown>
   get: (key: string) => Promise<R2ObjectLike | null>
+  delete?: (key: string) => Promise<unknown>
 }
 
 export function r2Bucket(event?: any): R2BucketLike | undefined {
@@ -40,6 +41,22 @@ export async function saveFile(event: any, key: string, data: Uint8Array, conten
     writeFileSync(full, data)
   }
   return { key, url: `/api/files/${key}` }
+}
+
+// Borrado físico (Fase 16, gestor de medios del admin): R2 en el
+// Worker, unlink en desarrollo local. No lanza si el objeto ya no
+// está: el llamador borra la fila de `uploads` igual.
+export async function deleteFile(event: any, key: string): Promise<void> {
+  const r2 = r2Bucket(event)
+  if (r2) {
+    if (typeof r2.delete === 'function') await r2.delete(key)
+    return
+  }
+  const { existsSync, unlinkSync } = await import('node:fs')
+  const { join } = await import('node:path')
+  const safe = key.split('/').filter(p => p && p !== '..' && p !== '.').join('/')
+  const full = join(process.cwd(), 'data', 'uploads', safe)
+  if (existsSync(full)) unlinkSync(full)
 }
 
 export interface ReadFile { data: Uint8Array, contentType: string }

@@ -36,6 +36,9 @@ export interface CourseStudioFields {
   enrollLimit?: number
   dripMode?: string
   certificateEnabled?: number
+  // Fase 16: diseño de certificado elegido (id de blueprint);
+  // null = diseño por defecto del sistema.
+  certificateBlueprintId?: number | null
 }
 
 export function parseCourseStudioFields(body: Record<string, unknown>): CourseStudioFields {
@@ -50,6 +53,10 @@ export function parseCourseStudioFields(body: Record<string, unknown>): CourseSt
   if (body.enrollLimit !== undefined) out.enrollLimit = Math.max(0, Math.round(Number(body.enrollLimit || 0)))
   if (typeof body.dripMode === 'string' && ['none', 'enrollment', 'dates'].includes(body.dripMode)) out.dripMode = body.dripMode
   if (body.certificateEnabled !== undefined) out.certificateEnabled = body.certificateEnabled ? 1 : 0
+  if (body.certificateBlueprintId !== undefined) {
+    const n = Number(body.certificateBlueprintId)
+    out.certificateBlueprintId = Number.isFinite(n) && n > 0 ? Math.round(n) : null
+  }
   return out
 }
 

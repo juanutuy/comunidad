@@ -37,6 +37,7 @@ export default defineEventHandler(async (event) => {
       imageUrl: c.image_url || '', bannerUrl: c.banner_url || '',
       visibility: c.visibility || 'public', enrollLimit: Number(c.enroll_limit || 0),
       dripMode: c.drip_mode || 'none', certificateEnabled: c.certificate_enabled === undefined ? true : !!c.certificate_enabled,
+      certificateBlueprintId: c.certificate_blueprint_id ? Number(c.certificate_blueprint_id) : null,
       enrolled, createdAt: c.created_at,
     },
     chapters,

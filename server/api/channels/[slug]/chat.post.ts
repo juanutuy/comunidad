@@ -1,6 +1,6 @@
 // Enviar un mensaje al chat de un canal (Fase 3): se persiste en
 // chat_messages y se empuja en vivo a la sala del canal (Durable Object).
-import { canAccessChannel, channelBySlug, resolveTenant, currentAuth, requireCanWrite } from '../../../utils/community'
+import { canAccessChannel, channelBySlug, isChannelArchived, resolveTenant, currentAuth, requireCanWrite } from '../../../utils/community'
 import { assertGate, containsLink } from '../../../utils/members'
 import { serializeChatMessage, type ChatMessageRow } from '../../../utils/chat'
 import { publishRealtime, roomChannel } from '../../../utils/realtime'
@@ -13,6 +13,9 @@ export default defineEventHandler(async (event) => {
   if (!channel) throw createError({ statusCode: 404, message: 'Canal no encontrado.' })
   const { user, role } = await currentAuth(event, tenant.id)
   if (!user) throw createError({ statusCode: 401, message: 'Iniciá sesión para participar en el chat.' })
+  // Fase 16: el chat de un canal archivado se cierra para los miembros.
+  if (isChannelArchived(channel) && role !== 'admin')
+    throw createError({ statusCode: 404, message: 'Canal no encontrado.' })
   const access = await canAccessChannel(event, user.id, role, channel)
   if (!access) throw createError({ statusCode: 403, message: 'No tenés acceso al chat de este canal.' })
 

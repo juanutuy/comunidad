@@ -19,7 +19,7 @@ const TABLES = [
   'chat_rooms', 'chat_room_members', 'chat_room_messages', 'user_blocks',
   'user_hidden_posts', 'user_follows', 'gamification_levels', 'gamification_points',
   'reports', 'invitations', 'join_requests', 'member_tags', 'member_tag_assignments',
-  'access_links',
+  'access_links', 'certificate_blueprints', 'certificates',
 ]
 
 const db = new Database(join(process.cwd(), 'data', 'comunidad.db'), { readonly: true })

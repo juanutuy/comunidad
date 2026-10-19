@@ -17,9 +17,26 @@ export interface TenantRow {
   // lectura canónica de estos ajustes es getPrivacySettings).
   visibility?: string, directory_audience?: string, library_audience?: string
   anyone_can_register?: number
+  // Fase 15: marca del tenant (la usa el certificado de la Fase 16
+  // cuando el diseño pide mostrar el logo).
+  logo_url?: string, logo_dark_url?: string, icon_url?: string, favicon_url?: string
 }
 export interface UserRow { id: number, name: string, slug: string, email: string, bio: string, location: string, avatar_url: string, created_at: string, cover_url?: string, website?: string, last_seen_at?: string }
-export interface ChannelRow { id: number, tenant_id: number, group_id: number | null, slug: string, name: string, icon: string, description: string, type: string, price_cents: number }
+export interface ChannelRow { id: number, tenant_id: number, group_id: number | null, slug: string, name: string, icon: string, description: string, type: string, price_cents: number, archived_at?: string, post_permission?: string }
+
+// Fase 16: un canal archivado deja de existir para los miembros
+// (navegación, feed, búsqueda, detalle y chat), pero su contenido
+// queda guardado y el admin lo sigue gestionando en la consola.
+export function isChannelArchived(channel: { archived_at?: string | null }): boolean {
+  return !!(channel.archived_at && String(channel.archived_at).trim())
+}
+// Fase 16: «quién puede publicar» del canal — 'staff' reserva los
+// posts NUEVOS al equipo (admin/moderator/course_manager); comentar
+// y reaccionar quedan como siempre. Sin columna (bases viejas en
+// memoria) vale 'members'.
+export function channelPostPermission(channel: { post_permission?: string | null }): 'members' | 'staff' {
+  return channel.post_permission === 'staff' ? 'staff' : 'members'
+}
 
 export async function resolveTenant(event: H3Event): Promise<TenantRow> {
   const db = await dbFor(event)
