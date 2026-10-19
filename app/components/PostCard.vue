@@ -50,10 +50,24 @@ const reactionMeta = [
 const localReactions = ref({ ...props.post.reactions })
 const localMine = ref([...props.post.myReactions])
 const localBookmarked = ref(props.post.bookmarked)
+// Fase 16-B: estado local sincronizado de comentarios abiertos/
+// cerrados (el menú lo cambia sin esperar la recarga del padre) y
+// «override» de la última edición hecha desde esta misma tarjeta, para
+// que el cambio se vea al instante en TODAS las superficies (también
+// en la búsqueda, que no escucha @changed). Cuando el padre refresca,
+// las props traen los valores del servidor y el override se descarta.
+const localAllowComments = ref(props.post.allowComments !== false)
+const editOverride = ref<{ title: string, body: string, bodyHtml: string } | null>(null)
+const displayTitle = computed(() => editOverride.value?.title ?? props.post.title)
+const displayBody = computed(() => editOverride.value?.body ?? props.post.body)
+const displayBodyHtml = computed(() => editOverride.value ? editOverride.value.bodyHtml : props.post.bodyHtml)
+const displayEdited = computed(() => !!editOverride.value || !!props.post.edited)
 watch(() => props.post, (p) => {
   localReactions.value = { ...p.reactions }
   localMine.value = [...p.myReactions]
   localBookmarked.value = p.bookmarked
+  localAllowComments.value = p.allowComments !== false
+  editOverride.value = null
 })
 
 const youtubeEmbed = computed(() => {
@@ -89,6 +103,91 @@ async function togglePin() {
   catch { toast.add({ title: 'No se pudo fijar la publicación', color: 'error' }) }
 }
 
+// Fase 16-B: activar/desactivar comentarios desde el menú (autor o
+// staff). Es la misma allow_comments que respeta la API de
+// comentarios; el estado local se actualiza al instante y el padre
+// refresca con @changed.
+async function toggleComments() {
+  try {
+    const res = await api<{ allowComments: boolean }>(`/api/posts/${props.post.id}/comments-toggle`, { method: 'POST' })
+    localAllowComments.value = res.allowComments
+    toast.add({ title: res.allowComments ? 'Comentarios activados' : 'Comentarios desactivados', color: 'success' })
+    emit('changed')
+  }
+  catch { toast.add({ title: 'No se pudo cambiar el estado de los comentarios', color: 'error' }) }
+}
+
+// Fase 16-B: copiar el enlace REAL del detalle (origen actual + ruta
+// canónica /p/<canal>/<post>). Sin clipboard API se cae a la selección
+// manual con prompt, pero el valor copiado/ofrecido es siempre el real.
+async function copyLink() {
+  const url = `${window.location.origin}/p/${props.post.channel.slug}/${props.post.slug}`
+  try {
+    await navigator.clipboard.writeText(url)
+    toast.add({ title: 'Enlace copiado', description: url, color: 'success' })
+  }
+  catch {
+    window.prompt('Copiá el enlace de la publicación:', url)
+  }
+}
+
+function viewPost() {
+  navigateTo(`/p/${props.post.channel.slug}/${props.post.slug}`)
+}
+
+// Fase 16-B: editar la publicación DESDE la tarjeta (el mismo editor
+// rico con «/» de «Mis borradores» y el mismo PUT del servidor, que
+// sanitiza y marca «Editado»). Las encuestas editan su pregunta como
+// texto, igual que en borradores.
+const editing = ref(false)
+const editForm = reactive({ title: '', body: '', bodyHtml: '' })
+const savingEdit = ref(false)
+async function uploadImageFile(file: File): Promise<string> {
+  const fd = new FormData()
+  fd.append('file', file)
+  fd.append('kind', 'image')
+  const up = await api<{ url: string }>('/api/uploads', { method: 'POST', body: fd })
+  return up.url
+}
+function escapeHtml(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+}
+function editPlainText(): string {
+  if (!editForm.bodyHtml) return editForm.body.trim()
+  const d = document.createElement('div')
+  d.innerHTML = editForm.bodyHtml
+  return (d.textContent || '').trim()
+}
+function startEdit() {
+  editForm.title = displayTitle.value
+  editForm.body = displayBody.value
+  // Sin cuerpo rico guardado (posts de texto plano), el editor arranca
+  // desde el texto convertido a párrafos.
+  editForm.bodyHtml = displayBodyHtml.value
+    || (displayBody.value ? displayBody.value.split(/\n{2,}/).map(p => `<p>${escapeHtml(p).replace(/\n/g, '<br>')}</p>`).join('') : '')
+  editing.value = true
+}
+async function saveEdit() {
+  savingEdit.value = true
+  try {
+    const isPoll = props.post.kind === 'poll'
+    const body: Record<string, unknown> = isPoll
+      ? { title: editForm.title, body: editForm.body }
+      : { title: editForm.title, bodyHtml: editForm.bodyHtml }
+    await api(`/api/posts/${props.post.id}`, { method: 'PUT', body })
+    editOverride.value = isPoll
+      ? { title: editForm.title, body: editForm.body, bodyHtml: '' }
+      : { title: editForm.title, body: editPlainText(), bodyHtml: editForm.bodyHtml }
+    toast.add({ title: 'Publicación actualizada', color: 'success' })
+    editing.value = false
+    emit('changed')
+  }
+  catch (e) {
+    toast.add({ title: 'No se pudo guardar', description: (e as { data?: { message?: string } }).data?.message || '', color: 'error' })
+  }
+  finally { savingEdit.value = false }
+}
+
 // Encuesta (Fase 5): votar o cambiar el voto; el servidor devuelve
 // los conteos actualizados y se refleja sin recargar.
 const localPoll = ref<PollView | null>(props.post.poll ?? null)
@@ -119,27 +218,39 @@ async function hidePost() {
   }
   catch { toast.add({ title: 'No se pudo ocultar la publicación', color: 'error' }) }
 }
-// Fase 7: el menú «…» de la cabecera reúne las acciones secundarias
-// (ocultar para mí, fijar si soy admin, eliminar si corresponde).
+// Fase 7 → 16-B: el menú «…» reúne TODAS las acciones de la
+// publicación, con la composición de la referencia y todo funcional:
+// siempre Guardar/Copiar enlace/Ver; del autor, Editar; del autor y
+// del staff, comentarios on/off; del staff que modera, Fijar; Eliminar
+// si corresponde; y en posts ajenos, Ocultar y Reportar (Fases 5/12).
+// En un post anónimo el slug viene vacío: «es mío» lo dice la marca
+// `mine` del serializador, no la comparación de slugs.
+const isMine = computed(() => !!user.value && (!!props.post.author.mine || user.value.slug === props.post.author.slug))
+const isModeratorStaff = computed(() => !!user.value && ['admin', 'moderator'].includes(user.value.role || ''))
 const postMenuItems = computed(() => {
-  const items: { label: string, icon: string, onSelect: () => void }[] = []
-  // En un post anónimo el slug viene vacío: «es mío» lo dice la marca
-  // `mine` del serializador, no la comparación de slugs.
-  const notMine = !!user.value && !props.post.author.mine && user.value.slug !== props.post.author.slug
-  if (notMine)
+  const items: { label: string, icon: string, color?: 'error', onSelect: () => void }[] = []
+  if (!user.value) return [items]
+  items.push({ label: localBookmarked.value ? 'Quitar de guardados' : 'Guardar publicación', icon: localBookmarked.value ? 'i-lucide-bookmark-check' : 'i-lucide-bookmark', onSelect: toggleBookmark })
+  if (isModeratorStaff.value)
+    items.push({ label: props.post.pinned ? 'Desfijar publicación' : 'Fijar publicación', icon: 'i-lucide-pin', onSelect: togglePin })
+  if (isMine.value)
+    items.push({ label: 'Editar publicación', icon: 'i-lucide-pencil', onSelect: startEdit })
+  if (isMine.value || isModeratorStaff.value)
+    items.push({ label: localAllowComments.value ? 'Desactivar comentarios' : 'Activar comentarios', icon: localAllowComments.value ? 'i-lucide-message-circle-off' : 'i-lucide-message-circle', onSelect: toggleComments })
+  items.push({ label: 'Copiar enlace', icon: 'i-lucide-link', onSelect: copyLink })
+  items.push({ label: 'Ver publicación', icon: 'i-lucide-external-link', onSelect: viewPost })
+  if (!isMine.value) {
     items.push({ label: 'Ocultar publicación', icon: 'i-lucide-eye-off', onSelect: hidePost })
-  if (user.value?.role === 'admin')
-    items.push({ label: props.post.pinned ? 'Desfijar' : 'Fijar (anuncio)', icon: 'i-lucide-pin', onSelect: togglePin })
+    // Fase 12: reportar contenido ajeno (el servidor también lo valida).
+    items.push({ label: 'Reportar', icon: 'i-lucide-flag', onSelect: () => openReport({ type: 'post', id: props.post.id, label: displayTitle.value }) })
+  }
   if (canDelete.value)
-    items.push({ label: 'Eliminar publicación', icon: 'i-lucide-trash-2', onSelect: () => { confirmDelete.value = true } })
-  // Fase 12: reportar contenido ajeno (el servidor también lo valida).
-  if (notMine)
-    items.push({ label: 'Reportar', icon: 'i-lucide-flag', onSelect: () => openReport({ type: 'post', id: props.post.id, label: props.post.title }) })
+    items.push({ label: 'Eliminar publicación', icon: 'i-lucide-trash-2', color: 'error', onSelect: () => { confirmDelete.value = true } })
   return [items]
 })
 
 // Fase 14: el moderador también puede eliminar publicaciones ajenas.
-const canDelete = computed(() => !!user.value && (['admin', 'moderator'].includes(user.value.role || '') || !!props.post.author.mine || user.value.slug === props.post.author.slug))
+const canDelete = computed(() => isModeratorStaff.value || isMine.value)
 const confirmDelete = ref(false)
 const deleting = ref(false)
 async function deletePost() {
@@ -187,7 +298,7 @@ async function deletePost() {
               {{ post.channel.name }}
             </NuxtLink>
             <span class="text-muted">· {{ timeAgo(post.createdAt) }}</span>
-            <span v-if="post.edited" class="flex items-center gap-1 text-muted">
+            <span v-if="displayEdited" class="flex items-center gap-1 text-muted">
               · <UIcon name="i-lucide-pencil" class="text-xs" /> Editado
             </span>
             <UBadge v-if="post.pinned" color="warning" variant="subtle" icon="i-lucide-pin">
@@ -214,10 +325,10 @@ async function deletePost() {
         </div>
 
         <NuxtLink v-if="linkable !== false" :to="`/p/${post.channel.slug}/${post.slug}`" class="mt-1 block text-lg font-bold leading-snug hover:underline">
-          {{ post.title }}
+          {{ displayTitle }}
         </NuxtLink>
         <h1 v-else class="mt-1 text-2xl font-bold leading-snug">
-          {{ post.title }}
+          {{ displayTitle }}
         </h1>
 
         <div v-if="post.locked" class="mt-3 rounded-lg border border-dashed border-default p-4">
@@ -242,9 +353,9 @@ async function deletePost() {
           <!-- Fase 8: con cuerpo rico se muestra el HTML (sanitizado
                en el servidor al guardar y al servir); sin él, el
                texto plano de siempre. -->
-          <div v-if="post.bodyHtml" class="rich-content mt-2 text-[15px] leading-relaxed" v-html="post.bodyHtml" />
+          <div v-if="displayBodyHtml" class="rich-content mt-2 text-[15px] leading-relaxed" v-html="displayBodyHtml" />
           <p v-else class="mt-2 whitespace-pre-line text-[15px] leading-relaxed">
-            {{ post.body }}
+            {{ displayBody }}
           </p>
           <div v-if="post.mediaType === 'video' && youtubeEmbed" class="mt-3 aspect-video overflow-hidden rounded-lg">
             <iframe :src="youtubeEmbed" class="h-full w-full" allowfullscreen title="Video de la publicación" />
@@ -298,7 +409,7 @@ async function deletePost() {
             :title="r.label"
             @click="toggleReaction(r.type)"
           />
-          <NuxtLink v-if="post.allowComments !== false" :to="`/p/${post.channel.slug}/${post.slug}`" class="ml-1">
+          <NuxtLink v-if="localAllowComments" :to="`/p/${post.channel.slug}/${post.slug}`" class="ml-1">
             <UButton size="sm" color="neutral" variant="ghost" icon="i-lucide-message-circle" :label="`${post.commentCount} comentarios`" />
           </NuxtLink>
           <span v-else class="ml-1 flex items-center gap-1.5 px-2 text-sm text-muted" title="El autor desactivó los comentarios">
@@ -311,6 +422,33 @@ async function deletePost() {
             <div class="flex justify-end gap-2">
               <UButton color="neutral" variant="ghost" label="Cancelar" @click="confirmDelete = false" />
               <UButton color="error" label="Sí, eliminar" icon="i-lucide-trash-2" :loading="deleting" @click="deletePost" />
+            </div>
+          </template>
+        </UModal>
+
+        <!-- Fase 16-B: editar la publicación desde la tarjeta, con el
+             mismo editor rico de «Mis borradores». -->
+        <UModal v-model:open="editing" title="Editar publicación">
+          <template #body>
+            <div class="space-y-3">
+              <UFormField label="Título">
+                <UInput v-model="editForm.title" class="w-full" />
+              </UFormField>
+              <UFormField v-if="post.kind === 'poll'" label="Pregunta">
+                <UTextarea v-model="editForm.body" :rows="5" class="w-full" />
+              </UFormField>
+              <UFormField v-else label="Contenido">
+                <ClientOnly>
+                  <RichEditor v-model="editForm.bodyHtml" mode="slash" :upload-image="uploadImageFile" placeholder="Escribí «/» para insertar bloques…" />
+                </ClientOnly>
+              </UFormField>
+              <p v-if="post.kind === 'poll'" class="text-xs text-muted">Las opciones de la encuesta no se editan desde acá: borrá la publicación y creala de nuevo si necesitás cambiarlas.</p>
+            </div>
+          </template>
+          <template #footer>
+            <div class="flex justify-end gap-2">
+              <UButton color="neutral" variant="ghost" label="Cancelar" @click="editing = false" />
+              <UButton label="Guardar cambios" icon="i-lucide-save" :loading="savingEdit" :disabled="post.kind === 'poll' ? !editForm.body.trim() || !editForm.title.trim() : !editForm.title.trim() || !editPlainText()" @click="saveEdit" />
             </div>
           </template>
         </UModal>
