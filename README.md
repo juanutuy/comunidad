@@ -1007,6 +1007,93 @@ estudio sin perder datos (certificado sigue encendido en ellos);
   sección «Perfil» (que ya incluye avatar y portada), y al cerrarlo
   la página de perfil recarga sus datos para reflejar los cambios.
 
+## Fase 14 (hecha) — miembros a fondo: roles, invitaciones, aprobación, Level Gates, etiquetas y auto-ingreso
+
+La sección de Miembros de la consola crece a la par de la referencia
+(auditoría profunda de la consola, 19-oct-2026), con código y textos
+propios. Migración **aditiva**: `memberships.status` nueva y columnas
+JSON en `tenants` (`join_approval`, `join_questions`,
+`join_cooldown_days`, `auto_join_channels`, `level_gates`) + tablas
+`invitations`, `join_requests`, `member_tags`,
+`member_tag_assignments` y `access_links`.
+
+- **Roles**: además de `admin` y `member`, existen `moderator` y
+  `course_manager`, con capacidades fijas definidas en el servidor
+  (`canModerate` / `canManageCourses` / `requireAdmin` /
+  `requireModerator` / `requireCourseManager` en
+  `server/utils/community.ts`), aplicadas en TODAS las rutas de la
+  consola: el moderador entra a Moderación (Fase 12) y a la lista de
+  Miembros en solo lectura, y puede eliminar publicaciones y
+  comentarios ajenos desde el menú «⋯»; el encargado de cursos, solo
+  a Cursos. El riel de la consola se filtra por rol, «Panel de
+  administración» aparece para todo el staff (cada uno aterriza en
+  su sección) y entrar directo a una ruta prohibida muestra el aviso
+  de acceso denegado de siempre. La regla de no degradar al único
+  administrador se mantiene. **Diferencia documentada**: NO hay
+  matriz de permisos configurable ni roles personalizados (la
+  referencia trae 25 grupos de permisos): la subsección
+  Miembros → Roles explica en lenguaje claro qué puede hacer cada
+  uno de los cuatro roles fijos.
+- **Aprobación previa de ingreso** (Ajustes → «Ingreso de
+  miembros»): interruptor, hasta 6 preguntas que se responden al
+  registrarse y días de espera tras un rechazo (`join_cooldown_days`;
+  0 = reintento inmediato). Con la aprobación encendida, el registro
+  crea la membresía en estado `pending` y una solicitud con las
+  respuestas: la persona abre sesión pero un **muro de estado**
+  (`server/middleware/membership-status.ts`) responde 403 en toda la
+  API de la comunidad y la interfaz muestra `/pending` («Tu
+  solicitud está en revisión»). La cola vive en Miembros →
+  Solicitudes de ingreso (aprobar = acceso + auto-ingreso + aviso
+  in-app; rechazar = estado `declined`, con re-solicitud posible
+  tras el cooldown) y el Panel suma el conteo en «Necesita tu
+  atención». Sin aprobación, el registro sigue siendo inmediato.
+- **Invitaciones** (Miembros → Invitaciones): por **correo**
+  (personal, un solo uso, solo para ese correo) y por **enlace**
+  (reutilizable, con vencimiento opcional, contador de usos y
+  revocación). Quien entra con invitación válida nace **aprobado**
+  aunque la aprobación previa esté encendida. Los correos de
+  invitación pasan por la capa existente y quedan **EN OSCURO**:
+  sin proveedor configurado se registran como no enviados y la
+  interfaz lo dice con franqueza, ofreciendo copiar el enlace para
+  compartirlo manualmente (nunca se finge un envío). **Alta manual**:
+  el administrador crea la cuenta con una contraseña temporal
+  generada que se muestra **una sola vez** para pasársela a la
+  persona.
+- **Level Gates (compuertas por nivel)**: Gamificación →
+  «Compuertas por nivel», una por acción (crear publicaciones,
+  enviar mensajes directos, chatear en salas y canales, pegar
+  enlaces en el feed, pegar enlaces en el chat, publicar videos en
+  el feed), cada una con un nivel mínimo o «sin compuerta». Se
+  **aplican en el servidor** (403 con el mensaje «Necesitás el nivel
+  X para…», con los puntos actuales y los necesarios) en posts,
+  comentarios con enlace, DMs, chat de canal, salas y videos. El
+  **staff nunca se bloquea**. La UI avisa antes en el compositor de
+  posts y en los mensajes directos (vía `gates` de `/api/tenant`);
+  en enlaces y video avisa el error del servidor. La compuerta se
+  guarda por **umbral de puntos** (único por tenant), no por id:
+  la pantalla de niveles reemplaza la lista al guardar. **Diferencia
+  documentada**: no hay interruptor maestro de gamificación;
+  compuerta en «sin compuerta» = apagada.
+- **Etiquetas privadas**: etiquetas del equipo (crear, renombrar,
+  borrar, asignar por miembro y filtrar la lista). El miembro
+  **nunca** las ve: no salen en su perfil, ni en el directorio, ni
+  en ninguna API pública — solo en las rutas de administración.
+- **Auto-ingreso a canales**: hasta 2 canales (Ajustes → Ingreso de
+  miembros) a los que entra todo miembro nuevo por cualquier vía
+  (registro aprobado, invitación o alta manual), como seguimiento
+  (`follows`). Si el canal es privado, el auto-ingreso igual suma a
+  la persona: es una decisión explícita del administrador al
+  configurarlo.
+- **Acciones de fila completas**: además de rol y quitar membresía,
+  **Suspender** (no puede iniciar sesión — 403 con aviso — y su
+  sesión abierta queda fuera por el muro de estado), **Restringir**
+  (entra y lee, pero publicar/comentar/reaccionar/votar/chatear
+  devuelve 403 claro, vía `requireCanWrite`) y **Enviar enlace de
+  acceso** (enlace de un solo uso que vence en 1 hora para entrar
+  sin contraseña; el envío por correo queda en oscuro y el enlace
+  se puede copiar desde la consola). Nadie puede suspenderse ni
+  restringirse a sí mismo, y el último administrador tampoco.
+
 ## Pendiente a propósito (fuera de esta fase)
 
 - Migraciones versionadas con `drizzle-kit` para D1 (hoy: esquema
