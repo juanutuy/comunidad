@@ -8,8 +8,17 @@
 // (Programar / Guardar borrador). El cuerpo se edita con RichEditor
 // en modo «slash» y se envía como HTML: el servidor lo sanitiza y
 // deriva el texto plano (ver server/utils/sanitize.ts).
-const props = withDefaults(defineProps<{ channelSlug?: string, variant?: 'bar' | 'bare' }>(), { variant: 'bar' })
-const emit = defineEmits<{ published: [] }>()
+// Fase 16-C: ESTE es el único editor de publicaciones del proyecto,
+// para crear Y para editar. En modo «edit» el mismo modal precarga
+// el post (canal fijo en la cabecera, adjunto y encuesta visibles) y
+// guarda con «Actualizar» vía el mismo PUT de siempre. La instancia
+// anfitriona (prop editorHost, montada en el layout de miembro)
+// recibe los pedidos de edición de las tarjetas y de «Mis
+// borradores» a través de usePostEditor: imposible desincronizar
+// crear y editar porque son la misma pieza.
+const props = withDefaults(defineProps<{ channelSlug?: string, variant?: 'bar' | 'bare', editorHost?: boolean }>(), { variant: 'bar', editorHost: false })
+const emit = defineEmits<{ published: [], updated: [] }>()
+const { target: editTarget, consumeTarget, notifySaved } = usePostEditor()
 
 const { user, gates } = useAuth()
 const { initials } = useFormat()
@@ -42,6 +51,15 @@ const staffOnlyChannel = computed(() => {
 const open = ref(false)
 const isPhone = useIsPhone()
 const maximized = ref(false)
+// Fase 16-C: modo del modal. En «edit», editId/editStatus identifican
+// el post cargado y la cabecera muestra su canal fijo (no se mueve
+// un post de canal, como en la referencia).
+const mode = ref<'create' | 'edit'>('create')
+const editId = ref<number | null>(null)
+const editStatus = ref('')
+const editChannelName = ref('')
+const editPollLabels = ref<string[]>([])
+const originalPinned = ref(false)
 const channelSlug = ref('')
 const title = ref('')
 const bodyHtml = ref('')
@@ -53,7 +71,11 @@ const anonymous = ref(false)
 const scheduleMode = ref(false)
 const scheduledAt = ref('')
 const publishing = ref(false)
-const attachedFile = ref<{ url: string, name: string } | null>(null)
+// Adjunto principal del post (el que la tarjeta muestra bajo el
+// cuerpo). Al crear solo se produce «file» (el botón de clip); en
+// edición se precarga el que el post ya tenga (imagen/video/archivo)
+// y se puede quitar o reemplazar por un archivo.
+const attachedMedia = ref<{ type: 'image' | 'video' | 'file', url: string, name: string } | null>(null)
 const videoUrl = ref('')
 const gifUrl = ref('')
 const videoPopOpen = ref(false)
@@ -86,8 +108,18 @@ const canSubmit = computed(() => {
 })
 const snapshot = computed(() => JSON.stringify({
   t: title.value, h: bodyHtml.value, k: kind.value, o: pollOptions.value,
-  a: anonymous.value, c: allowComments.value, f: attachedFile.value?.url || '',
+  a: anonymous.value, c: allowComments.value,
+  f: attachedMedia.value ? `${attachedMedia.value.type}:${attachedMedia.value.url}` : '',
+  s: scheduledAt.value, p: asAnnouncement.value,
 }))
+// Fase 16-C: guardar la edición exige contenido (la pregunta, si es
+// encuesta) y título en los posts comunes — las mismas reglas que
+// valida el PUT en el servidor.
+const canSubmitEdit = computed(() => {
+  if (!bodyText.value) return false
+  if (kind.value === 'poll') return true
+  return !!title.value.trim()
+})
 const isDirty = computed(() => open.value && snapshot.value !== openedSnapshot.value)
 
 function addPollOption() { if (pollOptions.value.length < 4) pollOptions.value.push('') }
@@ -121,7 +153,7 @@ function onAttachFile(e: Event) {
   const file = (e.target as HTMLInputElement).files?.[0]
   ;(e.target as HTMLInputElement).value = ''
   if (!file) return
-  upload('file', file).then(({ url, name }) => { attachedFile.value = { url, name } })
+  upload('file', file).then(({ url, name }) => { attachedMedia.value = { type: 'file', url, name } })
     .catch(err => toast.add({ title: 'No se pudo subir el archivo', description: (err as { data?: { message?: string } }).data?.message || '', color: 'error' }))
 }
 function insertVideo() {
@@ -186,8 +218,63 @@ function resetForm() {
   anonymous.value = false
   scheduleMode.value = false
   scheduledAt.value = ''
-  attachedFile.value = null
+  attachedMedia.value = null
   maximized.value = false
+  // Fase 16-C: al cerrar, el modal vuelve a modo crear limpio.
+  mode.value = 'create'
+  editId.value = null
+  editStatus.value = ''
+  editChannelName.value = ''
+  editPollLabels.value = []
+  originalPinned.value = false
+}
+
+function escapeHtml(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+}
+
+// Fase 16-C: abrir el MISMO modal en modo edición, precargado con el
+// post. Lo invocan la instancia anfitriona (desde usePostEditor) —
+// las tarjetas y «Mis borradores» no tienen editor propio.
+function openEdit(p: EditablePost) {
+  mode.value = 'edit'
+  editId.value = p.id
+  editStatus.value = p.status
+  editChannelName.value = p.channelName
+  channelSlug.value = p.channelSlug
+  title.value = p.title
+  // Sin cuerpo rico guardado (posts de texto plano), el editor
+  // arranca desde el texto convertido a párrafos.
+  bodyHtml.value = p.bodyHtml
+    || (p.body ? p.body.split(/\n{2,}/).map(par => `<p>${escapeHtml(par).replace(/\n/g, '<br>')}</p>`).join('') : '')
+  kind.value = p.kind === 'poll' ? 'poll' : 'post'
+  editPollLabels.value = p.pollOptions || []
+  allowComments.value = p.allowComments !== false
+  // El anónimo se refleja tal cual quedó al crear: no se convierte
+  // después (regla de la Fase 8, el PUT ni lo acepta).
+  anonymous.value = !!p.anonymous
+  asAnnouncement.value = !!p.pinned
+  originalPinned.value = !!p.pinned
+  attachedMedia.value = p.mediaType && p.mediaType !== 'none' && p.mediaUrl
+    ? { type: p.mediaType as 'image' | 'video' | 'file', url: p.mediaUrl, name: p.attachmentName || '' }
+    : null
+  scheduleMode.value = false
+  scheduledAt.value = p.status === 'scheduled' && p.scheduledAt ? p.scheduledAt.slice(0, 16) : ''
+  maximized.value = false
+  open.value = true
+  openedSnapshot.value = snapshot.value
+  setTimeout(() => editorRef.value?.focus(), 400)
+}
+
+// Solo la instancia anfitriona (layout) responde a los pedidos de
+// edición compartidos: las demás instancias (feed, barra móvil)
+// siguen siendo de solo crear y no abren nada.
+if (props.editorHost) {
+  watch(editTarget, (t) => {
+    if (!t) return
+    const p = consumeTarget()
+    if (p) openEdit(p)
+  })
 }
 
 function requestClose() {
@@ -226,10 +313,10 @@ async function submit(mode: 'now' | 'draft' | 'schedule') {
     }
     if (kind.value === 'poll') payload.options = validOptions.value
     if (mode === 'schedule') payload.scheduledAt = new Date(scheduledAt.value).toISOString()
-    if (attachedFile.value) {
-      payload.mediaType = 'file'
-      payload.mediaUrl = attachedFile.value.url
-      payload.attachmentName = attachedFile.value.name
+    if (attachedMedia.value) {
+      payload.mediaType = attachedMedia.value.type
+      payload.mediaUrl = attachedMedia.value.url
+      payload.attachmentName = attachedMedia.value.type === 'file' ? attachedMedia.value.name : ''
     }
     const created = await api<{ status?: string }>('/api/posts', { method: 'POST', body: payload })
     if (mode === 'draft') toast.add({ title: 'Borrador guardado', description: 'Lo encontrás en «Mis borradores».', color: 'success' })
@@ -242,6 +329,48 @@ async function submit(mode: 'now' | 'draft' | 'schedule') {
     open.value = false
     resetForm()
     emit('published')
+    if (props.variant === 'bare') await refreshNuxtData()
+  }
+  catch (e) {
+    toast.add({ title: 'No se pudo guardar', description: (e as { data?: { message?: string } }).data?.message || (e as Error).message || 'Intentá de nuevo.', color: 'error' })
+  }
+  finally { publishing.value = false }
+}
+
+// Fase 16-C: guardar en modo edición — el mismo PUT de siempre
+// (sanitiza, deriva el texto plano y marca «Editado»), ahora con el
+// estado de comentarios y el adjunto principal incluidos: guardar
+// sin tocarlos los conserva tal cual. El fijado (admin, solo en
+// publicadas) se aplica con el mismo endpoint del menú de la
+// tarjeta si cambió. Al terminar se avisa por usePostEditor para que
+// la tarjeta y las listas reflejen lo nuevo sin recargar.
+async function submitEdit() {
+  if (!editId.value || !canSubmitEdit.value) return
+  if (editStatus.value === 'scheduled' && !scheduledAt.value) {
+    toast.add({ title: 'Elegí la fecha y hora de publicación', color: 'warning' })
+    return
+  }
+  publishing.value = true
+  try {
+    const payload: Record<string, unknown> = {
+      title: title.value,
+      bodyHtml: bodyHtml.value,
+      allowComments: allowComments.value,
+      mediaType: attachedMedia.value?.type || 'none',
+      mediaUrl: attachedMedia.value?.url || '',
+      attachmentName: attachedMedia.value?.type === 'file' ? attachedMedia.value.name : '',
+    }
+    if (editStatus.value === 'scheduled') payload.scheduledAt = new Date(scheduledAt.value).toISOString()
+    const id = editId.value
+    await api(`/api/posts/${id}`, { method: 'PUT', body: payload })
+    if (user.value?.role === 'admin' && editStatus.value === 'published' && asAnnouncement.value !== originalPinned.value)
+      await api(`/api/posts/${id}/pin`, { method: 'POST' })
+    notifySaved({ id, title: title.value, body: htmlText(bodyHtml.value), bodyHtml: bodyHtml.value, allowComments: allowComments.value })
+    toast.add({ title: 'Publicación actualizada', color: 'success' })
+    confirmDiscard.value = false
+    open.value = false
+    resetForm()
+    emit('updated')
     if (props.variant === 'bare') await refreshNuxtData()
   }
   catch (e) {
@@ -315,21 +444,26 @@ const chevronItems = computed(() => [
             <p class="truncate font-semibold">{{ anonymous ? 'Anónimo' : user.name }}</p>
             <div class="flex items-center gap-1 text-sm text-muted">
               <span>Publicando en</span>
-              <UDropdownMenu :items="channelMenuItems">
+              <!-- Fase 16-C: al crear se elige el canal; al editar el
+                   canal es FIJO (un post no se muda de canal, como en
+                   la referencia) y se muestra como texto. -->
+              <UDropdownMenu v-if="mode === 'create'" :items="channelMenuItems">
                 <UButton color="neutral" variant="link" size="sm" class="px-1 font-semibold text-primary" :label="`# ${currentChannel?.name || '…'}`" trailing-icon="i-lucide-chevron-down" />
               </UDropdownMenu>
+              <span v-else class="px-1 font-semibold text-primary"># {{ editChannelName }}</span>
             </div>
           </div>
           <!-- Toggles-icono como en la referencia -->
           <div class="flex shrink-0 items-center gap-1">
             <UButton
-              v-if="user.role === 'admin'" size="sm" :color="asAnnouncement ? 'primary' : 'neutral'"
+              v-if="user.role === 'admin' && (mode === 'create' || editStatus === 'published')" size="sm" :color="asAnnouncement ? 'primary' : 'neutral'"
               :variant="asAnnouncement ? 'soft' : 'ghost'" icon="i-lucide-megaphone"
-              title="Publicar como anuncio (queda fijado en el canal)" @click="asAnnouncement = !asAnnouncement"
+              :title="mode === 'edit' ? 'Fijado en el canal (anuncio)' : 'Publicar como anuncio (queda fijado en el canal)'" @click="asAnnouncement = !asAnnouncement"
             />
             <UButton
               size="sm" :color="anonymous ? 'primary' : 'neutral'" :variant="anonymous ? 'soft' : 'ghost'"
-              icon="i-lucide-venetian-mask" title="Publicar como anónimo: nadie ve tu nombre ni tu perfil"
+              icon="i-lucide-venetian-mask" :disabled="mode === 'edit'"
+              :title="mode === 'edit' ? 'El anonimato se elige al crear la publicación y no se puede cambiar' : 'Publicar como anónimo: nadie ve tu nombre ni tu perfil'"
               @click="anonymous = !anonymous"
             />
             <UButton
@@ -363,26 +497,45 @@ const chevronItems = computed(() => [
           <!-- Panel de encuesta integrado al editor -->
           <div v-if="kind === 'poll'" class="space-y-2 rounded-lg border border-default p-3">
             <p class="flex items-center gap-2 text-sm font-semibold"><UIcon name="i-lucide-bar-chart-3" /> Opciones de la encuesta</p>
-            <div v-for="(_, i) in pollOptions" :key="i" class="flex items-center gap-2">
-              <UInput v-model="pollOptions[i]" :placeholder="`Opción ${i + 1}`" class="flex-1" maxlength="80" />
-              <UButton v-if="pollOptions.length > 2" size="sm" color="neutral" variant="ghost" icon="i-lucide-x" @click="removePollOption(i)" />
-            </div>
-            <UButton v-if="pollOptions.length < 4" size="sm" color="neutral" variant="soft" icon="i-lucide-plus" label="Agregar opción" @click="addPollOption" />
-            <p class="text-xs text-muted">Los miembros pueden votar y cambiar su voto. La pregunta es el texto del editor.</p>
+            <!-- Fase 16-C: en edición las opciones son SOLO LECTURA
+                 (regla del producto, la misma de siempre: con votos
+                 serían datos falsos y sin votos tampoco se reescribe
+                 una encuesta ya creada). La pregunta SÍ se edita: es
+                 el texto del editor. -->
+            <template v-if="mode === 'edit'">
+              <ul class="list-inside list-disc space-y-1 text-sm text-muted">
+                <li v-for="label in editPollLabels" :key="label">{{ label }}</li>
+              </ul>
+              <p class="text-xs text-muted">Las opciones de una encuesta ya creada no se editan: borrá la publicación y creala de nuevo si necesitás cambiarlas.</p>
+            </template>
+            <template v-else>
+              <div v-for="(_, i) in pollOptions" :key="i" class="flex items-center gap-2">
+                <UInput v-model="pollOptions[i]" :placeholder="`Opción ${i + 1}`" class="flex-1" maxlength="80" />
+                <UButton v-if="pollOptions.length > 2" size="sm" color="neutral" variant="ghost" icon="i-lucide-x" @click="removePollOption(i)" />
+              </div>
+              <UButton v-if="pollOptions.length < 4" size="sm" color="neutral" variant="soft" icon="i-lucide-plus" label="Agregar opción" @click="addPollOption" />
+              <p class="text-xs text-muted">Los miembros pueden votar y cambiar su voto. La pregunta es el texto del editor.</p>
+            </template>
           </div>
 
-          <div v-if="attachedFile" class="flex items-center gap-2 rounded-lg border border-default px-3 py-2 text-sm">
-            <UIcon name="i-lucide-paperclip" class="text-muted" />
-            <span class="min-w-0 flex-1 truncate font-medium">{{ attachedFile.name }}</span>
-            <UButton size="xs" color="neutral" variant="ghost" icon="i-lucide-x" title="Quitar adjunto" @click="attachedFile = null" />
+          <!-- Adjunto principal: la misma fila en crear y en editar.
+               Al crear solo llega un archivo (botón de clip); en
+               edición se precarga el del post (imagen, video o
+               archivo) y quitarlo o reemplazarlo se guarda con el
+               resto de la edición. -->
+          <div v-if="attachedMedia" class="flex items-center gap-2 rounded-lg border border-default px-3 py-2 text-sm">
+            <img v-if="attachedMedia.type === 'image'" :src="attachedMedia.url" alt="Imagen adjunta" class="h-8 w-8 shrink-0 rounded object-cover">
+            <UIcon v-else :name="attachedMedia.type === 'video' ? 'i-lucide-video' : 'i-lucide-paperclip'" class="shrink-0 text-muted" />
+            <span class="min-w-0 flex-1 truncate font-medium">{{ attachedMedia.type === 'file' ? attachedMedia.name : attachedMedia.type === 'image' ? 'Imagen de la publicación' : 'Video de la publicación' }}</span>
+            <UButton size="xs" color="neutral" variant="ghost" icon="i-lucide-x" title="Quitar adjunto" @click="attachedMedia = null" />
           </div>
 
-          <div v-if="scheduleMode" class="flex flex-wrap items-center gap-2 rounded-lg bg-elevated p-3">
+          <div v-if="scheduleMode || (mode === 'edit' && editStatus === 'scheduled')" class="flex flex-wrap items-center gap-2 rounded-lg bg-elevated p-3">
             <UIcon name="i-lucide-calendar-clock" />
             <span class="text-sm font-medium">Publicar el</span>
             <UInput v-model="scheduledAt" type="datetime-local" />
           </div>
-          <p class="text-xs text-muted">
+          <p v-if="mode === 'create'" class="text-xs text-muted">
             Los borradores y programados quedan en <NuxtLink to="/drafts" class="text-primary hover:underline" @click="open = false">Mis borradores</NuxtLink>.
           </p>
         </div>
@@ -427,7 +580,8 @@ const chevronItems = computed(() => [
           </UPopover>
           <UButton
             size="sm" :color="kind === 'poll' ? 'primary' : 'neutral'" :variant="kind === 'poll' ? 'soft' : 'ghost'"
-            icon="i-lucide-bar-chart-3" title="Encuesta" @click="kind = kind === 'poll' ? 'post' : 'poll'"
+            icon="i-lucide-bar-chart-3" :disabled="mode === 'edit'"
+            :title="mode === 'edit' ? 'El tipo de publicación no se cambia al editar' : 'Encuesta'" @click="kind = kind === 'poll' ? 'post' : 'poll'"
           />
           <label class="inline-flex cursor-pointer rounded-md p-2 text-muted transition hover:bg-elevated hover:text-default" title="Adjuntar un archivo descargable">
             <UIcon name="i-lucide-paperclip" class="text-lg" />
@@ -436,7 +590,15 @@ const chevronItems = computed(() => [
           <UButton size="sm" color="neutral" variant="ghost" icon="i-lucide-code-xml" title="Bloque de código" @click="editorRef?.insertCodeBlock()" />
           <span class="flex-1" />
           <UButton color="neutral" variant="ghost" label="Cancelar" @click="requestClose" />
-          <div class="flex">
+          <!-- Fase 16-C: en edición el botón principal es
+               «Actualizar» (sin chevron: no hay programar/borrador
+               nuevos sobre un post que ya existe; el programado
+               ajusta su fecha en el cuerpo del modal). -->
+          <UButton
+            v-if="mode === 'edit'" label="Actualizar" icon="i-lucide-send"
+            :loading="publishing" :disabled="!canSubmitEdit" @click="submitEdit"
+          />
+          <div v-else class="flex">
             <UButton
               :label="scheduleMode ? 'Programar' : 'Publicar'"
               :icon="scheduleMode ? 'i-lucide-calendar-clock' : 'i-lucide-send'"
@@ -451,13 +613,17 @@ const chevronItems = computed(() => [
       </template>
     </UModal>
 
-    <!-- Confirmación al cerrar con cambios sin publicar -->
-    <UModal v-model:open="confirmDiscard" title="¿Descartar publicación?" description="Tenés contenido sin publicar en el editor.">
+    <!-- Confirmación al cerrar con cambios sin guardar -->
+    <UModal
+      v-model:open="confirmDiscard"
+      :title="mode === 'edit' ? '¿Descartar cambios?' : '¿Descartar publicación?'"
+      :description="mode === 'edit' ? 'Tenés cambios sin guardar en esta publicación.' : 'Tenés contenido sin publicar en el editor.'"
+    >
       <template #footer>
         <div class="flex w-full flex-wrap justify-end gap-2">
           <UButton color="neutral" variant="ghost" label="Seguir editando" @click="confirmDiscard = false" />
-          <UButton color="neutral" variant="soft" label="Guardar borrador" icon="i-lucide-save" :loading="publishing" @click="submit('draft')" />
-          <UButton color="error" label="Descartar" icon="i-lucide-trash-2" @click="discard" />
+          <UButton v-if="mode === 'create'" color="neutral" variant="soft" label="Guardar borrador" icon="i-lucide-save" :loading="publishing" @click="submit('draft')" />
+          <UButton color="error" :label="mode === 'edit' ? 'Descartar cambios' : 'Descartar'" icon="i-lucide-trash-2" @click="discard" />
         </div>
       </template>
     </UModal>

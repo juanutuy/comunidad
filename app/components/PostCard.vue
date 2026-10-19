@@ -135,58 +135,38 @@ function viewPost() {
   navigateTo(`/p/${props.post.channel.slug}/${props.post.slug}`)
 }
 
-// Fase 16-B: editar la publicación DESDE la tarjeta (el mismo editor
-// rico con «/» de «Mis borradores» y el mismo PUT del servidor, que
-// sanitiza y marca «Editado»). Las encuestas editan su pregunta como
-// texto, igual que en borradores.
-const editing = ref(false)
-const editForm = reactive({ title: '', body: '', bodyHtml: '' })
-const savingEdit = ref(false)
-async function uploadImageFile(file: File): Promise<string> {
-  const fd = new FormData()
-  fd.append('file', file)
-  fd.append('kind', 'image')
-  const up = await api<{ url: string }>('/api/uploads', { method: 'POST', body: fd })
-  return up.url
-}
-function escapeHtml(s: string): string {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-}
-function editPlainText(): string {
-  if (!editForm.bodyHtml) return editForm.body.trim()
-  const d = document.createElement('div')
-  d.innerHTML = editForm.bodyHtml
-  return (d.textContent || '').trim()
-}
+// Fase 16-B → 16-C: editar la publicación DESDE la tarjeta abre el
+// compositor del proyecto en modo edición (el mismo de crear, ver
+// PostComposer y usePostEditor) — la tarjeta ya NO tiene modal de
+// edición propio. Al guardar, el compositor avisa por usePostEditor
+// y esta tarjeta aplica el override al instante (también en la
+// búsqueda, que no escucha @changed) y avisa al padre.
+const { openPostEditor, saved: editorSaved } = usePostEditor()
 function startEdit() {
-  editForm.title = displayTitle.value
-  editForm.body = displayBody.value
-  // Sin cuerpo rico guardado (posts de texto plano), el editor arranca
-  // desde el texto convertido a párrafos.
-  editForm.bodyHtml = displayBodyHtml.value
-    || (displayBody.value ? displayBody.value.split(/\n{2,}/).map(p => `<p>${escapeHtml(p).replace(/\n/g, '<br>')}</p>`).join('') : '')
-  editing.value = true
+  openPostEditor({
+    id: props.post.id,
+    title: displayTitle.value,
+    body: displayBody.value,
+    bodyHtml: displayBodyHtml.value || '',
+    kind: props.post.kind || 'post',
+    status: props.post.status || 'published',
+    channelSlug: props.post.channel.slug,
+    channelName: props.post.channel.name,
+    anonymous: !!props.post.author.anonymous,
+    allowComments: localAllowComments.value,
+    pinned: props.post.pinned,
+    mediaType: props.post.mediaType || 'none',
+    mediaUrl: props.post.mediaUrl || '',
+    attachmentName: props.post.attachmentName || '',
+    pollOptions: (localPoll.value?.options || []).map(o => o.label),
+  })
 }
-async function saveEdit() {
-  savingEdit.value = true
-  try {
-    const isPoll = props.post.kind === 'poll'
-    const body: Record<string, unknown> = isPoll
-      ? { title: editForm.title, body: editForm.body }
-      : { title: editForm.title, bodyHtml: editForm.bodyHtml }
-    await api(`/api/posts/${props.post.id}`, { method: 'PUT', body })
-    editOverride.value = isPoll
-      ? { title: editForm.title, body: editForm.body, bodyHtml: '' }
-      : { title: editForm.title, body: editPlainText(), bodyHtml: editForm.bodyHtml }
-    toast.add({ title: 'Publicación actualizada', color: 'success' })
-    editing.value = false
-    emit('changed')
-  }
-  catch (e) {
-    toast.add({ title: 'No se pudo guardar', description: (e as { data?: { message?: string } }).data?.message || '', color: 'error' })
-  }
-  finally { savingEdit.value = false }
-}
+watch(editorSaved, (n) => {
+  if (!n || n.id !== props.post.id) return
+  editOverride.value = { title: n.title, body: n.body, bodyHtml: n.bodyHtml }
+  localAllowComments.value = n.allowComments
+  emit('changed')
+})
 
 // Encuesta (Fase 5): votar o cambiar el voto; el servidor devuelve
 // los conteos actualizados y se refleja sin recargar.
@@ -426,32 +406,6 @@ async function deletePost() {
           </template>
         </UModal>
 
-        <!-- Fase 16-B: editar la publicación desde la tarjeta, con el
-             mismo editor rico de «Mis borradores». -->
-        <UModal v-model:open="editing" title="Editar publicación">
-          <template #body>
-            <div class="space-y-3">
-              <UFormField label="Título">
-                <UInput v-model="editForm.title" class="w-full" />
-              </UFormField>
-              <UFormField v-if="post.kind === 'poll'" label="Pregunta">
-                <UTextarea v-model="editForm.body" :rows="5" class="w-full" />
-              </UFormField>
-              <UFormField v-else label="Contenido">
-                <ClientOnly>
-                  <RichEditor v-model="editForm.bodyHtml" mode="slash" :upload-image="uploadImageFile" placeholder="Escribí «/» para insertar bloques…" />
-                </ClientOnly>
-              </UFormField>
-              <p v-if="post.kind === 'poll'" class="text-xs text-muted">Las opciones de la encuesta no se editan desde acá: borrá la publicación y creala de nuevo si necesitás cambiarlas.</p>
-            </div>
-          </template>
-          <template #footer>
-            <div class="flex justify-end gap-2">
-              <UButton color="neutral" variant="ghost" label="Cancelar" @click="editing = false" />
-              <UButton label="Guardar cambios" icon="i-lucide-save" :loading="savingEdit" :disabled="post.kind === 'poll' ? !editForm.body.trim() || !editForm.title.trim() : !editForm.title.trim() || !editPlainText()" @click="saveEdit" />
-            </div>
-          </template>
-        </UModal>
       </div>
     </div>
   </UCard>

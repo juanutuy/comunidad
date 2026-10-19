@@ -286,5 +286,10 @@ const isProfilePage = computed(() => route.path.startsWith('/profile/'))
     <SearchDialog />
     <UserSettingsModal />
     <ReportDialog />
+    <!-- Fase 16-C: anfitrión del editor de publicaciones — el MISMO
+         PostComposer de crear, en modo edición, para las tarjetas y
+         «Mis borradores» (ver usePostEditor). Sin disparador visible:
+         solo vive su modal. -->
+    <PostComposer v-if="user" variant="bare" editor-host />
   </div>
 </template>

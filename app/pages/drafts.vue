@@ -1,7 +1,8 @@
 <script setup lang="ts">
 // Mis borradores y programados (Fase 5): solo los ve el autor.
-// Acciones: publicar ahora, editar título/cuerpo (y la hora si es
-// programado) y borrar.
+// Acciones: publicar ahora, editar (Fase 16-C: en el MISMO
+// compositor del feed, en modo edición — esta página ya no tiene
+// editor propio) y borrar.
 interface DraftView {
   id: number
   slug: string
@@ -13,6 +14,11 @@ interface DraftView {
   status: string
   scheduledAt: string
   createdAt: string
+  allowComments: boolean
+  pinned: boolean
+  mediaType: string
+  mediaUrl: string
+  attachmentName: string
   channel: { slug: string, name: string }
   options: string[]
 }
@@ -25,49 +31,31 @@ const toast = useToast()
 const { data, refresh } = await useAsyncData('my-drafts', () =>
   user.value ? api<{ drafts: DraftView[] }>('/api/drafts') : Promise.resolve({ drafts: [] as DraftView[] }))
 
-const editing = ref<DraftView | null>(null)
-const editForm = reactive({ title: '', body: '', bodyHtml: '', scheduledAt: '' })
-const saving = ref(false)
-async function uploadImageFile(file: File): Promise<string> {
-  const fd = new FormData()
-  fd.append('file', file)
-  fd.append('kind', 'image')
-  const up = await api<{ url: string }>('/api/uploads', { method: 'POST', body: fd })
-  return up.url
-}
-function editPlainText(): string {
-  if (!editForm.bodyHtml) return editForm.body.trim()
-  const d = document.createElement('div')
-  d.innerHTML = editForm.bodyHtml
-  return (d.textContent || '').trim()
-}
+// Fase 16-C: la edición abre el compositor compartido (anfitrión en
+// el layout) precargado con el borrador/programado; al guardar, el
+// aviso refresca esta lista.
+const { openPostEditor, saved: editorSaved } = usePostEditor()
 function startEdit(d: DraftView) {
-  editing.value = d
-  editForm.title = d.title
-  editForm.body = d.body
-  editForm.bodyHtml = d.bodyHtml || ''
-  editForm.scheduledAt = d.scheduledAt ? d.scheduledAt.slice(0, 16) : ''
+  openPostEditor({
+    id: d.id,
+    title: d.title,
+    body: d.body,
+    bodyHtml: d.bodyHtml || '',
+    kind: d.kind,
+    status: d.status,
+    channelSlug: d.channel.slug,
+    channelName: d.channel.name,
+    anonymous: d.anonymous,
+    allowComments: d.allowComments !== false,
+    pinned: d.pinned,
+    scheduledAt: d.scheduledAt || '',
+    mediaType: d.mediaType || 'none',
+    mediaUrl: d.mediaUrl || '',
+    attachmentName: d.attachmentName || '',
+    pollOptions: d.options || [],
+  })
 }
-async function saveEdit() {
-  if (!editing.value) return
-  saving.value = true
-  try {
-    // Con cuerpo rico se manda el HTML y el servidor deriva el texto
-    // plano; una encuesta sigue editando su pregunta como texto.
-    const body: Record<string, unknown> = editing.value.kind === 'poll'
-      ? { title: editForm.title, body: editForm.body }
-      : { title: editForm.title, bodyHtml: editForm.bodyHtml }
-    if (editing.value.status === 'scheduled') body.scheduledAt = new Date(editForm.scheduledAt).toISOString()
-    await api(`/api/posts/${editing.value.id}`, { method: 'PUT', body })
-    toast.add({ title: 'Borrador actualizado', color: 'success' })
-    editing.value = null
-    await refresh()
-  }
-  catch (e) {
-    toast.add({ title: 'No se pudo guardar', description: (e as { data?: { message?: string } }).data?.message || '', color: 'error' })
-  }
-  finally { saving.value = false }
-}
+watch(editorSaved, (n) => { if (n) refresh() })
 
 async function publishNow(d: DraftView) {
   try {
@@ -129,34 +117,6 @@ async function deleteDraft() {
       </UCard>
       <UAlert v-if="!(data?.drafts?.length)" color="neutral" variant="soft" title="No tenés borradores ni programados" description="Desde el compositor del feed podés guardar un borrador o programar una publicación para más tarde." />
     </template>
-
-    <UModal :open="!!editing" :title="editing?.status === 'scheduled' ? 'Editar publicación programada' : 'Editar borrador'" @update:open="(v: boolean) => { if (!v) editing = null }">
-      <template #body>
-        <div class="space-y-3">
-          <UFormField label="Título">
-            <UInput v-model="editForm.title" class="w-full" />
-          </UFormField>
-          <UFormField v-if="editing?.kind === 'poll'" label="Pregunta">
-            <UTextarea v-model="editForm.body" :rows="5" class="w-full" />
-          </UFormField>
-          <UFormField v-else label="Contenido">
-            <ClientOnly>
-              <RichEditor v-model="editForm.bodyHtml" mode="slash" :upload-image="uploadImageFile" placeholder="Escribí «/» para insertar bloques…" />
-            </ClientOnly>
-          </UFormField>
-          <UFormField v-if="editing?.status === 'scheduled'" label="Fecha y hora de publicación">
-            <UInput v-model="editForm.scheduledAt" type="datetime-local" />
-          </UFormField>
-          <p v-if="editing?.kind === 'poll'" class="text-xs text-muted">Las opciones de la encuesta no se editan desde acá: borrá el borrador y creala de nuevo si necesitás cambiarlas.</p>
-        </div>
-      </template>
-      <template #footer>
-        <div class="flex justify-end gap-2">
-          <UButton color="neutral" variant="ghost" label="Cancelar" @click="editing = null" />
-          <UButton label="Guardar cambios" icon="i-lucide-save" :loading="saving" :disabled="editing?.kind === 'poll' ? !editForm.body.trim() : !editPlainText()" @click="saveEdit" />
-        </div>
-      </template>
-    </UModal>
 
     <UModal :open="!!toDelete" title="Borrar borrador" description="Esta acción no se puede deshacer." @update:open="(v: boolean) => { if (!v) toDelete = null }">
       <template #footer>
