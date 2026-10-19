@@ -8,6 +8,7 @@
 // canal y a los mencionados.
 import { canAccessChannel, channelBySlug, channelPostPermission, currentAuth, isChannelArchived, isStaff, requireCanWrite, requireUser, resolveTenant } from '../utils/community'
 import { nowIso, dbFor, slugify } from '../utils/db'
+import { msg } from '../utils/i18n'
 import { getReviewEnabled } from '../utils/moderation'
 import { assertGate, containsLink } from '../utils/members'
 import { notifyNewPost } from '../utils/notify'
@@ -42,19 +43,19 @@ export default defineEventHandler(async (event) => {
   const { role } = await currentAuth(event, tenant.id)
   const body = await readBody<CreateBody>(event)
   const channel = await channelBySlug(event, tenant.id, body.channelSlug || '')
-  if (!channel) throw createError({ statusCode: 404, message: 'Canal no encontrado.' })
+  if (!channel) throw createError({ statusCode: 404, message: await msg(event, tenant.id, 'posts.channelNotFound') })
   // Fase 16: en un canal archivado no se publica (para el miembro el
   // canal no existe; el admin tampoco publica ahí: primero se
   // desarchiva desde la consola).
   if (isChannelArchived(channel))
-    throw createError({ statusCode: 404, message: 'Canal no encontrado.' })
+    throw createError({ statusCode: 404, message: await msg(event, tenant.id, 'posts.channelNotFound') })
   if (!(await canAccessChannel(event, user.id, role, channel)))
-    throw createError({ statusCode: 403, message: 'No tenés acceso a publicar en este canal.' })
+    throw createError({ statusCode: 403, message: await msg(event, tenant.id, 'posts.noChannelAccess') })
   // Fase 16: «Quién puede publicar» del canal en modo 'staff': los
   // posts nuevos son solo del equipo. Comentar y reaccionar no pasan
   // por acá y no se bloquean con este ajuste.
   if (channelPostPermission(channel) === 'staff' && !isStaff(role))
-    throw createError({ statusCode: 403, message: 'Solo el equipo puede publicar en este canal.' })
+    throw createError({ statusCode: 403, message: await msg(event, tenant.id, 'posts.staffOnly') })
   // Fase 14: restricción de escritura y compuerta «Crear
   // publicaciones» (el staff nunca se bloquea).
   await requireCanWrite(event, tenant.id, user.id)
@@ -74,15 +75,15 @@ export default defineEventHandler(async (event) => {
   // En una encuesta la pregunta vive en el cuerpo; si no hay título, se
   // deriva de la pregunta (recortada) para el slug y el encabezado.
   if (kind === 'poll' && !title && text) title = text.slice(0, 80)
-  if (!title || !text) throw createError({ statusCode: 400, message: kind === 'poll' ? 'La encuesta necesita una pregunta.' : 'La publicación necesita título y contenido.' })
+  if (!title || !text) throw createError({ statusCode: 400, message: await msg(event, tenant.id, kind === 'poll' ? 'posts.pollNeedsQuestion' : 'posts.needsTitleBody') })
 
   let options: string[] = []
   if (kind === 'poll') {
     options = (body.options || []).map(o => String(o).trim()).filter(Boolean)
     if (options.length < 2 || options.length > 4)
-      throw createError({ statusCode: 400, message: 'Una encuesta necesita entre 2 y 4 opciones.' })
+      throw createError({ statusCode: 400, message: await msg(event, tenant.id, 'posts.pollOptionsRange') })
     if (options.some(o => o.length > 80))
-      throw createError({ statusCode: 400, message: 'Cada opción puede tener hasta 80 caracteres.' })
+      throw createError({ statusCode: 400, message: await msg(event, tenant.id, 'posts.pollOptionTooLong') })
   }
 
   let status = body.status === 'draft' ? 'draft' : body.status === 'scheduled' ? 'scheduled' : 'published'
@@ -98,7 +99,7 @@ export default defineEventHandler(async (event) => {
   if (status === 'scheduled') {
     const when = new Date(body.scheduledAt || '')
     if (Number.isNaN(when.getTime()) || when.getTime() <= Date.now())
-      throw createError({ statusCode: 400, message: 'Elegí una fecha y hora futuras para programar.' })
+      throw createError({ statusCode: 400, message: await msg(event, tenant.id, 'posts.scheduleFuture') })
     scheduledAt = when.toISOString()
   }
 

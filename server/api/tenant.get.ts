@@ -6,6 +6,7 @@
 // compuertas por nivel que lo bloquean (gates) para avisar antes de
 // ofrecer el compositor o los mensajes directos.
 import { currentAuth, publicUser, resolveTenant } from '../utils/community'
+import { resolveEventLocale } from '../utils/i18n'
 import { myGateStates } from '../utils/members'
 import { getPaymentSettings } from '../utils/payments'
 import { getPrivacySettings } from '../utils/privacy'
@@ -13,6 +14,10 @@ import { getPrivacySettings } from '../utils/privacy'
 export default defineEventHandler(async (event) => {
   const tenant = await resolveTenant(event)
   const { user, role, status } = await currentAuth(event, tenant.id)
+  // Fase 18: idioma resuelto del pedido (elección del usuario >
+  // cookie > defecto de la comunidad > 'es') y sus dos fuentes, para
+  // que la interfaz nazca en el idioma correcto también en SSR.
+  const loc = await resolveEventLocale(event, tenant.id)
   const gates = user && status === 'active'
     ? await myGateStates(event, tenant.id, user.id, role).catch(() => null)
     : null
@@ -29,6 +34,8 @@ export default defineEventHandler(async (event) => {
       brandColor: tenant.brand_color,
       currency: pay.currency,
       manualPaymentsEnabled: pay.manualPaymentsEnabled,
+      // Fase 18: idioma por defecto de la comunidad.
+      defaultLocale: loc.defaultLocale,
       guidelines: JSON.parse(tenant.guidelines || '[]') as string[],
       visibility: priv.visibility,
       anyoneCanRegister: priv.anyoneCanRegister,
@@ -38,8 +45,11 @@ export default defineEventHandler(async (event) => {
       socialLinks: priv.socialLinks,
       navMenu: priv.navMenu,
     },
-    user: user ? { ...publicUser(user), role } : null,
+    // Fase 18: la elección personal cruda viaja en el usuario (null =
+    // sigue el defecto de la comunidad); `locale` es el RESUELTO.
+    user: user ? { ...publicUser(user), role, locale: loc.userLocale } : null,
     status: user ? (status || 'active') : null,
     gates,
+    locale: loc.locale,
   }
 })

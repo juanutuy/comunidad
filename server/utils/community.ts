@@ -6,6 +6,7 @@ import type { H3Event } from 'h3'
 import { readSession } from './auth'
 import { isOnline } from './chat'
 import { dbFor } from './db'
+import { msg } from './i18n'
 import { getReviewEnabled } from './moderation'
 import { getPrivacySettings, paidTeaserText, truncateTitle } from './privacy'
 import { sanitizeHtml } from './sanitize'
@@ -17,11 +18,14 @@ export interface TenantRow {
   // lectura canónica de estos ajustes es getPrivacySettings).
   visibility?: string, directory_audience?: string, library_audience?: string
   anyone_can_register?: number
+  // Fase 18: idioma por defecto de la comunidad ('es' si la base es
+  // anterior a la fase; la lectura canónica es resolveEventLocale).
+  default_locale?: string
   // Fase 15: marca del tenant (la usa el certificado de la Fase 16
   // cuando el diseño pide mostrar el logo).
   logo_url?: string, logo_dark_url?: string, icon_url?: string, favicon_url?: string
 }
-export interface UserRow { id: number, name: string, slug: string, email: string, bio: string, location: string, avatar_url: string, created_at: string, cover_url?: string, website?: string, last_seen_at?: string }
+export interface UserRow { id: number, name: string, slug: string, email: string, bio: string, location: string, avatar_url: string, created_at: string, cover_url?: string, website?: string, last_seen_at?: string, locale?: string | null }
 export interface ChannelRow { id: number, tenant_id: number, group_id: number | null, slug: string, name: string, icon: string, description: string, type: string, price_cents: number, archived_at?: string, post_permission?: string }
 
 // Fase 16: un canal archivado deja de existir para los miembros
@@ -104,19 +108,20 @@ export async function ensureMembership(event: H3Event, tenantId: number, userId:
 
 export async function requireUser(event: H3Event, tenantId: number): Promise<UserRow> {
   const { user, status } = await currentAuth(event, tenantId)
-  if (!user) throw createError({ statusCode: 401, message: 'Iniciá sesión para continuar.' })
+  if (!user) throw createError({ statusCode: 401, message: await msg(event, tenantId, 'auth.signInRequired') })
   await ensureMembership(event, tenantId, user.id)
   // Fase 14: estados que NO dan acceso a la comunidad. 'pending' =
   // solicitud de ingreso en revisión; 'declined' = solicitud
   // rechazada; 'suspended' = cuenta suspendida por un administrador.
   // ('restricted' SÍ entra: lee todo, pero no escribe — eso lo corta
   // requireCanWrite en cada endpoint de escritura.)
+  // Fase 18: los mensajes salen en el idioma resuelto del solicitante.
   if (status === 'pending')
-    throw createError({ statusCode: 403, message: 'Tu solicitud de ingreso está en revisión. Te avisaremos cuando un administrador la resuelva.' })
+    throw createError({ statusCode: 403, message: await msg(event, tenantId, 'auth.joinPending') })
   if (status === 'declined')
-    throw createError({ statusCode: 403, message: 'Tu solicitud de ingreso no fue aprobada. Podés volver a solicitar el ingreso desde el registro cuando pase el tiempo de espera.' })
+    throw createError({ statusCode: 403, message: await msg(event, tenantId, 'auth.joinDeclined') })
   if (status === 'suspended')
-    throw createError({ statusCode: 403, message: 'Tu cuenta está suspendida en esta comunidad. Si creés que es un error, escribile a un administrador.' })
+    throw createError({ statusCode: 403, message: await msg(event, tenantId, 'auth.suspended') })
   return user
 }
 
@@ -127,12 +132,12 @@ export async function requireCanWrite(event: H3Event, tenantId: number, userId: 
   const db = await dbFor(event)
   const m = await db.prepare('SELECT role, status FROM memberships WHERE tenant_id = ? AND user_id = ?').get(tenantId, userId) as { role: string, status?: string } | undefined
   if (m && (m.status || 'active') === 'restricted' && !isStaff(m.role))
-    throw createError({ statusCode: 403, message: 'Tu cuenta está restringida: podés leer la comunidad, pero no publicar ni participar por ahora. Si creés que es un error, escribile a un administrador.' })
+    throw createError({ statusCode: 403, message: await msg(event, tenantId, 'auth.restricted') })
 }
 
 async function requireRole(event: H3Event, tenantId: number, roles: string[], message: string): Promise<UserRow> {
   const { user, role, status } = await currentAuth(event, tenantId)
-  if (!user) throw createError({ statusCode: 401, message: 'Iniciá sesión para continuar.' })
+  if (!user) throw createError({ statusCode: 401, message: await msg(event, tenantId, 'auth.signInRequired') })
   if (!role || !roles.includes(role) || (status !== null && status !== 'active'))
     throw createError({ statusCode: 403, message })
   return user

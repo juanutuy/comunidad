@@ -12,7 +12,7 @@ export default defineEventHandler(async (event) => {
   const tenant = await resolveTenant(event)
   await requireAdmin(event, tenant.id)
   const db = await dbFor(event)
-  const row = await db.prepare('SELECT terms, privacy, moderation_review FROM tenants WHERE id = ?').get(tenant.id).catch(() => undefined) as { terms: string, privacy: string, moderation_review?: number } | undefined
+  const row = await db.prepare('SELECT terms, privacy, moderation_review, default_locale FROM tenants WHERE id = ?').get(tenant.id).catch(() => undefined) as { terms: string, privacy: string, moderation_review?: number, default_locale?: string } | undefined
   const join = await getJoinSettings(event, tenant.id)
   const priv = await getPrivacySettings(event, tenant.id)
   const pay = await getPaymentSettings(event, tenant.id)
@@ -24,6 +24,8 @@ export default defineEventHandler(async (event) => {
       terms: row?.terms || '', privacy: row?.privacy || '',
       // Fase 12: revisión previa opcional de publicaciones.
       moderationReview: !!row?.moderation_review,
+      // Fase 18: idioma por defecto de la comunidad.
+      defaultLocale: row?.default_locale === 'en' ? 'en' : 'es',
       // Fase 14: ingreso de miembros.
       joinApproval: join.approval,
       joinQuestions: join.questions,

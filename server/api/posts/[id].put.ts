@@ -10,6 +10,7 @@
 // anónimo NO se acepta acá: se fija solo al crear (Fase 8).
 import { requireUser, resolveTenant } from '../../utils/community'
 import { dbFor, nowIso } from '../../utils/db'
+import { msg } from '../../utils/i18n'
 import { htmlToText, sanitizeHtml } from '../../utils/sanitize'
 
 export default defineEventHandler(async (event) => {
@@ -19,9 +20,9 @@ export default defineEventHandler(async (event) => {
   const body = await readBody<{ title?: string, body?: string, bodyHtml?: string, scheduledAt?: string, allowComments?: boolean, mediaType?: string, mediaUrl?: string, attachmentName?: string }>(event)
   const db = await dbFor(event)
   const post = await db.prepare('SELECT author_id, status, kind FROM posts WHERE id = ? AND tenant_id = ?').get(postId, tenant.id) as { author_id: number, status: string, kind: string } | undefined
-  if (!post) throw createError({ statusCode: 404, message: 'Publicación no encontrada.' })
+  if (!post) throw createError({ statusCode: 404, message: await msg(event, tenant.id, 'posts.notFound') })
   if (post.author_id !== user.id)
-    throw createError({ statusCode: 403, message: 'Solo el autor puede editar esta publicación.' })
+    throw createError({ statusCode: 403, message: await msg(event, tenant.id, 'posts.onlyAuthorEdit') })
   let title = (body.title || '').trim()
   // Fase 8: si el editor manda cuerpo rico, se sanitiza y el texto
   // plano se deriva (igual que al crear). El anónimo NO se toca acá:
@@ -33,12 +34,12 @@ export default defineEventHandler(async (event) => {
     text = htmlToText(bodyHtml)
   }
   if (post.kind === 'poll' && !title && text) title = text.slice(0, 80)
-  if (!title || !text) throw createError({ statusCode: 400, message: 'La publicación necesita título y contenido.' })
+  if (!title || !text) throw createError({ statusCode: 400, message: await msg(event, tenant.id, post.kind === 'poll' ? 'posts.needsBody' : 'posts.needsTitleBody') })
   let scheduledAt: string | null = null
   if (post.status === 'scheduled') {
     const when = new Date(body.scheduledAt || '')
     if (Number.isNaN(when.getTime()) || when.getTime() <= Date.now())
-      throw createError({ statusCode: 400, message: 'Elegí una fecha y hora futuras para programar.' })
+      throw createError({ statusCode: 400, message: await msg(event, tenant.id, 'posts.scheduleFuture') })
     scheduledAt = when.toISOString()
   }
   // Fase 16-C: campos extra del compositor en modo edición. Solo se

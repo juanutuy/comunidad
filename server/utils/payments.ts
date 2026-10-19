@@ -11,6 +11,8 @@
 import type { H3Event } from 'h3'
 import type { AsyncDb } from './db'
 import { dbFor, nowIso } from './db'
+import { serverMessage } from './i18n'
+import type { AppLocale } from './i18n'
 import { normalizeCurrency } from './money'
 
 export interface PaymentSettings {
@@ -46,26 +48,28 @@ export interface Purchasable {
 // Resuelve qué se compra (canal pago, curso pago o plan activo) y su
 // precio REAL desde la base. Lo comparten el checkout de Stripe y el
 // registro de pagos manuales: el monto nunca viene del cliente.
-export async function resolvePurchasable(db: AsyncDb, tenant: { id: number, name: string }, body: { kind?: string, slug?: string, planId?: number }): Promise<Purchasable> {
+// Fase 18: los errores de resolución salen en el idioma del
+// comprador (parámetro opcional; sin él, el idioma base).
+export async function resolvePurchasable(db: AsyncDb, tenant: { id: number, name: string }, body: { kind?: string, slug?: string, planId?: number }, locale: AppLocale = 'es'): Promise<Purchasable> {
   const kind = body.kind || ''
   if (kind === 'channel') {
     const ch = await db.prepare("SELECT * FROM channels WHERE tenant_id = ? AND slug = ? AND type = 'paid'").get(tenant.id, body.slug || '') as Record<string, unknown> | undefined
-    if (!ch) throw createError({ statusCode: 404, message: 'Canal pago no encontrado.' })
-    if (!(Number(ch.price_cents) > 0)) throw createError({ statusCode: 400, message: 'Este canal no tiene precio.' })
+    if (!ch) throw createError({ statusCode: 404, message: serverMessage(locale, 'billing.paidChannelNotFound') })
+    if (!(Number(ch.price_cents) > 0)) throw createError({ statusCode: 400, message: serverMessage(locale, 'billing.channelNoPrice') })
     return { kind, itemId: Number(ch.id), planId: 0, amountCents: Number(ch.price_cents), productName: `Acceso al canal ${ch.name} · ${tenant.name}`, interval: '' }
   }
   if (kind === 'course') {
     const course = await db.prepare('SELECT * FROM courses WHERE tenant_id = ? AND slug = ?').get(tenant.id, body.slug || '') as Record<string, unknown> | undefined
-    if (!course) throw createError({ statusCode: 404, message: 'Curso no encontrado.' })
-    if (!(Number(course.price_cents) > 0)) throw createError({ statusCode: 400, message: 'Este curso es gratuito: inscribite directamente.' })
+    if (!course) throw createError({ statusCode: 404, message: serverMessage(locale, 'billing.courseNotFound') })
+    if (!(Number(course.price_cents) > 0)) throw createError({ statusCode: 400, message: serverMessage(locale, 'billing.courseFree') })
     return { kind, itemId: Number(course.id), planId: 0, amountCents: Number(course.price_cents), productName: `Curso ${course.title} · ${tenant.name}`, interval: '' }
   }
   if (kind === 'plan') {
     const plan = await db.prepare('SELECT * FROM plans WHERE tenant_id = ? AND id = ? AND active = 1').get(tenant.id, Number(body.planId) || 0) as Record<string, unknown> | undefined
-    if (!plan) throw createError({ statusCode: 404, message: 'Plan no encontrado.' })
+    if (!plan) throw createError({ statusCode: 404, message: serverMessage(locale, 'billing.planNotFound') })
     return { kind, itemId: Number(plan.id), planId: Number(plan.id), amountCents: Number(plan.price_cents), productName: `Membresía ${plan.name} · ${tenant.name}`, interval: String(plan.interval || 'month') }
   }
-  throw createError({ statusCode: 400, message: 'Tipo de compra no válido.' })
+  throw createError({ statusCode: 400, message: serverMessage(locale, 'billing.invalidKind') })
 }
 
 // Fin del período de una suscripción concedida a mano: Stripe informa

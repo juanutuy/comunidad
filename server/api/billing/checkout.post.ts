@@ -7,6 +7,7 @@
 // resuelve resolvePurchasable, compartido con los pagos manuales.
 import { requireUser, resolveTenant } from '../../utils/community'
 import { dbFor, nowIso } from '../../utils/db'
+import { eventLocale, msg } from '../../utils/i18n'
 import { getPaymentSettings, resolvePurchasable } from '../../utils/payments'
 import { createCheckoutSession, stripeEnabled } from '../../utils/stripe'
 
@@ -14,12 +15,12 @@ export default defineEventHandler(async (event) => {
   const tenant = await resolveTenant(event)
   const user = await requireUser(event, tenant.id)
   if (!stripeEnabled())
-    throw createError({ statusCode: 409, message: 'Los pagos en línea todavía no están activados en esta comunidad.' })
+    throw createError({ statusCode: 409, message: await msg(event, tenant.id, 'billing.onlineDisabled') })
   const body = await readBody<{ kind?: string, slug?: string, planId?: number }>(event)
   const db = await dbFor(event)
   const origin = getRequestURL(event).origin
 
-  const item = await resolvePurchasable(db, tenant, body)
+  const item = await resolvePurchasable(db, tenant, body, await eventLocale(event, tenant.id))
   const { currency } = await getPaymentSettings(event, tenant.id)
   const mode: 'payment' | 'subscription' = item.kind === 'plan' && item.interval !== 'once' ? 'subscription' : 'payment'
   const interval: 'month' | 'year' | undefined = mode === 'subscription' ? (item.interval === 'year' ? 'year' : 'month') : undefined

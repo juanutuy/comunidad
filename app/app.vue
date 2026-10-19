@@ -2,6 +2,12 @@
 const { fetchMe } = useAuth()
 await fetchMe()
 
+// Fase 18: el <html lang> refleja el idioma resuelto. fetchMe ya
+// corrió (y con él useI18n.applyResolved), así que en SSR el
+// atributo nace correcto, sin parpadeo de idioma.
+const { locale } = useI18n()
+useHead({ htmlAttrs: { lang: locale } })
+
 // Fase 4 — PWA: registrar el service worker solo en el cliente y en
 // producción (en dev interferiría con el HMR). El SW es prudente:
 // solo cachea assets versionados, nunca API ni HTML (ver public/sw.js).

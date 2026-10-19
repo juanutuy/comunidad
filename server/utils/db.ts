@@ -303,6 +303,13 @@ const MIGRATIONS = [
   // idempotente y no toca datos.
   `DROP INDEX IF EXISTS payments_session_unique`,
   `CREATE UNIQUE INDEX payments_session_unique ON payments (stripe_session_id) WHERE stripe_session_id <> ''`,
+  // Fase 18: multilenguaje. `users.locale` es la elección PERSONAL
+  // del usuario (NULL = «predeterminado de la comunidad»);
+  // `tenants.default_locale` es el idioma por defecto de la
+  // comunidad ('es' = el comportamiento de siempre: nada cambia
+  // hasta que alguien elige otro idioma).
+  `ALTER TABLE users ADD COLUMN locale TEXT`,
+  `ALTER TABLE tenants ADD COLUMN default_locale TEXT NOT NULL DEFAULT 'es'`,
 ]
 
 async function runMigrations(db: AsyncDb): Promise<void> {

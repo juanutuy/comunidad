@@ -9,6 +9,8 @@ export interface SessionUser {
   avatarUrl: string
   memberSince: string
   role: string | null
+  // Fase 18: elección personal de idioma (null = defecto de la comunidad).
+  locale?: string | null
 }
 
 export interface NavItemInfo { id: string, label: string, url: string, visible: boolean, custom: boolean, zone: 'header' | 'sidebar' }
@@ -36,6 +38,8 @@ export interface TenantInfo {
   // pagos manuales encendidos/apagados.
   currency?: string
   manualPaymentsEnabled?: boolean
+  // Fase 18: idioma por defecto de la comunidad.
+  defaultLocale?: string
 }
 
 // Fase 14: estado de una compuerta por nivel para el usuario actual
@@ -55,11 +59,15 @@ export function useAuth() {
 
   async function fetchMe() {
     try {
-      const data = await api<{ tenant: TenantInfo, user: SessionUser | null, status?: string | null, gates?: MyGates | null }>('/api/tenant')
+      const data = await api<{ tenant: TenantInfo, user: SessionUser | null, status?: string | null, gates?: MyGates | null, locale?: string }>('/api/tenant')
       tenant.value = data.tenant
       user.value = data.user
       status.value = data.status ?? null
       gates.value = data.gates ?? null
+      // Fase 18: el idioma resuelto que calculó el servidor manda —
+      // en SSR esto corre antes del primer render (app.vue espera
+      // fetchMe), así la página nace en el idioma correcto.
+      useI18n().applyResolved(data.locale, data.user?.locale ?? null, data.tenant?.defaultLocale)
     }
     catch {
       user.value = null

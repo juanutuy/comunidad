@@ -7,42 +7,45 @@
 // oscuro: la app no finge canales de cobro que no existen.
 import { requireUser, resolveTenant } from '../../utils/community'
 import { dbFor, nowIso } from '../../utils/db'
+import { eventLocale, msg } from '../../utils/i18n'
 import { getPaymentSettings, resolvePurchasable } from '../../utils/payments'
 
 export default defineEventHandler(async (event) => {
   const tenant = await resolveTenant(event)
   const user = await requireUser(event, tenant.id)
   const db = await dbFor(event)
+  // Fase 18: errores en el idioma del comprador.
+  const locale = await eventLocale(event, tenant.id)
   const settings = await getPaymentSettings(event, tenant.id)
   if (!settings.manualPaymentsEnabled)
-    throw createError({ statusCode: 409, message: 'Los pagos manuales no están activados en esta comunidad.' })
+    throw createError({ statusCode: 409, message: await msg(event, tenant.id, 'billing.manualDisabled') })
 
   const body = await readBody<{ kind?: string, slug?: string, planId?: number, methodId?: number, reference?: string }>(event)
   const methodId = Number(body.methodId) || 0
   const method = await db.prepare('SELECT * FROM manual_payment_methods WHERE tenant_id = ? AND id = ? AND active = 1').get(tenant.id, methodId) as Record<string, unknown> | undefined
-  if (!method) throw createError({ statusCode: 400, message: 'Elegí un método de pago válido.' })
+  if (!method) throw createError({ statusCode: 400, message: await msg(event, tenant.id, 'billing.chooseMethod') })
 
-  const item = await resolvePurchasable(db, tenant, body)
+  const item = await resolvePurchasable(db, tenant, body, locale)
 
   // Sin duplicados: un pago manual ya pendiente para el mismo
   // producto bloquea otro (la UI muestra «Tu pago está en revisión»).
   const pending = await db.prepare(`SELECT id FROM payments WHERE tenant_id = ? AND user_id = ? AND kind = ? AND item_id = ? AND gateway = 'manual' AND status = 'pending'`)
     .get(tenant.id, user.id, item.kind, item.itemId) as { id: number } | undefined
   if (pending)
-    throw createError({ statusCode: 409, message: 'Tu pago ya está en revisión: la administración lo está verificando.' })
+    throw createError({ statusCode: 409, message: await msg(event, tenant.id, 'billing.paymentInReview') })
 
   // Si ya tiene el acceso, no hay nada que cobrar de nuevo.
   if (item.kind === 'channel') {
     const acc = await db.prepare('SELECT id FROM channel_access WHERE tenant_id = ? AND user_id = ? AND channel_id = ?').get(tenant.id, user.id, item.itemId)
-    if (acc) throw createError({ statusCode: 400, message: 'Ya tenés acceso a este canal.' })
+    if (acc) throw createError({ statusCode: 400, message: await msg(event, tenant.id, 'billing.alreadyChannelAccess') })
   }
   else if (item.kind === 'course') {
     const enr = await db.prepare('SELECT id FROM enrollments WHERE tenant_id = ? AND user_id = ? AND course_id = ?').get(tenant.id, user.id, item.itemId)
-    if (enr) throw createError({ statusCode: 400, message: 'Ya estás inscrito en este curso.' })
+    if (enr) throw createError({ statusCode: 400, message: await msg(event, tenant.id, 'billing.alreadyEnrolled') })
   }
   else if (item.kind === 'plan') {
     const sub = await db.prepare("SELECT id FROM member_subscriptions WHERE tenant_id = ? AND user_id = ? AND plan_id = ? AND status = 'active'").get(tenant.id, user.id, item.planId)
-    if (sub) throw createError({ statusCode: 400, message: 'Ya tenés una suscripción activa a este plan.' })
+    if (sub) throw createError({ statusCode: 400, message: await msg(event, tenant.id, 'billing.alreadySubscribed') })
   }
 
   const now = nowIso()

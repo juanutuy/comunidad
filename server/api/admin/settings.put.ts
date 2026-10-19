@@ -10,6 +10,8 @@ import type { NavItem, SidebarBlock, SocialLink } from '../../utils/privacy'
 interface SettingsBody {
   name?: string, tagline?: string, brandColor?: string, guidelines?: string[], terms?: string, privacy?: string
   moderationReview?: boolean
+  // Fase 18: idioma por defecto de la comunidad ('es' | 'en').
+  defaultLocale?: string
   joinApproval?: boolean, joinQuestions?: string[], joinCooldownDays?: number, autoJoinChannels?: number[]
   // Fase 15: privacidad y presentación.
   visibility?: string, directoryAudience?: string, libraryAudience?: string
@@ -49,6 +51,14 @@ export default defineEventHandler(async (event) => {
   if (typeof body.moderationReview === 'boolean') {
     await db.prepare('UPDATE tenants SET moderation_review = ? WHERE id = ?')
       .run(body.moderationReview ? 1 : 0, tenant.id).catch(() => {})
+  }
+  // Fase 18: idioma por defecto de la comunidad — mismo patrón; solo
+  // cambian los valores soportados ('es' | 'en'), otro valor es error.
+  if (body.defaultLocale !== undefined) {
+    if (body.defaultLocale !== 'es' && body.defaultLocale !== 'en')
+      throw createError({ statusCode: 400, message: 'El idioma por defecto tiene que ser español o inglés.' })
+    await db.prepare('UPDATE tenants SET default_locale = ? WHERE id = ?')
+      .run(body.defaultLocale, tenant.id).catch(() => {})
   }
   // Fase 14: ingreso de miembros — mismo patrón: cada campo se guarda
   // solo si viene en el cuerpo, con sus validaciones (hasta 6

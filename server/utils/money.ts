@@ -31,12 +31,15 @@ export function normalizeCurrency(code: unknown): string {
   return isValidCurrency(code) ? String(code) : 'USD'
 }
 
-export function formatMoney(cents: number, currency = 'USD'): string {
-  if (!cents) return 'Gratis'
+export function formatMoney(cents: number, currency = 'USD', locale: 'es' | 'en' = 'es'): string {
+  // Fase 18: el formato respeta el idioma activo además de la moneda
+  // ('es-419' latinoamericano / 'en-US'); sin idioma pedido vale el
+  // comportamiento de siempre.
+  if (!cents) return locale === 'en' ? 'Free' : 'Gratis'
   try {
     // 'es-419' (español latinoamericano) con símbolo angosto: USD se
     // ve «$22.00» y GTQ «Q 22.00», como los escribe la audiencia.
-    return new Intl.NumberFormat('es-419', { style: 'currency', currency: normalizeCurrency(currency), currencyDisplay: 'narrowSymbol' }).format(cents / 100)
+    return new Intl.NumberFormat(locale === 'en' ? 'en-US' : 'es-419', { style: 'currency', currency: normalizeCurrency(currency), currencyDisplay: 'narrowSymbol' }).format(cents / 100)
   }
   catch {
     return `$${(cents / 100).toFixed(2)}`

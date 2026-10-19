@@ -16,6 +16,7 @@
 import { hashPassword, setSession } from '../../utils/auth'
 import { publicUser, resolveTenant } from '../../utils/community'
 import { nowIso, dbFor, slugify } from '../../utils/db'
+import { eventLocale, msg, resolveEventLocale, setLocaleCookie } from '../../utils/i18n'
 import { sendEmail } from '../../utils/email'
 import { applyAutoJoin, getJoinSettings, invitationByToken, invitationState, joinCooldownUntil } from '../../utils/members'
 import { notifyAdmins } from '../../utils/moderation'
@@ -34,10 +35,12 @@ export default defineEventHandler(async (event) => {
   const name = (body.name || '').trim()
   const email = (body.email || '').trim().toLowerCase()
   const password = body.password || ''
-  if (!name || !email.includes('@') || password.length < 8)
-    throw createError({ statusCode: 400, message: 'Completá nombre, un correo válido y una contraseña de al menos 8 caracteres.' })
   const db = await dbFor(event)
   const tenant = await resolveTenant(event)
+  // Fase 18: los errores del registro salen en el idioma resuelto
+  // del visitante (cookie o defecto de la comunidad).
+  if (!name || !email.includes('@') || password.length < 8)
+    throw createError({ statusCode: 400, message: await msg(event, tenant.id, 'auth.registerInvalid') })
   const join = await getJoinSettings(event, tenant.id)
 
   // Invitación (opcional): se valida ANTES de crear nada.
@@ -45,9 +48,9 @@ export default defineEventHandler(async (event) => {
   if (body.inviteToken) {
     invitation = await invitationByToken(event, tenant.id, String(body.inviteToken))
     if (!invitation || invitationState(invitation) !== 'pending')
-      throw createError({ statusCode: 400, message: 'Esta invitación no es válida: pudo haber vencido o haber sido revocada. Pedile una nueva a un administrador.' })
+      throw createError({ statusCode: 400, message: await msg(event, tenant.id, 'auth.inviteInvalid') })
     if (invitation.kind === 'email' && invitation.email.toLowerCase() !== email)
-      throw createError({ statusCode: 400, message: 'Esta invitación es para otro correo. Registrate con el correo que recibió la invitación.' })
+      throw createError({ statusCode: 400, message: await msg(event, tenant.id, 'auth.inviteOtherEmail') })
   }
 
   // Fase 15: registro público cerrado — sin una invitación válida no
@@ -55,7 +58,7 @@ export default defineEventHandler(async (event) => {
   // rechazo: el ingreso vuelve a ser una decisión del equipo).
   const priv = await getPrivacySettings(event, tenant.id)
   if (!priv.anyoneCanRegister && !invitation)
-    throw createError({ statusCode: 403, message: 'El registro público está cerrado en esta comunidad. Necesitás una invitación de un administrador para crear tu cuenta.' })
+    throw createError({ statusCode: 403, message: await msg(event, tenant.id, 'auth.registrationClosed') })
 
   const existing = await db.prepare('SELECT * FROM users WHERE email = ?').get(email) as (import('../../utils/community').UserRow & { password_hash: string }) | undefined
   let userId: number
@@ -65,12 +68,13 @@ export default defineEventHandler(async (event) => {
     // Único reingreso posible con el mismo correo: la solicitud fue
     // rechazada en ESTE tenant y ya pasó el cooldown.
     if (!m || (m.status || 'active') !== 'declined')
-      throw createError({ statusCode: 409, message: 'Ya existe una cuenta con ese correo.' })
+      throw createError({ statusCode: 409, message: await msg(event, tenant.id, 'auth.emailTaken') })
     if (!invitation) {
       const until = await joinCooldownUntil(event, tenant.id, existing.id)
       if (until) {
-        const fecha = new Date(until).toLocaleDateString('es', { day: 'numeric', month: 'long', year: 'numeric' })
-        throw createError({ statusCode: 403, message: `Tu solicitud anterior no fue aprobada. Podés volver a solicitar el ingreso a partir del ${fecha}.` })
+        const locale = await eventLocale(event, tenant.id)
+        const fecha = new Date(until).toLocaleDateString(locale === 'en' ? 'en-US' : 'es', { day: 'numeric', month: 'long', year: 'numeric' })
+        throw createError({ statusCode: 403, message: await msg(event, tenant.id, 'auth.cooldown', { date: fecha }) })
       }
     }
     // Se renueva la solicitud: contraseña nueva y nombre actualizado.
@@ -129,5 +133,8 @@ export default defineEventHandler(async (event) => {
   }
   const user = await db.prepare('SELECT * FROM users WHERE id = ?').get(userId) as import('../../utils/community').UserRow
   setSession(event, userId, (user as { token_version?: number }).token_version ?? 0)
+  // Fase 18: la cuenta nueva no tiene elección personal: la cookie
+  // de idioma queda en el defecto de la comunidad.
+  setLocaleCookie(event, (await resolveEventLocale(event, tenant.id)).defaultLocale)
   return { user: { ...publicUser(user), role: 'member' }, status }
 })
