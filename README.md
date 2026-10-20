@@ -64,7 +64,7 @@ Los usuarios son globales; sus membresías pertenecen a cada comunidad. Iniciar 
 
 Los adjuntos de posts, comentarios y lecciones no son públicos por conocer su URL. Avatares, portadas de perfil y marca usan una política pública separada. Los archivos protegidos responden con `private, no-store`.
 
-El feed y los canales paginan antes de serializar; las reglas de visibilidad se aplican antes del límite. Reacciones, comentarios, guardados y encuestas se consultan por lote. El ranking agrega y ordena en SQL. El gestor de medios resuelve referencias de toda su página en una consulta.
+El feed y los canales paginan antes de serializar; las reglas de visibilidad se aplican antes del límite. Reacciones, comentarios, guardados y encuestas se consultan por lote. El ranking agrega y ordena en SQL. El gestor de medios resuelve referencias de toda su página en tres consultas acotadas.
 
 ## Dependencias
 

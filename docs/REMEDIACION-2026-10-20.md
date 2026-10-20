@@ -19,7 +19,7 @@ Base auditada: `d82f8fc`. Remediación preparada el 20 de octubre de 2026. La pu
 | A11 | Corregido | Subidas y edición/publicación exigen permiso de escritura; revalidan canal, archivo, acceso y revisión. |
 | A12 | Corregido | Biblioteca usa el mismo entitlement vigente que canales/directorio. |
 | A13 | Corregido | Esquema canónico y migraciones versionadas explícitas. Producción solo comprueba versión. Errores no se silencian como columnas duplicadas; inicialización fallida se puede reintentar. |
-| A14 | Corregido en superficies auditadas | Metadatos de 50 posts: hasta 5 consultas incluidas comprobación de esquema y datos propios. Referencias de 50 archivos: 1 consulta. Presupuesto comprobado por pruebas. Currículum carga capítulos/lecciones por lote. |
+| A14 | Corregido en superficies auditadas | Metadatos de 50 posts: hasta 5 consultas incluidas comprobación de esquema y datos propios. Referencias de 50 archivos: 3 consultas acotadas. Presupuesto comprobado por pruebas. Currículum carga capítulos/lecciones por lote. |
 | A15 | Corregido | Feed filtra visibilidad antes de límite. Feed, canal y ranking tienen paginación validada con offset y orden determinista; interfaz incluye controles. Ranking agrega y ordena en SQL. |
 | A16 | Corregido | Ubicaciones incluyen canales, comentarios, adjuntos y HTML de lecciones, con aislamiento por tenant. El informe inicial se corrigió: `lessons.tenant_id` sí existía. |
 | A17 | Corregido | Logout/cambio de identidad limpia caché privada; carga tardía no restaura datos anteriores. Máximo 100 conversaciones en caché. Sockets de cliente se cierran al cambiar identidad. |
@@ -63,7 +63,7 @@ Reemplazar los parches por releases oficiales cuando existan exige revisión y p
 
 ## Límites
 
-La remediación cubre los hallazgos y regresiones descritos; no certifica ausencia absoluta de bugs. Se verificó Cloudflare en emulación local, no un despliegue remoto. La paginación usa offset: nuevas publicaciones entre solicitudes pueden desplazar posiciones. No se realizó prueba de carga de producción ni revisión visual exhaustiva de todas las pantallas.
+La remediación cubre los hallazgos y regresiones descritos; no certifica ausencia absoluta de bugs. Se verificó Cloudflare en emulación local y se comprobó D1 remoto durante despliegue. El gestor de medios divide las referencias en tres consultas por el límite de términos de SELECT compuesto del servicio remoto. La paginación usa offset: nuevas publicaciones entre solicitudes pueden desplazar posiciones. No se realizó prueba de carga de producción ni revisión visual exhaustiva de todas las pantallas.
 
 ## Referencias técnicas consultadas
 

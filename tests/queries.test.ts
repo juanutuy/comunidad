@@ -23,7 +23,7 @@ test('post metadata uses bounded query count for fifty posts', async () => {
   finally { close() }
 })
 
-test('media locations resolve a whole page in one query', async () => {
+test('media locations resolve a whole page in three bounded queries', async () => {
   const { db, close } = await memoryDatabase()
   let queries = 0
   try {
@@ -32,7 +32,7 @@ test('media locations resolve a whole page in one query', async () => {
     const wrapped = { ...db, prepare: (sql: string) => { queries++; return db.prepare(sql) } }
     const result = await findFilesLocations(wrapped, 1, uploads)
     assert.equal(result.size, 50)
-    assert.equal(queries, 1)
+    assert.equal(queries, 3)
   }
   finally { close() }
 })

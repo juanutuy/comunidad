@@ -32,23 +32,32 @@ export interface UploadRow {
 
 export interface FileLocations { labels: string[], libraryItemId: number | null }
 
-/** Resolve every reference for a page in one SQL statement, without a query per file. */
+/** Resolve every reference for a page in a bounded set of SQL statements, without a query per file. */
 export async function findFilesLocations(db: AsyncDb, tenantId: number, uploads: UploadRow[]): Promise<Map<number, FileLocations>> {
   const out = new Map(uploads.map(u => [u.id, { labels: [] as string[], libraryItemId: null as number | null }]))
   if (!uploads.length) return out
-  const rows = await db.prepare(`WITH selected AS (
-    SELECT id, key, '/api/files/' || key AS url FROM uploads WHERE tenant_id = ? AND id IN (SELECT value FROM json_each(?))
-  )
-  SELECT s.id AS upload_id, 'Foto de perfil de ' || u.name AS label, NULL AS library_id FROM selected s JOIN users u ON u.avatar_url = s.url JOIN memberships m ON m.user_id = u.id AND m.tenant_id = ?
-  UNION ALL SELECT s.id, 'Portada de perfil de ' || u.name, NULL FROM selected s JOIN users u ON u.cover_url = s.url JOIN memberships m ON m.user_id = u.id AND m.tenant_id = ?
-  UNION ALL SELECT s.id, 'Publicación «' || p.title || '»', NULL FROM selected s JOIN posts p ON p.media_url = s.url OR instr(p.body_html, s.url) > 0 WHERE p.tenant_id = ?
-  UNION ALL SELECT s.id, 'Comentario en «' || p.title || '»', NULL FROM selected s JOIN comments cm ON cm.media_url = s.url JOIN posts p ON p.id = cm.post_id WHERE p.tenant_id = ?
-  UNION ALL SELECT s.id, 'Portada del canal «' || c.name || '»', NULL FROM selected s JOIN channels c ON c.cover_url = s.url WHERE c.tenant_id = ?
-  UNION ALL SELECT s.id, 'Imagen del curso «' || c.title || '»', NULL FROM selected s JOIN courses c ON c.image_url = s.url OR c.banner_url = s.url WHERE c.tenant_id = ?
-  UNION ALL SELECT s.id, 'Archivo de la lección «' || l.title || '»', NULL FROM selected s JOIN lessons l ON l.file_url = s.url OR l.resource_url = s.url OR l.video_url = s.url OR instr(l.content_html, s.url) > 0 JOIN chapters ch ON ch.id = l.chapter_id JOIN courses c ON c.id = ch.course_id WHERE c.tenant_id = ?
-  UNION ALL SELECT s.id, 'Ítem de biblioteca «' || l.title || '»', l.id FROM selected s JOIN library_items l ON l.file_key = s.key WHERE l.tenant_id = ?
-  UNION ALL SELECT s.id, 'Marca de la comunidad', NULL FROM selected s JOIN tenants t ON t.logo_url = s.url OR t.logo_dark_url = s.url OR t.icon_url = s.url OR t.favicon_url = s.url WHERE t.id = ?`)
-    .all(tenantId, JSON.stringify(uploads.map(u => u.id)), tenantId, tenantId, tenantId, tenantId, tenantId, tenantId, tenantId, tenantId, tenantId) as { upload_id: number, label: string, library_id: number | null }[]
+  const references = [
+    `SELECT s.id AS upload_id, 'Foto de perfil de ' || u.name AS label, NULL AS library_id FROM selected s JOIN users u ON u.avatar_url = s.url JOIN memberships m ON m.user_id = u.id AND m.tenant_id = s.tenant_id`,
+    `SELECT s.id, 'Portada de perfil de ' || u.name, NULL FROM selected s JOIN users u ON u.cover_url = s.url JOIN memberships m ON m.user_id = u.id AND m.tenant_id = s.tenant_id`,
+    `SELECT s.id, 'Publicación «' || p.title || '»', NULL FROM selected s JOIN posts p ON p.media_url = s.url OR instr(p.body_html, s.url) > 0 WHERE p.tenant_id = s.tenant_id`,
+    `SELECT s.id, 'Comentario en «' || p.title || '»', NULL FROM selected s JOIN comments cm ON cm.media_url = s.url JOIN posts p ON p.id = cm.post_id WHERE p.tenant_id = s.tenant_id`,
+    `SELECT s.id, 'Portada del canal «' || c.name || '»', NULL FROM selected s JOIN channels c ON c.cover_url = s.url WHERE c.tenant_id = s.tenant_id`,
+    `SELECT s.id, 'Imagen del curso «' || c.title || '»', NULL FROM selected s JOIN courses c ON c.image_url = s.url OR c.banner_url = s.url WHERE c.tenant_id = s.tenant_id`,
+    `SELECT s.id, 'Archivo de la lección «' || l.title || '»', NULL FROM selected s JOIN lessons l ON l.file_url = s.url OR l.resource_url = s.url OR l.video_url = s.url OR instr(l.content_html, s.url) > 0 JOIN chapters ch ON ch.id = l.chapter_id JOIN courses c ON c.id = ch.course_id WHERE c.tenant_id = s.tenant_id`,
+    `SELECT s.id, 'Ítem de biblioteca «' || l.title || '»', l.id FROM selected s JOIN library_items l ON l.file_key = s.key WHERE l.tenant_id = s.tenant_id`,
+    `SELECT s.id, 'Marca de la comunidad', NULL FROM selected s JOIN tenants t ON t.logo_url = s.url OR t.logo_dark_url = s.url OR t.icon_url = s.url OR t.favicon_url = s.url WHERE t.id = s.tenant_id`,
+  ]
+  const rows: { upload_id: number, label: string, library_id: number | null }[] = []
+  // Remote D1 limits compound SELECT terms more strictly than local SQLite.
+  // Three bounded queries still resolve the entire page without an N+1 loop.
+  for (let index = 0; index < references.length; index += 3) {
+    const group = references.slice(index, index + 3).join(' UNION ALL ')
+    rows.push(...await db.prepare(`WITH selected AS (
+      SELECT id, tenant_id, key, '/api/files/' || key AS url FROM uploads
+      WHERE tenant_id = ? AND id IN (SELECT value FROM json_each(?))
+    ), reference_rows(upload_id, label, library_id) AS (${group})
+    SELECT upload_id, label, library_id FROM reference_rows`).all(tenantId, JSON.stringify(uploads.map(u => u.id))))
+  }
   for (const row of rows) {
     const entry = out.get(row.upload_id)!
     if (!entry.labels.includes(row.label)) entry.labels.push(row.label)

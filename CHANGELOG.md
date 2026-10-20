@@ -1,5 +1,9 @@
 # Historial de cambios
 
+## 2026-10-20 — Compatibilidad de medios con D1 remoto
+
+Consultas de referencias de medios divididas en tres grupos, con nombres de columnas explícitos. Evita el límite remoto de términos UNION; mantiene coste acotado para toda la página. Regresión Worker con referencias de canal y biblioteca.
+
 ## 2026-10-20 — Cierre de dependencias
 
 Parches locales versionados para profundidad de braces y validación estructural de DigestInfo de node-forge. Se aplican en instalación con fallo obligatorio y regresiones específicas; se conservan versiones upstream para que la auditoría sea transparente.

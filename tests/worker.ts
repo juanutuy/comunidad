@@ -21,6 +21,9 @@ const connection = await memoryDatabase()
 await seedIfEmpty(connection.db)
 await connection.db.prepare("INSERT INTO channels(id,tenant_id,slug,name,type,visibility) VALUES(100,1,'worker-secret','Secret','free','secret')").run()
 await connection.db.prepare("INSERT INTO member_subscriptions(tenant_id,user_id,plan_id,status,source,current_period_end,created_at,updated_at) VALUES(1,2,1,'active','manual','2000-01-01','','')").run()
+await connection.db.prepare("INSERT INTO uploads(tenant_id,user_id,key,created_at) VALUES(1,1,'posts/worker-fixture.txt','')").run()
+await connection.db.prepare("UPDATE channels SET cover_url='/api/files/posts/worker-fixture.txt' WHERE id=1").run()
+await connection.db.prepare("INSERT INTO library_items(tenant_id,title,kind,file_key,created_at) VALUES(1,'Worker media reference','doc','posts/worker-fixture.txt','')").run()
 const tables = await connection.db.prepare("SELECT name, sql FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'").all()
 const statements = tables.map(t => t.sql)
 for (const table of tables) {
@@ -71,6 +74,17 @@ try {
     const response = await fetch(base + '/api/feed', { headers: { cookie } })
     assert.equal(response.status, 200, await response.clone().text())
     assert.equal((await response.json() as any).posts.length, 7)
+  })
+  await test('Worker media page handles existing uploads within D1 query limits', async () => {
+    const login = await fetch(base + '/api/auth/login', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email: 'admin@demo.local', password: 'demo1234' }) })
+    assert.equal(login.status, 200)
+    const adminCookie = login.headers.get('set-cookie')!.split(';')[0]!
+    const response = await fetch(base + '/api/admin/media', { headers: { cookie: adminCookie } })
+    assert.equal(response.status, 200, await response.clone().text())
+    const media = await response.json() as any
+    assert.equal(media.files.length, 1)
+    assert.match(media.files[0].locations.join(' '), /canal/)
+    assert.match(media.files[0].locations.join(' '), /biblioteca/)
   })
   await test('real Durable Object rejects secret channels and expired subscriptions', async () => {
     await assert.rejects(ws('/api/rt/channel/worker-secret', cookie), /HTTP 403/)
