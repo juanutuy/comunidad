@@ -4,6 +4,14 @@ Plataforma de comunidades (MVP) inspirada en el *producto* EzyCommunity — sin 
 
 Canales con feed, publicaciones con reacciones y comentarios, cursos, eventos, biblioteca, ranking por puntos y canales pagos con paywall — **multi-tenant desde la base** y pensada para alojarse **100% en Cloudflare**.
 
+Producción: https://comunidad-mvp.j94390833.workers.dev
+
+## Documentación
+
+- [`docs/COMO-SE-CREO.md`](docs/COMO-SE-CREO.md) — el encargo, el método de paridad (todo igual en comportamiento, código 100 % propio), las decisiones de stack y la arquitectura.
+- [`docs/DESPLIEGUE.md`](docs/DESPLIEGUE.md) — despliegue en **Cloudflare** paso a paso (la ruta de producción), actualización, desarrollo local, respaldos y **cómo desplegar en otros lados** (VPS/Dokploy y otros serverless, con lo que hay que adaptar).
+- [`CHANGELOG.md`](CHANGELOG.md) — historial de versiones: del MVP a la paridad completa, fase por fase, con la versión de Worker de cada despliegue.
+
 ## Stack fijado
 
 | Capa | Tecnología |
