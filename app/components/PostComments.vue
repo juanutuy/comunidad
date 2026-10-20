@@ -28,9 +28,13 @@ const toast = useToast()
 const commentsApi = usePostComments()
 const s = commentsApi.state(props.postId)
 
+// Con datos iniciales (detalle) la siembra es en setup: la sección
+// también se renderiza en el servidor, como siempre en el detalle.
+// Sin datos iniciales (tarjeta) se carga al montar — la tarjeta
+// solo monta la sección al expandirla.
+if (props.initial) commentsApi.seed(props.postId, props.initial.comments, props.initial.total, props.initial.withheld)
 onMounted(() => {
-  if (props.initial) commentsApi.seed(props.postId, props.initial.comments, props.initial.total, props.initial.withheld)
-  else commentsApi.load(props.postId)
+  if (!props.initial) commentsApi.load(props.postId)
 })
 
 const sortItems = computed(() => [
