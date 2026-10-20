@@ -70,7 +70,7 @@ El feed y los canales paginan antes de serializar; las reglas de visibilidad se 
 
 Nuxt, Vue, UI, editores y herramientas pertenecen a construcción/desarrollo; los artefactos de Cloudflare incluyen su código compilado. `better-sqlite3` es dependencia del modo Node. Para compilar se deben instalar dependencias de desarrollo.
 
-La auditoría de producción se comprueba con `npm audit --omit=dev`. El árbol completo de herramientas conserva avisos upstream de `braces` y `node-forge` sin versión corregida publicada al 20 de octubre de 2026. Ver exposición y seguimiento en [estado de remediación](docs/REMEDIACION-2026-10-20.md). Mover paquetes de categoría no corrige su código: las herramientas deben usarse con entradas de confianza y sin exponer servidores de desarrollo a Internet.
+La auditoría de producción se comprueba con `npm audit --omit=dev`. Los defectos upstream de `braces` y `node-forge` están reparados mediante parches locales versionados, aplicados obligatoriamente en instalación y cubiertos por regresiones. El escáner completo sigue reportando versiones upstream porque no inspecciona parches. Ver [remediación](docs/REMEDIACION-2026-10-20.md).
 
 ## Documentación
 

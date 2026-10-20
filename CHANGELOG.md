@@ -1,8 +1,13 @@
 # Historial de cambios
 
+## 2026-10-20 — Cierre de dependencias
+
+Parches locales versionados para profundidad de braces y validación estructural de DigestInfo de node-forge. Se aplican en instalación con fallo obligatorio y regresiones específicas; se conservan versiones upstream para que la auditoría sea transparente.
+
+
 ## 2026-10-20 — Remediación de auditoría
 
-Correcciones de identidad y membresía, política REST/WebSocket compartida, pagos atómicos y expiración, descargas protegidas, cascadas completas, esquema SQL canónico con migración explícita, consultas por lote, paginación, limpieza de caché privada y comprobación de tipos fiable. Nuevas regresiones locales SQLite/D1/Durable Objects y CI. Véase [remediación](docs/REMEDIACION-2026-10-20.md) para validación y avisos upstream pendientes.
+Correcciones de identidad y membresía, política REST/WebSocket compartida, pagos atómicos y expiración, descargas protegidas, cascadas completas, esquema SQL canónico con migración explícita, consultas por lote, paginación, limpieza de caché privada y comprobación de tipos fiable. Nuevas regresiones locales SQLite/D1/Durable Objects y CI. Véase [remediación](docs/REMEDIACION-2026-10-20.md) para validación y parches de dependencias.
 
 
 Todas las versiones se desplegaron y verificaron en producción

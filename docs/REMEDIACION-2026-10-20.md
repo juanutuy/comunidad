@@ -1,6 +1,6 @@
 # Remediación de la auditoría
 
-Base auditada: `d82f8fc`. Cambios locales preparados el 20 de octubre de 2026. No se desplegó ni modificó producción.
+Base auditada: `d82f8fc`. Remediación preparada el 20 de octubre de 2026. La publicación se registra en el historial de Git y versiones de Cloudflare.
 
 ## Estado por hallazgo
 
@@ -14,7 +14,7 @@ Base auditada: `d82f8fc`. Cambios locales preparados el 20 de octubre de 2026. N
 | A06 | Corregido | Concesión, pago y recepción de webhook en lote atómico. Fallos o eventos antes de su fila devuelven error recuperable. Pruebas de rollback SQLite y D1 real local. |
 | A07 | Corregido | Estado y vencimiento efectivo en permiso compartido. Fecha vacía solo representa permanencia en plan de pago único. Eventos de suscripción sincronizan período/estado y preservan cancelaciones frente a eventos antiguos. |
 | A08 | Corregido | Descarga de adjuntos vinculada a autorización de post, comentario, canal o lección. Archivos privados con `private, no-store`; identidad gráfica pública separada. |
-| A09 | Mitigado; upstream pendiente | Cero avisos en árbol de producción. Herramientas actualizadas/separadas; removido Drizzle sin uso y actualizado esbuild. Árbol completo conserva avisos sin parche de dos paquetes transitivos; detalle debajo. |
+| A09 | Corregido con parches locales | Parches versionados para braces y node-forge, aplicados al instalar con fallo obligatorio si no aplican. Regresiones reproducen ambos defectos. El escáner por versión sigue mostrando avisos upstream; detalle debajo. |
 | A10 | Corregido | Cascada compartida y transaccional; limpia reacciones de comentarios, encuestas, chat, guardados, ocultos, reportes y notificaciones pertinentes. |
 | A11 | Corregido | Subidas y edición/publicación exigen permiso de escritura; revalidan canal, archivo, acceso y revisión. |
 | A12 | Corregido | Biblioteca usa el mismo entitlement vigente que canales/directorio. |
@@ -40,16 +40,16 @@ Base auditada: `d82f8fc`. Cambios locales preparados el 20 de octubre de 2026. N
 
 Las suites usan fixtures temporales y terminan sus procesos. No requieren cuentas de Stripe ni Cloudflare remoto. Los pagos con tarjeta y renovaciones contra Stripe real deben comprobarse en un entorno de staging con las claves y eventos reales de la cuenta.
 
-## Dependencias upstream pendientes
+## Dependencias reparadas mediante parches locales
 
-El árbol completo de herramientas sigue reportando `braces <=3.0.3` y `node-forge <=1.4.0`, propagados por dependencias de Nuxt/Nitro. Al consultar sus avisos oficiales no existía versión corregida publicada:
+Los avisos [GHSA-vfj7-8cjw-p6xm](https://github.com/advisories/GHSA-vfj7-8cjw-p6xm) y [GHSA-86w9-cpqp-85rv](https://github.com/advisories/GHSA-86w9-cpqp-85rv) no tienen release upstream corregido. Esta versión aplica parches explícitos y revisables con `patch-package`:
 
-- [GHSA-vfj7-8cjw-p6xm: profundidad de patrones en braces](https://github.com/advisories/GHSA-vfj7-8cjw-p6xm).
-- [GHSA-86w9-cpqp-85rv: validación RSA en node-forge](https://github.com/advisories/GHSA-86w9-cpqp-85rv).
+- `patches/braces+3.0.3.patch`: límite de profundidad en parser y recorridos compile/expand/stringify, incluidos AST proporcionados directamente. Rechazo controlado antes de agotar pila; patrones normales siguen funcionando.
+- `patches/node-forge+1.4.0.patch`: valida cantidad de elementos del AlgorithmIdentifier anidado. Prueba con envoltorio RSA válido confirma que el DigestInfo normal verifica y el que añade elementos se rechaza.
 
-No se maquillaron versiones, ignoraron avisos ni modificó criptografía de terceros. Nuxt/UI/editores y CLI se utilizan para construir; el artefacto Cloudflare no importa esos módulos de herramientas. Se comprobó que los módulos `.mjs` emitidos no referencian `node-forge`, `micromatch` ni imports de `braces`/`listhen`. Esto reduce exposición del despliegue, pero no arregla los paquetes del entorno de desarrollo.
+`postinstall` aplica parches con `--error-on-fail` antes de preparar Nuxt. Las pruebas fallan si se reinstala una versión vulnerable sin parche. No se cambian números de versión ni se silencian avisos: `npm audit` identifica paquetes por versión, por lo que mantiene las entradas upstream aunque los archivos instalados estén corregidos. `npm audit --omit=dev` queda sin avisos. Las herramientas no se incluyen como módulos ejecutables en el artefacto Cloudflare.
 
-Mantener construcción con entradas de confianza, servidores de desarrollo locales y hosts explícitos (`NUXT_DEV_ALLOWED_HOSTS` para adicionales). Volver a revisar avisos al actualizar upstream. A09 conserva este pendiente: no corresponde afirmar que todo el árbol tiene cero vulnerabilidades.
+Reemplazar los parches por releases oficiales cuando existan exige revisión y pruebas, como cualquier futura actualización; no queda un defecto conocido sin mitigación dentro de este alcance.
 
 ## Cambios operativos antes de desplegar
 
