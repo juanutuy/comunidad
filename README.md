@@ -1968,6 +1968,131 @@ feed con la suya, y limpieza total hasta la semilla (4 usuarios /
 PASS, `test-fase16e` 24/24, `test-fase16d` 49/49, `test-fase17`
 45/45 y `test-fase18` 29/29. Build y typecheck en cero.
 
+## Fase 16-G (hecha) — comentarios y reacciones como el original: paleta de emojis, hilos y adjuntos
+
+Pedido de Juan con capturas del original (19-oct-2026): en el
+original se puede REACCIONAR a un comentario y RESPONDERLE
+(hilos), reaccionar abre una paleta amplia de emojis (lo nuestro
+eran 4 reacciones fijas de palabra) y al responder hay adjuntos
+(clip, imagen, video, archivo). Aplica en todo: feed, canales y
+detalle. Construido con código y textos propios.
+
+**Paleta de reacciones (posts y comentarios).** Catálogo fijo y
+ordenado de 21 emojis Unicode (`server/utils/reactions.ts`, la
+misma lista en el cliente): 👍 ❤️ 😍 🫀 😂 🥳 🎉 👏 🔥 💯 🚀 💪
+😮 🤯 👀 🤔 💡 🙏 🤝 😢 😡. `reactions.type` pasa a guardar el
+emoji y los endpoints validan contra el catálogo (fuera de
+catálogo = 400; las palabras legadas ya no son tipos válidos).
+**Semántica nueva, como el original: UNA reacción por usuario y
+objetivo** — elegir un emoji crea o REEMPLAZA la propia, elegir el
+mismo la quita. **Migración** (sentencias en `MIGRATIONS` de
+`server/utils/db.ts`, idempotentes): mapea like→👍, love→❤️,
+fire→🔥, clap→👏 (mapeo inyectivo, sin colisiones), colapsa las
+filas múltiples legadas del mismo (post, usuario) conservando la
+más reciente (id mayor) y el índice único pasa de
+`(post_id, user_id, type)` a `(post_id, user_id)`. El serializador
+devuelve conteos por emoji + `reactionTop` (hasta 3 más usados) +
+`reactionTotal` + `myReaction` (la mía o null). La UI: botón
+«Reaccionar» con popover de la cuadrícula (`ReactionPicker`) y
+resumen con los emojis más usados y el total (`ReactionSummary`),
+componentes únicos para tarjeta y detalle.
+
+**Puntos (la convención exacta).** Este sistema NO tiene ledger
+por reacción: los puntos se RECALCULAN desde las filas actuales
+(conteo × valor de la acción). Reaccionar a un post premia al
+AUTOR del post con `reaction_received` (def. 2) por cada reacción
+vigente en sus publicaciones; por eso reemplazar un emoji no
+cambia ningún conteo (ni duplica ni re-premia) y quitar la
+reacción lo resta. La notificación al autor solo sale al CREAR
+(de ninguno a uno), no al reemplazar. Nueva acción de
+gamificación **`comment_reaction` (def. 1)**, misma convención:
+premiar al autor del COMENTARIO por cada reacción vigente en sus
+comentarios, editable en la consola de Gamificación como las
+demás; entra en las estadísticas del miembro y en el ranking.
+(Nota honesta: en el original el XP de reaccionar lo gana quien
+reacciona; acá se replicó la convención propia — lo gana quien
+recibe — con el valor 1 de la referencia para comentarios.)
+
+**Reacciones en comentarios.** Tabla nueva `comment_reactions`
+(único por comentario+usuario), endpoint `POST
+/api/comments/[id]/reactions` con la misma semántica, validación
+y reglas de acceso que el de posts; al crear avisa al autor del
+comentario (tipo nuevo `comment_reaction`, con la preferencia de
+notificaciones de reacciones). El serializador de comentarios
+incluye por comentario: conteos, top, total y mi reacción.
+
+**Hilos (respuestas).** `comments.parent_id` aditivo nullable.
+Responder crea un hijo de la raíz; **responder a una respuesta
+cuelga del comentario raíz: UN solo nivel de anidación**, plano
+dentro del hilo (decisión documentada, como muestra la
+referencia). La API devuelve el árbol (raíces + respuestas
+siempre cronológicas) desde UN serializador compartido
+(`server/utils/comments.ts`) que usan el detalle (`GET /api/post`)
+y el endpoint nuevo `GET /api/posts/[id]/comments`, con las
+mismas reglas de acceso del detalle (sin acceso real al canal la
+conversación no viaja; el visitante en modo público tampoco la
+lee). El conteo del post sigue contando TODAS las filas (raíces y
+respuestas), como antes. Responder notifica al autor del
+comentario padre (sin duplicar el aviso al autor del post cuando
+es la misma persona) y las menciones siguen funcionando. Borrar
+una raíz elimina en cascada sus respuestas y las reacciones de
+todas ellas (`deleteCommentCascade`, compartido por el DELETE
+normal y la cola de moderación); borrar una respuesta solo la
+suya y sus reacciones; borrar un post limpia también las
+`comment_reactions` de sus comentarios. Los bloqueos entre
+miembros filtran respuestas igual que comentarios (una respuesta
+visible cuya raíz quedó filtrada se promueve a raíz). Reportar y
+eliminar de staff funcionan igual en respuestas; editar un
+comentario (solo su autor, solo el texto) es nuevo: `PUT
+/api/comments/[id]`.
+
+**Adjuntos en comentarios y respuestas.** Columnas aditivas
+`media_type` / `media_url` / `media_name` en `comments`, espejo
+del adjunto principal de posts: **UN adjunto por comentario**
+(ámbito honesto). El compositor de comentario y el de respuesta
+llevan la fila de iconos de la referencia (clip, imagen, video,
+archivo) que filtran el selector según el tipo; la subida va por
+el `/api/uploads` de siempre (imagen con `kind='image'`; video y
+archivo con `kind='file'`, que ya acepta MP4 y los tipos de la
+biblioteca) y queda una vista previa retirable antes de enviar.
+Un comentario puede ser solo el adjunto (sin texto). Render:
+imagen en línea, video con reproductor nativo y archivo como
+chip con nombre y descarga.
+
+**Sección única y expansible.** `PostComments` es EL componente
+de comentarios: la tarjeta (feed, canales, perfil, guardados,
+búsqueda) lo expande DENTRO de la misma tarjeta con el botón de
+comentarios (en posts bloqueados el botón sigue llevando al
+detalle) y el detalle lo monta expandido dentro de su tarjeta de
+siempre, sembrado con los datos del SSR. El estado vive en un
+composable compartido por post (`usePostComments`): lo que se
+comenta o reacciona en una superficie se ve en la otra. Estructura
+como la referencia: compositor «Añade un comentario…» arriba con
+sus adjuntos, línea «N comentarios» con selector de orden (Más
+recientes / Más antiguos — reordena las raíces; las respuestas
+siempre cronológicas) y cada comentario con avatar, nombre, hora,
+cuerpo, adjunto, resumen de reacciones y acciones Reaccionar
+(popover) · Responder (caja bajo la raíz, con su fila de
+adjuntos) · menú «⋯». Con `allow_comments` desactivado no hay
+compositores NI respuestas (responder da 403, como comentar) y se
+muestra el aviso de siempre. Textos nuevos en es/en (sección
+`comments.*`, paridad exacta verificada: 1045 claves) y las 4
+claves muertas de las reacciones viejas fuera de los catálogos.
+
+**Verificación:** `scripts/test-fase16g.mjs` — **49/49 PASS**
+contra `wrangler dev` local: la migración legada ejecutada con
+las sentencias exactas extraídas de `db.ts` (6 filas → 4, mapeo y
+colapso correctos, índice nuevo), emoji fuera de catálogo = 400
+en posts y comentarios, ciclo crear/reemplazar/quitar sin
+duplicar ni re-premiar puntos, punto `comment_reaction` al autor
+del comentario, responder a una respuesta colgando de la raíz,
+adjunto de imagen viajando por la API y llegando al detalle,
+borrado en cascada completo, `allow_comments` apagado bloqueando
+también respuestas, un solo `PostComments` en tarjeta y detalle,
+paridad i18n y limpieza hasta la semilla (4 usuarios / 7 posts /
+5 canales). Regresiones: `test-fase18` 29/29, `test-fase16f`
+78/78, `test-fase16e` 24/24. Build y typecheck en cero.
+
 ## Pendiente a propósito (fuera de esta fase)
 
 - Migraciones versionadas con `drizzle-kit` para D1 (hoy: esquema
