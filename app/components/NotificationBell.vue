@@ -34,10 +34,14 @@ const filterChips = computed(() => [
   { label: t('notifications.filterFollowers'), value: 'follow' },
 ])
 const visibleItems = computed(() =>
-  items.value.filter(n => filter.value === 'all' || n.type === filter.value).slice(0, 8))
+  items.value.filter(n => filter.value === 'all' || n.type === filter.value
+    // Fase 16-G: la reacción a un comentario es de la familia de
+    // reacciones también en el filtro de la campana.
+    || (filter.value === 'reaction' && n.type === 'comment_reaction')).slice(0, 8))
 
 const typeIcons: Record<string, string> = {
   reaction: 'i-lucide-heart',
+  comment_reaction: 'i-lucide-heart',
   comment: 'i-lucide-message-circle',
   new_post: 'i-lucide-pen-square',
   mention: 'i-lucide-at-sign',

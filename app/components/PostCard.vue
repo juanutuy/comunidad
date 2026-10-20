@@ -27,14 +27,21 @@ export interface PostView {
   createdAt: string
   author: { name: string, slug: string, avatarUrl?: string, role?: string, online?: boolean, anonymous?: boolean, mine?: boolean, realAuthor?: { name: string, slug: string, avatarUrl?: string }, realRole?: string }
   channel: { name: string, slug: string, type: string }
+  // Fase 16-G: reacciones con emojis — conteos por emoji, top,
+  // total y MI reacción (una sola; null = ninguna).
   reactions: Record<string, number>
-  myReactions: string[]
+  reactionTop: string[]
+  reactionTotal: number
+  myReaction: string | null
   commentCount: number
   bookmarked: boolean
   poll?: PollView | null
 }
 
-const props = defineProps<{ post: PostView, linkable?: boolean }>()
+// `inlineComments: false` (detalle): la sección vive debajo de la
+// tarjeta y el botón de comentarios ancla hasta ella, en vez de
+// expandir una segunda copia dentro de la tarjeta.
+const props = defineProps<{ post: PostView, linkable?: boolean, inlineComments?: boolean }>()
 const emit = defineEmits<{ changed: [], deleted: [] }>()
 const { user } = useAuth()
 const { t } = useI18n()
@@ -43,15 +50,13 @@ const { timeAgo, initials } = useFormat()
 const api = useApi()
 const toast = useToast()
 
-const reactionMeta = computed(() => [
-  { type: 'love', icon: 'i-lucide-heart', label: t('post.reactionLove') },
-  { type: 'like', icon: 'i-lucide-thumbs-up', label: t('post.reactionLike') },
-  { type: 'fire', icon: 'i-lucide-flame', label: t('post.reactionFire') },
-  { type: 'clap', icon: 'i-lucide-hand-metal', label: t('post.reactionClap') },
-])
-
-const localReactions = ref({ ...props.post.reactions })
-const localMine = ref([...props.post.myReactions])
+// Fase 16-G: estado local de reacciones con emojis, sincronizado
+// con las props cuando el padre refresca (mismo patrón que el
+// resto de la tarjeta).
+const localReactions = ref<Record<string, number>>({ ...props.post.reactions })
+const localReactionTop = ref<string[]>([...(props.post.reactionTop || [])])
+const localReactionTotal = ref(props.post.reactionTotal || 0)
+const localMyReaction = ref<string | null>(props.post.myReaction ?? null)
 const localBookmarked = ref(props.post.bookmarked)
 // Fase 16-B: estado local sincronizado de comentarios abiertos/
 // cerrados (el menú lo cambia sin esperar la recarga del padre) y
@@ -67,7 +72,9 @@ const displayBodyHtml = computed(() => editOverride.value ? editOverride.value.b
 const displayEdited = computed(() => !!editOverride.value || !!props.post.edited)
 watch(() => props.post, (p) => {
   localReactions.value = { ...p.reactions }
-  localMine.value = [...p.myReactions]
+  localReactionTop.value = [...(p.reactionTop || [])]
+  localReactionTotal.value = p.reactionTotal || 0
+  localMyReaction.value = p.myReaction ?? null
   localBookmarked.value = p.bookmarked
   localAllowComments.value = p.allowComments !== false
   editOverride.value = null
@@ -81,14 +88,29 @@ const youtubeEmbed = computed(() => {
   return m ? `https://www.youtube.com/embed/${m[1]}` : ''
 })
 
+// Fase 16-G: elegir un emoji crea, reemplaza o quita MI reacción
+// (semántica del servidor); la respuesta trae el resumen fresco y
+// se aplica tal cual, sin cálculo optimista que pueda desfasarse.
 async function toggleReaction(type: string) {
   if (!user.value) { toast.add({ title: t('composer.loginToReact'), color: 'warning' }); return }
-  const wasActive = localMine.value.includes(type)
-  localMine.value = wasActive ? localMine.value.filter(t => t !== type) : [...localMine.value, type]
-  localReactions.value[type] = (localReactions.value[type] || 0) + (wasActive ? -1 : 1)
-  try { await api(`/api/posts/${props.post.id}/reactions`, { method: 'POST', body: { type } }) }
+  try {
+    const res = await api<{ reactions: Record<string, number>, reactionTop: string[], reactionTotal: number, myReaction: string | null }>(`/api/posts/${props.post.id}/reactions`, { method: 'POST', body: { type } })
+    localReactions.value = res.reactions
+    localReactionTop.value = res.reactionTop
+    localReactionTotal.value = res.reactionTotal
+    localMyReaction.value = res.myReaction
+  }
   catch { emit('changed') }
 }
+
+// Fase 16-G: la sección de comentarios se EXPANDE dentro de la
+// tarjeta (como en el original) y comparte estado con el detalle
+// (usePostComments): el conteo visible sale de ahí cuando ya se
+// cargó la conversación.
+const postComments = usePostComments()
+const commentsState = postComments.state(props.post.id)
+const commentsOpen = ref(false)
+const displayCommentCount = computed(() => commentsState.loaded ? commentsState.total : props.post.commentCount)
 
 async function toggleBookmark() {
   if (!user.value) { toast.add({ title: t('composer.loginToSave'), color: 'warning' }); return }
@@ -382,24 +404,48 @@ async function deletePost() {
         </div>
 
         <div class="mt-4 flex flex-wrap items-center gap-1 border-t border-default pt-3">
-          <UButton
-            v-for="r in reactionMeta"
-            :key="r.type"
-            size="sm"
-            :color="localMine.includes(r.type) ? 'primary' : 'neutral'"
-            :variant="localMine.includes(r.type) ? 'soft' : 'ghost'"
-            :icon="r.icon"
-            :label="`${localReactions[r.type] || 0}`"
-            :title="r.label"
-            @click="toggleReaction(r.type)"
-          />
-          <NuxtLink v-if="localAllowComments" :to="`/p/${post.channel.slug}/${post.slug}`" class="ml-1">
-            <UButton size="sm" color="neutral" variant="ghost" icon="i-lucide-message-circle" :label="t('post.commentsCount', { count: post.commentCount })" />
+          <!-- Fase 16-G: resumen (top + total) y botón «Reaccionar»
+               con la paleta de emojis; sin reacciones todavía solo
+               se ve el botón. -->
+          <ReactionSummary :top="localReactionTop" :total="localReactionTotal" class="mr-1" />
+          <ReactionPicker :my-reaction="localMyReaction" @select="toggleReaction">
+            <UButton
+              size="sm"
+              :color="localMyReaction ? 'primary' : 'neutral'"
+              :variant="localMyReaction ? 'soft' : 'ghost'"
+              :icon="localMyReaction ? undefined : 'i-lucide-smile-plus'"
+              :label="localMyReaction ? `${localMyReaction} ${t('comments.react')}` : t('comments.react')"
+              :title="t('comments.react')"
+            />
+          </ReactionPicker>
+          <!-- En un post bloqueado el botón sigue llevando al
+               detalle (pantalla de acceso); en el resto EXPANDE la
+               sección dentro de la tarjeta. -->
+          <NuxtLink v-if="localAllowComments && post.locked" :to="`/p/${post.channel.slug}/${post.slug}`" class="ml-1">
+            <UButton size="sm" color="neutral" variant="ghost" icon="i-lucide-message-circle" :label="t('post.commentsCount', { count: displayCommentCount })" />
           </NuxtLink>
+          <a v-else-if="localAllowComments && inlineComments === false" href="#post-comments" class="ml-1">
+            <UButton size="sm" color="neutral" variant="ghost" icon="i-lucide-message-circle" :label="t('post.commentsCount', { count: displayCommentCount })" />
+          </a>
+          <UButton
+            v-else-if="localAllowComments"
+            size="sm" color="neutral" :variant="commentsOpen ? 'soft' : 'ghost'" icon="i-lucide-message-circle"
+            :label="t('post.commentsCount', { count: displayCommentCount })" class="ml-1"
+            @click="commentsOpen = !commentsOpen"
+          />
           <span v-else class="ml-1 flex items-center gap-1.5 px-2 text-sm text-muted" :title="t('post.commentsOffHint')">
             <UIcon name="i-lucide-lock" /> {{ t('post.commentsOff') }}
           </span>
         </div>
+
+        <PostComments
+          v-if="commentsOpen && localAllowComments && inlineComments !== false"
+          :post-id="post.id"
+          :allow-comments="localAllowComments"
+          :can-interact="post.canInteract !== false"
+          :channel-slug="post.channel.slug"
+          class="mt-4"
+        />
 
         <UModal v-model:open="confirmDelete" :title="t('post.deleteTitle')" :description="t('post.deleteText')">
           <template #footer>

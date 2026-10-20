@@ -33,8 +33,9 @@ export function summarizeReactionRows(rows: { type: string, n: number }[]): Reac
   let total = 0
   for (const r of rows) {
     if (!CATALOG_SET.has(r.type)) continue
-    counts[r.type] = Number(r.n) || 0
-    total += counts[r.type]
+    const n = Number(r.n) || 0
+    counts[r.type] = n
+    total += n
   }
   const ordered = REACTION_CATALOG.filter(e => counts[e])
   const top = [...ordered].sort((a, b) => (counts[b]! - counts[a]!) || (REACTION_CATALOG.indexOf(a) - REACTION_CATALOG.indexOf(b))).slice(0, 3)

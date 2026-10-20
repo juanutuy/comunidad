@@ -1,0 +1,104 @@
+<script setup lang="ts">
+// LA sección de comentarios (Fase 16-G): un solo componente para
+// la tarjeta (se expande dentro de la misma tarjeta, como en el
+// original) y para la página de detalle (nace expandida). Lee y
+// escribe el estado compartido por post (usePostComments), así
+// ambas superficies muestran la misma conversación.
+//
+// Estructura como la referencia: compositor «Añade un comentario…»
+// arriba con su fila de adjuntos, línea «N comentarios» con el
+// selector de orden (Más recientes / Más antiguos — reordena las
+// raíces; las respuestas siempre van cronológicas) y la lista de
+// hilos. Sin acceso real al canal el servidor no entrega la
+// conversación (withheld) y se muestra el aviso; con los
+// comentarios desactivados no hay compositores ni respuestas.
+import type { CommentNode } from '~/utils/reactions'
+
+const props = defineProps<{
+  postId: number
+  allowComments: boolean
+  canInteract: boolean
+  channelSlug?: string
+  initial?: { comments: CommentNode[], total: number, withheld: boolean } | null
+}>()
+
+const { user } = useAuth()
+const { t } = useI18n()
+const toast = useToast()
+const commentsApi = usePostComments()
+const s = commentsApi.state(props.postId)
+
+onMounted(() => {
+  if (props.initial) commentsApi.seed(props.postId, props.initial.comments, props.initial.total, props.initial.withheld)
+  else commentsApi.load(props.postId)
+})
+
+const sortItems = computed(() => [
+  { label: t('comments.sortRecent'), value: 'recent' as const },
+  { label: t('comments.sortOldest'), value: 'oldest' as const },
+])
+const roots = computed(() => commentsApi.sortedRoots(props.postId))
+
+async function submitComment(payload: { body: string, media: { mediaType: string, mediaUrl: string, mediaName: string } | null }) {
+  try {
+    await commentsApi.add(props.postId, { body: payload.body, media: payload.media })
+  }
+  catch (e) { toast.add({ title: t('comments.commentFailed'), description: (e as { data?: { message?: string } }).data?.message || '', color: 'error' }) }
+}
+</script>
+
+<template>
+  <div class="border-t border-default pt-4">
+    <div v-if="s.loading && !s.loaded" class="flex items-center gap-2 text-sm text-muted">
+      <UIcon name="i-lucide-loader-2" class="animate-spin" /> {{ t('common.loading') }}
+    </div>
+    <template v-else>
+      <!-- Sin acceso: la conversación no viaja (detalle y tarjeta
+           comparten el criterio del servidor). -->
+      <p v-if="s.withheld" class="text-sm text-muted">{{ t('postDetail.commentsMembersOnly') }}</p>
+      <template v-else>
+        <div class="mb-4 flex items-center gap-2">
+          <h3 class="flex items-center gap-2 text-sm font-bold">
+            <UIcon name="i-lucide-message-circle" />
+            {{ t('comments.countLabel', { count: s.total }) }}
+          </h3>
+          <span class="flex-1" />
+          <USelect v-model="s.sort" :items="sortItems" size="xs" class="w-36" />
+        </div>
+
+        <UAlert
+          v-if="!allowComments" color="neutral" variant="soft" icon="i-lucide-lock" class="mb-4"
+          :title="t('postDetail.commentsDisabledTitle')" :description="t('postDetail.commentsDisabledText')"
+        />
+        <UAlert
+          v-else-if="!canInteract" color="neutral" variant="soft" icon="i-lucide-lock" class="mb-4"
+          :title="t('postDetail.readOnlyTitle')" :description="t('postDetail.readOnlyText')"
+        >
+          <template v-if="channelSlug" #actions>
+            <UButton :to="`/channels/${channelSlug}`" size="sm" :label="t('postDetail.getAccess')" />
+          </template>
+        </UAlert>
+        <div v-else-if="user" class="mb-5 flex gap-2">
+          <CommentComposer
+            :placeholder="t('comments.addPlaceholder')"
+            :submit-label="t('comments.commentButton')"
+            @submit="submitComment"
+          />
+        </div>
+        <UAlert v-else color="neutral" variant="soft" class="mb-4" :title="t('postDetail.loginToComment')" />
+
+        <div class="space-y-4">
+          <PostCommentItem
+            v-for="root in roots"
+            :key="root.id"
+            :post-id="postId"
+            :node="root"
+            :allow-comments="allowComments"
+            :can-interact="canInteract"
+          />
+          <p v-if="!roots.length" class="text-sm text-muted">{{ t('postDetail.noComments') }}</p>
+        </div>
+      </template>
+    </template>
+  </div>
+</template>
