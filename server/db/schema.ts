@@ -61,6 +61,14 @@ export const channels = sqliteTable('channels', {
   type: text('type', { enum: ['free', 'private', 'paid'] }).notNull().default('free'),
   priceCents: integer('price_cents').notNull().default(0),
   sort: integer('sort').notNull().default(0),
+  // Fase 16 (vía MIGRATIONS en db.ts; acá para mantener el espejo).
+  postPermission: text('post_permission').notNull().default('members'),
+  archivedAt: text('archived_at').notNull().default(''),
+  // Fase 16-F: tipo de contenido, portada y visibilidad — ejes
+  // separados del acceso (`type`).
+  contentType: text('content_type', { enum: ['post', 'image'] }).notNull().default('post'),
+  coverUrl: text('cover_url').notNull().default(''),
+  visibility: text('visibility', { enum: ['public', 'private', 'secret'] }).notNull().default('public'),
 }, t => [uniqueIndex('channels_tenant_slug').on(t.tenantId, t.slug)])
 
 export const follows = sqliteTable('follows', {
@@ -90,6 +98,8 @@ export const posts = sqliteTable('posts', {
   teaser: text('teaser').notNull().default(''),
   mediaType: text('media_type', { enum: ['none', 'image', 'video'] }).notNull().default('none'),
   mediaUrl: text('media_url').notNull().default(''),
+  // Fase 16-F: álbum del post en canales de imagen.
+  album: text('album').notNull().default(''),
   pinned: integer('pinned', { mode: 'boolean' }).notNull().default(false),
   createdAt: text('created_at').notNull(),
 }, t => [uniqueIndex('posts_channel_slug').on(t.channelId, t.slug)])

@@ -32,7 +32,7 @@ const api = useApi()
 const toast = useToast()
 
 const { data: channelData } = await useAsyncData('composer-channels', () =>
-  api<{ groups: { channels: { slug: string, name: string, type: string, hasAccess: boolean, postPermission?: string }[] }[] }>('/api/channels'))
+  api<{ groups: { channels: { slug: string, name: string, type: string, hasAccess: boolean, postPermission?: string, contentType?: string }[] }[] }>('/api/channels'))
 // Fase 16: «quién puede publicar» — en un canal de «solo el equipo»
 // los miembros no publican (la API también devuelve 403). Esos
 // canales salen de la lista publicable para los miembros; y si el
@@ -64,6 +64,10 @@ const originalPinned = ref(false)
 const channelSlug = ref('')
 const title = ref('')
 const bodyHtml = ref('')
+// Fase 16-F: álbum del post — SOLO se ofrece (y se manda) cuando el
+// canal elegido es de imagen; el servidor aplica la misma regla.
+const album = ref('')
+const currentChannelIsImage = computed(() => currentChannel.value?.contentType === 'image')
 const kind = ref<'post' | 'poll'>('post')
 const pollOptions = ref<string[]>(['', ''])
 const allowComments = ref(true)
@@ -111,7 +115,7 @@ const snapshot = computed(() => JSON.stringify({
   t: title.value, h: bodyHtml.value, k: kind.value, o: pollOptions.value,
   a: anonymous.value, c: allowComments.value,
   f: attachedMedia.value ? `${attachedMedia.value.type}:${attachedMedia.value.url}` : '',
-  s: scheduledAt.value, p: asAnnouncement.value,
+  s: scheduledAt.value, p: asAnnouncement.value, al: album.value,
 }))
 // Fase 16-C: guardar la edición exige contenido (la pregunta, si es
 // encuesta) y título en los posts comunes — las mismas reglas que
@@ -212,6 +216,7 @@ function openModal(preset?: 'photo' | 'video' | 'poll') {
 
 function resetForm() {
   title.value = ''; bodyHtml.value = ''
+  album.value = ''
   pollOptions.value = ['', '']
   kind.value = 'post'
   allowComments.value = true
@@ -249,6 +254,7 @@ function openEdit(p: EditablePost) {
   bodyHtml.value = p.bodyHtml
     || (p.body ? p.body.split(/\n{2,}/).map(par => `<p>${escapeHtml(par).replace(/\n/g, '<br>')}</p>`).join('') : '')
   kind.value = p.kind === 'poll' ? 'poll' : 'post'
+  album.value = p.album || ''
   editPollLabels.value = p.pollOptions || []
   allowComments.value = p.allowComments !== false
   // El anónimo se refleja tal cual quedó al crear: no se convierte
@@ -313,6 +319,9 @@ async function submit(mode: 'now' | 'draft' | 'schedule') {
       anonymous: anonymous.value,
     }
     if (kind.value === 'poll') payload.options = validOptions.value
+    // Fase 16-F: álbum solo en canales de imagen (el servidor lo
+    // vuelve a validar y lo ignora en el resto).
+    if (kind.value === 'post' && currentChannelIsImage.value) payload.album = album.value.trim()
     if (mode === 'schedule') payload.scheduledAt = new Date(scheduledAt.value).toISOString()
     if (attachedMedia.value) {
       payload.mediaType = attachedMedia.value.type
@@ -362,6 +371,10 @@ async function submitEdit() {
       attachmentName: attachedMedia.value?.type === 'file' ? attachedMedia.value.name : '',
     }
     if (editStatus.value === 'scheduled') payload.scheduledAt = new Date(scheduledAt.value).toISOString()
+    // Fase 16-F: en edición el álbum viaja solo si el canal del post
+    // es de imagen (en edición el canal es fijo: currentChannel lo
+    // resuelve por el slug cargado).
+    if (currentChannelIsImage.value) payload.album = album.value.trim()
     const id = editId.value
     await api(`/api/posts/${id}`, { method: 'PUT', body: payload })
     if (user.value?.role === 'admin' && editStatus.value === 'published' && asAnnouncement.value !== originalPinned.value)
@@ -488,6 +501,10 @@ const chevronItems = computed(() => [
             :placeholder="kind === 'poll' ? t('composer.pollTitlePlaceholder') : t('composer.titlePlaceholder')"
             class="w-full bg-transparent text-xl font-bold outline-none placeholder:text-dimmed"
           >
+          <!-- Fase 16-F: álbum, SOLO en canales de imagen -->
+          <UFormField v-if="kind === 'post' && currentChannelIsImage" :label="t('composer.albumLabel')">
+            <UInput v-model="album" maxlength="80" :placeholder="t('composer.albumPlaceholder')" class="w-full" />
+          </UFormField>
           <ClientOnly>
             <RichEditor
               ref="editorRef" v-model="bodyHtml" mode="slash" :upload-image="uploadImage"

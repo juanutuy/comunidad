@@ -7,8 +7,8 @@
 // con chevrons, canales con sus candados y Cerrar sesión en rojo.
 // Solo se monta en el layout; se abre desde la barra superior y desde
 // la barra inferior (estado compartido en useMobilePanel).
-interface ChannelItem { id: number, slug: string, name: string, icon: string, type: string, priceCents: number, following: boolean }
-interface ChannelGroup { id: number, name: string, channels: ChannelItem[] }
+interface ChannelItem { id: number, slug: string, name: string, icon: string, description?: string, type: string, priceCents: number, contentType?: 'post' | 'image', coverUrl?: string, visibility?: 'public' | 'private' | 'secret', groupId?: number | null, postPermission?: string, archived?: boolean, following: boolean, hasAccess?: boolean }
+interface ChannelGroup { id: number, name: string, sort?: number, isDefault?: boolean, channels: ChannelItem[] }
 interface LevelInfo { name: string, min: number, icon: string, nextAt: number | null, nextName: string | null, nextIcon: string | null }
 interface Community { id: number, slug: string, name: string, brandColor: string, role: string, domain: string | null }
 
@@ -18,6 +18,13 @@ const emit = defineEmits<{ logout: [] }>()
 const { user, tenant } = useAuth()
 const { t, navLabel } = useI18n()
 const { initials } = useFormat()
+// Fase 16-F: el panel muestra los canales SEGUIDOS (misma regla
+// que el lateral) y los mismos menús contextuales de canal/grupo.
+const { openCreate: openChannelCreate } = useChannelEditor()
+const displayGroups = computed(() => props.groups
+  .map(g => ({ ...g, channels: user.value ? g.channels.filter(c => c.following) : g.channels }))
+  .filter(g => g.channels.length))
+const defaultGroupName = computed(() => props.groups.find(g => g.isDefault)?.name || '')
 const api = useApi()
 const { open, closePanel } = useMobilePanel()
 // Fase 11: «Ajustes de cuenta» abre el modal de ajustes (y cierra el panel).
@@ -238,26 +245,36 @@ const mainLinks = computed(() => {
         </nav>
 
         <!-- Canales (mismos grupos y candados que el lateral fijo) -->
-        <div v-if="groups.length">
+        <div v-if="displayGroups.length">
           <h3 class="mb-1.5 px-2 text-xs font-bold tracking-wider text-muted uppercase">{{ t('nav.channels') }}</h3>
-          <div v-for="group in groups" :key="group.id" class="mb-2">
-            <p class="mb-0.5 px-2 text-[11px] font-semibold tracking-wide text-muted">{{ group.name }}</p>
+          <div v-for="group in displayGroups" :key="group.id" class="mb-2">
+            <div class="mb-0.5 flex items-center gap-1 px-2">
+              <p class="min-w-0 flex-1 truncate text-[11px] font-semibold tracking-wide text-muted">{{ group.name }}</p>
+              <UButton
+                v-if="user?.role === 'admin'" icon="i-lucide-plus" size="xs" color="neutral" variant="ghost"
+                :title="t('channelAdmin.groupNewChannel')" :aria-label="t('channelAdmin.groupNewChannel')"
+                @click="openChannelCreate(group.id)"
+              />
+              <ChannelGroupMenu :group="group" :fallback-name="defaultGroupName" />
+            </div>
             <ul class="space-y-0.5">
               <li v-for="ch in group.channels" :key="ch.id">
-                <NuxtLink
-                  :to="`/channels/${ch.slug}`"
-                  class="flex items-center gap-3 rounded-lg px-2 py-2 text-[15px] hover:bg-elevated"
-                  active-class="bg-elevated font-semibold"
-                  @click="closePanel"
-                >
-                  <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-elevated">
-                    <UIcon :name="ch.icon" class="text-primary" />
-                  </span>
-                  <span class="min-w-0 flex-1 truncate">{{ ch.name }}</span>
-                  <UIcon v-if="ch.type === 'paid'" name="i-lucide-crown" class="shrink-0 text-amber-500" />
-                  <UIcon v-else-if="ch.type === 'private'" name="i-lucide-lock" class="shrink-0 text-muted" />
-                  <UIcon name="i-lucide-chevron-right" class="shrink-0 text-muted" />
-                </NuxtLink>
+                <div class="flex items-center rounded-lg hover:bg-elevated">
+                  <NuxtLink
+                    :to="`/channels/${ch.slug}`"
+                    class="flex min-w-0 flex-1 items-center gap-3 px-2 py-2 text-[15px]"
+                    active-class="font-semibold"
+                    @click="closePanel"
+                  >
+                    <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-elevated">
+                      <UIcon :name="ch.icon" class="text-primary" />
+                    </span>
+                    <span class="min-w-0 flex-1 truncate">{{ ch.name }}</span>
+                    <UIcon v-if="ch.type === 'paid'" name="i-lucide-crown" class="shrink-0 text-amber-500" />
+                    <UIcon v-else-if="ch.type === 'private'" name="i-lucide-lock" class="shrink-0 text-muted" />
+                  </NuxtLink>
+                  <ChannelContextMenu :channel="ch" size="sm" />
+                </div>
               </li>
             </ul>
           </div>

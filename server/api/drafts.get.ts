@@ -8,7 +8,7 @@ export default defineEventHandler(async (event) => {
   const user = await requireUser(event, tenant.id)
   const db = await dbFor(event)
   const rows = await db.prepare(`SELECT p.id, p.slug, p.title, p.body, p.body_html, p.anonymous, p.kind, p.status, p.scheduled_at, p.created_at,
-      p.allow_comments, p.pinned, p.media_type, p.media_url, p.attachment_name,
+      p.allow_comments, p.pinned, p.media_type, p.media_url, p.attachment_name, p.album,
       c.slug AS channel_slug, c.name AS channel_name
     FROM posts p JOIN channels c ON c.id = p.channel_id
     WHERE p.tenant_id = ? AND p.author_id = ? AND p.status IN ('draft', 'scheduled')
@@ -27,6 +27,8 @@ export default defineEventHandler(async (event) => {
       allowComments: r.allow_comments === undefined || r.allow_comments === null ? true : !!r.allow_comments,
       pinned: !!r.pinned,
       mediaType: (r.media_type as string) || 'none', mediaUrl: (r.media_url as string) || '', attachmentName: (r.attachment_name as string) || '',
+      // Fase 16-F: álbum del borrador (canales de imagen).
+      album: (r.album as string) || '',
       channel: { slug: r.channel_slug, name: r.channel_name }, options,
     })
   }

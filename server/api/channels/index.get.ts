@@ -16,7 +16,7 @@ export default defineEventHandler(async (event) => {
   const priv = await getPrivacySettings(event, tenant.id)
   const hidePrivate = !user && priv.visibility === 'public'
   const db = await dbFor(event)
-  const groups = await db.prepare('SELECT * FROM channel_groups WHERE tenant_id = ? ORDER BY sort').all(tenant.id) as unknown as { id: number, name: string }[]
+  const groups = await db.prepare('SELECT * FROM channel_groups WHERE tenant_id = ? ORDER BY sort').all(tenant.id) as unknown as { id: number, name: string, sort: number }[]
   const channels = await db.prepare('SELECT * FROM channels WHERE tenant_id = ? ORDER BY sort').all(tenant.id) as unknown as ChannelRow[]
   const follows = new Set(user
     ? (await db.prepare('SELECT channel_id FROM follows WHERE tenant_id = ? AND user_id = ?').all(tenant.id, user.id) as unknown as { channel_id: number }[]).map(f => f.channel_id)
@@ -51,7 +51,7 @@ export default defineEventHandler(async (event) => {
   const visibleGroups = groups.filter(g => visible.some(({ ch }) => ch.group_id === g.id))
   return {
     groups: visibleGroups.map(g => ({
-      id: g.id, name: g.name, isDefault: g.id === defaultGroupId,
+      id: g.id, name: g.name, sort: g.sort, isDefault: g.id === defaultGroupId,
       channels: visible.filter(({ ch }) => ch.group_id === g.id).map(({ ch, access }) => ({
         id: ch.id, slug: ch.slug, name: ch.name, icon: ch.icon, description: ch.description,
         type: ch.type, priceCents: ch.price_cents,

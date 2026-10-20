@@ -19,6 +19,7 @@ interface DraftView {
   mediaType: string
   mediaUrl: string
   attachmentName: string
+  album?: string
   channel: { slug: string, name: string }
   options: string[]
 }
@@ -53,6 +54,7 @@ function startEdit(d: DraftView) {
     mediaType: d.mediaType || 'none',
     mediaUrl: d.mediaUrl || '',
     attachmentName: d.attachmentName || '',
+    album: d.album || '',
     pollOptions: d.options || [],
   })
 }

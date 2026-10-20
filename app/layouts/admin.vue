@@ -156,5 +156,11 @@ const userMenuItems = computed(() => [
     </USlideover>
 
     <UserSettingsModal />
+    <!-- Fase 16-F: el modal único de canal también vive en la
+         consola (lo abre Administrar canales), y el anfitrión de
+         administración en contexto con él (eliminar canal pide la
+         misma confirmación en las dos superficies). -->
+    <ChannelFormModal />
+    <ChannelAdminHost />
   </div>
 </template>

@@ -16,7 +16,21 @@ const { openSettings: openUserSettings } = useUserSettings()
 const { openSearch } = useSearchDialog()
 
 const { data: channelData, refresh: refreshChannels } = await useAsyncData('layout-channels', () =>
-  api<{ groups: { id: number, name: string, channels: { id: number, slug: string, name: string, icon: string, type: string, priceCents: number, following: boolean }[] }[] }>('/api/channels'))
+  api<{ groups: { id: number, name: string, sort?: number, isDefault?: boolean, channels: { id: number, slug: string, name: string, icon: string, description?: string, type: string, priceCents: number, contentType?: 'post' | 'image', coverUrl?: string, visibility?: 'public' | 'private' | 'secret', groupId?: number | null, postPermission?: string, archived?: boolean, following: boolean, hasAccess?: boolean }[] }[] }>('/api/channels'))
+
+// Fase 16-F: el lateral muestra SOLO los canales que el usuario
+// SIGUE (seguir/dejar de seguir vive en el menú «⋯» de cada canal;
+// dejar de seguir lo quita del lateral sin quitar el acceso, y el
+// canal sigue en el directorio /channels y en la búsqueda). Sin
+// sesión no hay seguimiento: el visitante ve el listado completo,
+// como hasta ahora. Cada grupo lleva su encabezado con «+» (staff:
+// crear canal en ese grupo) y menú «⋯» (ver canales / editar /
+// eliminar grupo), como en la referencia.
+const { openCreate: openChannelCreate } = useChannelEditor()
+const sidebarGroups = computed(() => (channelData.value?.groups || [])
+  .map(g => ({ ...g, channels: user.value ? g.channels.filter(c => c.following) : g.channels }))
+  .filter(g => g.channels.length))
+const defaultGroupName = computed(() => (channelData.value?.groups || []).find(g => g.isDefault)?.name || '')
 
 // Fase 7: navegación principal en pastillas, centrada en la barra
 // superior. Fase 10: las pastillas solo viven en escritorio amplio
@@ -122,7 +136,12 @@ const userMenuItems = computed(() => [
 
 {}// Fase 9: el perfil usa todo el ancho con sus tres zonas propias (como
 // la referencia): en /profile/* no se renderiza el riel derecho global.
-const isProfilePage = computed(() => route.path.startsWith('/profile/'))
+// El riel derecho es del feed (y de las páginas generales): el
+// perfil lo suprime desde la Fase 6 y la página de CANAL también
+// (Fase 16-F: «el sidebar o los dos sidebar solo en el feed; en
+// canales es otro diferente independiente» — su cabecera es propia
+// y el centro se ensancha sin el riel).
+const hideRightRail = computed(() => route.path.startsWith('/profile/') || route.path.startsWith('/channels/') || route.path === '/channels')
 </script>
 
 <template>
@@ -217,18 +236,32 @@ const isProfilePage = computed(() => route.path.startsWith('/profile/'))
           <h3 class="mb-1.5 px-2 text-xs font-bold tracking-wider text-muted uppercase">
             {{ t('nav.channels') }}
           </h3>
-          <div v-for="group in channelData?.groups || []" :key="group.id" class="mb-3">
-            <p class="mb-1 px-2 text-[11px] font-semibold tracking-wide text-muted">
-              {{ group.name }}
-            </p>
+          <div v-for="group in sidebarGroups" :key="group.id" class="mb-3">
+            <div class="group/gh mb-1 flex items-center gap-1 px-2">
+              <p class="min-w-0 flex-1 truncate text-[11px] font-semibold tracking-wide text-muted">
+                {{ group.name }}
+              </p>
+              <UButton
+                v-if="user?.role === 'admin'" icon="i-lucide-plus" size="xs" color="neutral" variant="ghost"
+                :title="t('channelAdmin.groupNewChannel')" :aria-label="t('channelAdmin.groupNewChannel')"
+                class="shrink-0"
+                @click="openChannelCreate(group.id)"
+              />
+              <ChannelGroupMenu :group="group" :fallback-name="defaultGroupName" />
+            </div>
             <ul class="space-y-0.5">
-              <li v-for="ch in group.channels" :key="ch.id">
-                <NuxtLink :to="`/channels/${ch.slug}`" class="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-elevated" active-class="bg-elevated font-semibold">
-                  <UIcon :name="ch.icon" class="shrink-0" />
-                  <span class="min-w-0 flex-1 truncate">{{ ch.name }}</span>
-                  <UIcon v-if="ch.type === 'paid'" name="i-lucide-crown" class="shrink-0 text-amber-500" />
-                  <UIcon v-else-if="ch.type === 'private'" name="i-lucide-lock" class="shrink-0 text-muted" />
-                </NuxtLink>
+              <li v-for="ch in group.channels" :key="ch.id" class="group/ch">
+                <div class="flex items-center rounded-md hover:bg-elevated">
+                  <NuxtLink :to="`/channels/${ch.slug}`" class="flex min-w-0 flex-1 items-center gap-2 px-2 py-1.5 text-sm" active-class="font-semibold">
+                    <UIcon :name="ch.icon" class="shrink-0" />
+                    <span class="min-w-0 flex-1 truncate">{{ ch.name }}</span>
+                    <UIcon v-if="ch.type === 'paid'" name="i-lucide-crown" class="shrink-0 text-amber-500" />
+                    <UIcon v-else-if="ch.type === 'private'" name="i-lucide-lock" class="shrink-0 text-muted" />
+                  </NuxtLink>
+                  <span class="shrink-0 pr-1 opacity-0 transition group-hover/ch:opacity-100 max-md:opacity-70 focus-within:opacity-100">
+                    <ChannelContextMenu :channel="ch" />
+                  </span>
+                </div>
               </li>
             </ul>
           </div>
@@ -299,7 +332,7 @@ const isProfilePage = computed(() => route.path.startsWith('/profile/'))
       <!-- Riel derecho: fijo con scroll interno propio (su contenedor
            lleva el overflow, con la altura de la zona bajo el
            header); solo desde xl y nunca en el perfil (Fase 9). -->
-      <aside v-if="!isProfilePage" data-scroll-region="right-rail" class="hidden min-h-0 w-[290px] shrink-0 overflow-y-auto py-6 pl-1 xl:block">
+      <aside v-if="!hideRightRail" data-scroll-region="right-rail" class="hidden min-h-0 w-[290px] shrink-0 overflow-y-auto py-6 pl-1 xl:block">
         <RightRail />
       </aside>
     </div>
@@ -309,6 +342,10 @@ const isProfilePage = computed(() => route.path.startsWith('/profile/'))
     <SearchDialog />
     <UserSettingsModal />
     <ReportDialog />
+    <!-- Fase 16-F: anfitrión del editor de canales — el modal único
+         que abren el lateral, los grupos y la página del canal. -->
+    <ChannelFormModal />
+    <ChannelAdminHost />
     <!-- Fase 16-C: anfitrión del editor de publicaciones — el MISMO
          PostComposer de crear, en modo edición, para las tarjetas y
          «Mis borradores» (ver usePostEditor). Sin disparador visible:

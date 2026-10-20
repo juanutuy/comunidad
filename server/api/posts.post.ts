@@ -6,7 +6,7 @@
 //     solo cuando vence, ver publishDuePosts en utils/community.ts).
 // Al publicarse (ahora o después) se notifica a quienes siguen el
 // canal y a los mencionados.
-import { canAccessChannel, channelBySlug, channelPostPermission, currentAuth, isChannelArchived, isStaff, requireCanWrite, requireUser, resolveTenant } from '../utils/community'
+import { canAccessChannel, channelBySlug, channelContentType, channelPostPermission, currentAuth, isChannelArchived, isStaff, requireCanWrite, requireUser, resolveTenant } from '../utils/community'
 import { nowIso, dbFor, slugify } from '../utils/db'
 import { msg } from '../utils/i18n'
 import { getReviewEnabled } from '../utils/moderation'
@@ -35,6 +35,9 @@ interface CreateBody {
   pin?: boolean
   // Fase 8: post anónimo (solo se fija al crear; no se convierte después).
   anonymous?: boolean
+  // Fase 16-F: álbum del post — SOLO se acepta en canales de imagen
+  // (en el resto se ignora: el campo ni se ofrece en el compositor).
+  album?: string
 }
 
 export default defineEventHandler(async (event) => {
@@ -109,6 +112,8 @@ export default defineEventHandler(async (event) => {
   // video adjunto exigen su nivel si el tenant las configuró.
   if (containsLink(`${title} ${text}`)) await assertGate(event, tenant.id, user.id, role, 'feed_link')
   if (mediaType === 'video') await assertGate(event, tenant.id, user.id, role, 'feed_video')
+  // Fase 16-F: el álbum solo existe en canales de imagen.
+  const album = channelContentType(channel) === 'image' ? String(body.album || '').trim().slice(0, 80) : ''
   const allowComments = body.allowComments === false ? 0 : 1
   // «Publicar como anuncio» solo tiene efecto para el admin: un miembro
   // no puede fijar su propio post mandando pin=true.
@@ -118,8 +123,8 @@ export default defineEventHandler(async (event) => {
   let slug = slugify(title)
   if (await db.prepare('SELECT id FROM posts WHERE channel_id = ? AND slug = ?').get(channel.id, slug))
     slug = `${slug}-${Math.floor(Math.random() * 9000 + 1000)}`
-  const id = Number((await db.prepare('INSERT INTO posts (tenant_id, channel_id, author_id, slug, title, body, body_html, teaser, media_type, media_url, attachment_name, pinned, created_at, status, scheduled_at, kind, allow_comments, anonymous) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
-    .run(tenant.id, channel.id, user.id, slug, title, text, bodyHtml, text.slice(0, 160), mediaType, kind === 'poll' ? '' : (body.mediaUrl || '').trim(), mediaType === 'file' ? String(body.attachmentName || '').slice(0, 120) : '', pinned, nowIso(), status, scheduledAt, kind, allowComments, anonymous)).lastInsertRowId)
+  const id = Number((await db.prepare('INSERT INTO posts (tenant_id, channel_id, author_id, slug, title, body, body_html, teaser, media_type, media_url, attachment_name, pinned, created_at, status, scheduled_at, kind, allow_comments, anonymous, album) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+    .run(tenant.id, channel.id, user.id, slug, title, text, bodyHtml, text.slice(0, 160), mediaType, kind === 'poll' ? '' : (body.mediaUrl || '').trim(), mediaType === 'file' ? String(body.attachmentName || '').slice(0, 120) : '', pinned, nowIso(), status, scheduledAt, kind, allowComments, anonymous, album)).lastInsertRowId)
   for (let i = 0; i < options.length; i++) {
     await db.prepare('INSERT INTO poll_options (tenant_id, post_id, label, sort) VALUES (?, ?, ?, ?)')
       .run(tenant.id, id, options[i], i + 1)

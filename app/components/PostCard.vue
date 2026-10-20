@@ -19,6 +19,8 @@ export interface PostView {
   attachmentName?: string
   pinned: boolean
   kind?: string
+  // Fase 16-F: álbum del post en canales de imagen.
+  album?: string
   status?: string
   allowComments?: boolean
   edited?: boolean
@@ -159,6 +161,7 @@ function startEdit() {
     mediaType: props.post.mediaType || 'none',
     mediaUrl: props.post.mediaUrl || '',
     attachmentName: props.post.attachmentName || '',
+    album: props.post.album || '',
     pollOptions: (localPoll.value?.options || []).map(o => o.label),
   })
 }

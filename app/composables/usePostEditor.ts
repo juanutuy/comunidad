@@ -23,6 +23,8 @@ export interface EditablePost {
   mediaType: string
   mediaUrl: string
   attachmentName: string
+  // Fase 16-F: álbum del post (solo canales de imagen).
+  album?: string
   // Etiquetas de las opciones si es encuesta. En edición son SOLO
   // LECTURA (regla del producto: las opciones no se editan en un post
   // ya creado; con votos serían además datos falsos).
