@@ -11,7 +11,7 @@ export interface NotifyInput {
   tenantId: number
   userId: number // destinatario
   actorId: number | null
-  type: 'reaction' | 'comment' | 'new_post' | 'mention' | 'dm' | 'follow' | 'report' | 'moderation' | 'join_request' | 'payment'
+  type: 'reaction' | 'comment' | 'comment_reaction' | 'new_post' | 'mention' | 'dm' | 'follow' | 'report' | 'moderation' | 'join_request' | 'payment'
   title: string
   link: string
 }
@@ -28,6 +28,9 @@ export interface NotifyInput {
 // mismo criterio operativo: no está en PREF_BY_TYPE y siempre llega.
 const PREF_BY_TYPE: Partial<Record<NotifyInput['type'], string>> = {
   reaction: 'notify_reaction',
+  // Fase 16-G: la reacción a un comentario es de la misma familia
+  // que la reacción a una publicación (misma preferencia).
+  comment_reaction: 'notify_reaction',
   comment: 'notify_comment',
   mention: 'notify_mention',
   new_post: 'notify_new_post',

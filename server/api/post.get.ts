@@ -5,7 +5,7 @@
 import { POST_SELECT, canAccessChannel, channelBySlug, channelVisibility, currentAuth, isChannelArchived, resolveTenant, serializePost } from '../utils/community'
 import { dbFor } from '../utils/db'
 import { getPrivacySettings, requireSessionUnlessPublic } from '../utils/privacy'
-import { blockedByMe } from '../utils/blocks'
+import { fetchCommentTree } from '../utils/comments'
 
 export default defineEventHandler(async (event) => {
   const tenant = await resolveTenant(event)
@@ -49,15 +49,17 @@ export default defineEventHandler(async (event) => {
   // comentarios (decisión propia de esta fase): los comentarios son
   // conversación de miembros.
   const visitorPublic = !user && priv.visibility === 'public'
-  const blocked = await blockedByMe(event, tenant.id, user?.id ?? null)
-  const comments = access && !visitorPublic
-    ? (await db.prepare(`SELECT c.*, u.name AS author_name, u.slug AS author_slug, u.avatar_url AS author_avatar FROM comments c JOIN users u ON u.id = c.author_id WHERE c.post_id = ? ORDER BY c.created_at`).all(row.id as number) as Record<string, unknown>[])
-        .filter(c => !blocked.has(Number(c.author_id)))
-        .map(c => ({ id: c.id, body: c.body, createdAt: c.created_at, author: { name: c.author_name, slug: c.author_slug, avatarUrl: c.author_avatar || '' } }))
-    : []
+  // Fase 16-G: los comentarios viajan como ÁRBOL (raíces con sus
+  // respuestas, reacciones por comentario y adjuntos) desde el
+  // serializador compartido — el detalle y la tarjeta expansible
+  // muestran exactamente lo mismo.
+  const tree = access && !visitorPublic
+    ? await fetchCommentTree(event, tenant.id, row.id as number, user?.id ?? null)
+    : { roots: [], total: 0 }
   return {
     post: await serializePost(event, row, user?.id ?? null, readAccess, role, { canInteract: access }),
-    comments,
+    comments: tree.roots,
+    commentTotal: tree.total,
     // Para que la página no diga «todavía no hay comentarios» cuando
     // los comentarios existen pero no viajan para este lector.
     commentsWithheld: visitorPublic,

@@ -1,7 +1,10 @@
 // Borrar un comentario: su autor o quien modera el tenant
-// (administrador o moderador — Fase 14).
+// (administrador o moderador — Fase 14). Fase 16-G: el borrado va
+// por la cascada compartida — una raíz se lleva sus respuestas y
+// las reacciones de todos los comentarios eliminados.
 import { canModerate, currentAuth, requireUser, resolveTenant } from '../../utils/community'
 import { dbFor } from '../../utils/db'
+import { deleteCommentCascade } from '../../utils/moderation'
 
 export default defineEventHandler(async (event) => {
   const tenant = await resolveTenant(event)
@@ -13,6 +16,6 @@ export default defineEventHandler(async (event) => {
   if (!comment) throw createError({ statusCode: 404, message: 'Comentario no encontrado.' })
   if (comment.author_id !== user.id && !canModerate(role))
     throw createError({ statusCode: 403, message: 'Solo el autor, un moderador o un administrador puede borrar este comentario.' })
-  await db.prepare('DELETE FROM comments WHERE id = ?').run(commentId)
+  await deleteCommentCascade(event, commentId)
   return { ok: true }
 })

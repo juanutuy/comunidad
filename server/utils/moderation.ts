@@ -49,8 +49,24 @@ export async function deletePostCascade(event: H3Event, tenantId: number, postId
   await db.prepare('DELETE FROM poll_votes WHERE post_id = ?').run(postId)
   await db.prepare('DELETE FROM poll_options WHERE post_id = ?').run(postId)
   await db.prepare('DELETE FROM reactions WHERE post_id = ?').run(postId)
+  // Fase 16-G: las reacciones de los comentarios del post también
+  // se van (antes de borrar los comentarios que las referencian).
+  await db.prepare('DELETE FROM comment_reactions WHERE comment_id IN (SELECT id FROM comments WHERE post_id = ?)').run(postId)
   await db.prepare('DELETE FROM comments WHERE post_id = ?').run(postId)
   await db.prepare('DELETE FROM bookmarks WHERE post_id = ?').run(postId)
   await db.prepare('DELETE FROM notifications WHERE tenant_id = ? AND link = ?').run(tenantId, `/p/${channelSlug}/${postSlug}`)
   await db.prepare('DELETE FROM posts WHERE id = ?').run(postId)
+}
+
+// Borrado de UN comentario con su cascada (Fase 16-G): si es raíz,
+// se van también sus respuestas; en todos los casos se borran las
+// reacciones de cada comentario eliminado. Lo comparten el DELETE
+// del miembro/staff y «Eliminar contenido» de la cola de moderación.
+export async function deleteCommentCascade(event: H3Event, commentId: number): Promise<void> {
+  const db = await dbFor(event)
+  const replies = await db.prepare('SELECT id FROM comments WHERE parent_id = ?').all(commentId) as { id: number }[]
+  const ids = [commentId, ...replies.map(r => Number(r.id))]
+  const placeholders = ids.map(() => '?').join(',')
+  await db.prepare(`DELETE FROM comment_reactions WHERE comment_id IN (${placeholders})`).run(...ids)
+  await db.prepare(`DELETE FROM comments WHERE id IN (${placeholders})`).run(...ids)
 }

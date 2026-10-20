@@ -9,7 +9,7 @@
 //     lo rechaza: en ese caso solo se puede cerrar el reporte.
 import { requireModerator, resolveTenant } from '../../../../../utils/community'
 import { nowIso, dbFor } from '../../../../../utils/db'
-import { deletePostCascade } from '../../../../../utils/moderation'
+import { deleteCommentCascade, deletePostCascade } from '../../../../../utils/moderation'
 
 export default defineEventHandler(async (event) => {
   const tenant = await resolveTenant(event)
@@ -36,7 +36,9 @@ export default defineEventHandler(async (event) => {
     else {
       const comment = await db.prepare('SELECT id FROM comments WHERE id = ? AND tenant_id = ?').get(targetId, tenant.id)
       if (!comment) throw createError({ statusCode: 409, message: 'El contenido ya no existe: cerrá el reporte sin eliminarlo.' })
-      await db.prepare('DELETE FROM comments WHERE id = ?').run(targetId)
+      // Fase 16-G: misma cascada que el borrado normal (respuestas
+      // del hilo y reacciones de todos los comentarios eliminados).
+      await deleteCommentCascade(event, targetId)
     }
     removed = true
   }
