@@ -26,7 +26,23 @@ export interface TenantRow {
   logo_url?: string, logo_dark_url?: string, icon_url?: string, favicon_url?: string
 }
 export interface UserRow { id: number, name: string, slug: string, email: string, bio: string, location: string, avatar_url: string, created_at: string, cover_url?: string, website?: string, last_seen_at?: string, locale?: string | null }
-export interface ChannelRow { id: number, tenant_id: number, group_id: number | null, slug: string, name: string, icon: string, description: string, type: string, price_cents: number, archived_at?: string, post_permission?: string }
+export interface ChannelRow { id: number, tenant_id: number, group_id: number | null, slug: string, name: string, icon: string, description: string, type: string, price_cents: number, archived_at?: string, post_permission?: string, content_type?: string, cover_url?: string, visibility?: string }
+
+// Fase 16-F: visibilidad del canal — un eje SEPARADO del acceso
+// (`type`: 'free'|'private'|'paid'). 'public' = listado y
+// comportamiento de siempre; 'private' = listado (nombre y
+// descripción visibles) pero contenido bloqueado hasta cumplir el
+// acceso; 'secret' = no listado para quien no tiene acceso y su
+// página responde 404. Sin columna (bases anteriores en memoria)
+// vale 'public'.
+export function channelVisibility(channel: { visibility?: string | null }): 'public' | 'private' | 'secret' {
+  return channel.visibility === 'private' || channel.visibility === 'secret' ? channel.visibility : 'public'
+}
+// Fase 16-F: tipo de contenido del canal ('post' clásico o 'image'
+// con vistas de galería/álbum). Sin columna vale 'post'.
+export function channelContentType(channel: { content_type?: string | null }): 'post' | 'image' {
+  return channel.content_type === 'image' ? 'image' : 'post'
+}
 
 // Fase 16: un canal archivado deja de existir para los miembros
 // (navegación, feed, búsqueda, detalle y chat), pero su contenido
@@ -102,8 +118,24 @@ export async function currentAuth(event: H3Event, tenantId: number) {
 
 export async function ensureMembership(event: H3Event, tenantId: number, userId: number, role = 'member') {
   const db = await dbFor(event)
-  await db.prepare('INSERT OR IGNORE INTO memberships (tenant_id, user_id, role) VALUES (?, ?, ?)')
+  const res = await db.prepare('INSERT OR IGNORE INTO memberships (tenant_id, user_id, role) VALUES (?, ?, ?)')
     .run(tenantId, userId, role)
+  // Fase 16-F: una membresía NUEVA nace siguiendo los canales
+  // listados del tenant (no archivados, no secretos): es lo que el
+  // lateral siempre mostró y ahora el lateral filtra por
+  // seguimiento (seguir/dejar de seguir vive en el menú del canal).
+  // El auto-ingreso configurado por el admin corre aparte y suma
+  // sus canales aunque sean secretos.
+  if (res.changes > 0) {
+    try {
+      await db.prepare(`INSERT OR IGNORE INTO follows (tenant_id, user_id, channel_id)
+        SELECT ?, ?, c.id FROM channels c WHERE c.tenant_id = ?
+          AND (c.archived_at IS NULL OR c.archived_at = '')
+          AND (c.visibility IS NULL OR c.visibility <> 'secret')`)
+        .run(tenantId, userId, tenantId)
+    }
+    catch { /* la semilla de seguimientos nunca rompe un alta */ }
+  }
 }
 
 export async function requireUser(event: H3Event, tenantId: number): Promise<UserRow> {
@@ -160,22 +192,45 @@ export async function requireCourseManager(event: H3Event, tenantId: number): Pr
 }
 
 export async function canAccessChannel(event: H3Event, userId: number | null, role: string | null, channel: ChannelRow): Promise<boolean> {
-  if (channel.type === 'free') return true
+  // Fase 16-F: con visibilidad 'public' manda la regla de siempre
+  // (la de abajo). Con 'private' o 'secret' el acceso es ESTRICTO:
+  // ni el canal gratuito se abre solo — hace falta el acceso
+  // concedido (invitación/compra/manual), la membresía cuando el
+  // acceso es «solo miembros» o la suscripción cuando es pago.
+  if (channelVisibility(channel) === 'public') {
+    if (channel.type === 'free') return true
+    if (!userId) return false
+    if (role === 'admin') return true
+    if (channel.type === 'private') return !!role // miembro del tenant
+    // paid: acceso directo (demo/stripe) o membresía activa del tenant
+    // (los planes incluyen acceso a los canales pagos — Fase 4).
+    const db = await dbFor(event)
+    const row = await db.prepare('SELECT id FROM channel_access WHERE tenant_id = ? AND user_id = ? AND channel_id = ?')
+      .get(channel.tenant_id, userId, channel.id)
+    if (row) return true
+    try {
+      const sub = await db.prepare("SELECT id FROM member_subscriptions WHERE tenant_id = ? AND user_id = ? AND status = 'active'")
+        .get(channel.tenant_id, userId)
+      return !!sub
+    }
+    catch { return false }
+  }
   if (!userId) return false
   if (role === 'admin') return true
-  if (channel.type === 'private') return !!role // miembro del tenant
-  // paid: acceso directo (demo/stripe) o membresía activa del tenant
-  // (los planes incluyen acceso a los canales pagos — Fase 4).
   const db = await dbFor(event)
   const row = await db.prepare('SELECT id FROM channel_access WHERE tenant_id = ? AND user_id = ? AND channel_id = ?')
     .get(channel.tenant_id, userId, channel.id)
   if (row) return true
-  try {
-    const sub = await db.prepare("SELECT id FROM member_subscriptions WHERE tenant_id = ? AND user_id = ? AND status = 'active'")
-      .get(channel.tenant_id, userId)
-    return !!sub
+  if (channel.type === 'private') return !!role // la membresía ES el acceso
+  if (channel.type === 'paid') {
+    try {
+      const sub = await db.prepare("SELECT id FROM member_subscriptions WHERE tenant_id = ? AND user_id = ? AND status = 'active'")
+        .get(channel.tenant_id, userId)
+      return !!sub
+    }
+    catch { return false }
   }
-  catch { return false }
+  return false // free + visibilidad privada/secreta: solo acceso concedido
 }
 
 // Fase 5 — publicación perezosa de posts programados: en Workers no
@@ -326,6 +381,9 @@ export async function serializePost(event: H3Event, row: Record<string, unknown>
     attachmentName: (row.attachment_name as string) || '',
     pinned: !!row.pinned,
     kind: (row.kind as string) || 'post',
+    // Fase 16-F: álbum del post (solo tiene sentido en canales de
+    // imagen; la vista Álbum agrupa por este texto).
+    album: (row.album as string) || '',
     status: (row.status as string) || 'published',
     // Fase 7: comentarios desactivados por el autor y marca de edición.
     allowComments: row.allow_comments === undefined || row.allow_comments === null ? true : !!row.allow_comments,

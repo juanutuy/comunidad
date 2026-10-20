@@ -1,6 +1,6 @@
 // Feed principal: publicaciones de canales públicos + seguidos por el
 // usuario. Las de canales pagos/privados sin acceso van como teaser.
-import { POST_SELECT, canAccessChannel, channelBySlug, currentAuth, isChannelArchived, publishDuePosts, resolveTenant, serializePost } from '../utils/community'
+import { POST_SELECT, canAccessChannel, channelBySlug, channelVisibility, currentAuth, isChannelArchived, publishDuePosts, resolveTenant, serializePost } from '../utils/community'
 import { dbFor } from '../utils/db'
 import { getPrivacySettings, requireSessionUnlessPublic } from '../utils/privacy'
 import { hiddenFilterSql } from '../utils/blocks'
@@ -43,6 +43,11 @@ export default defineEventHandler(async (event) => {
     // miembros (quedan guardados; el admin los sigue viendo).
     if (isChannelArchived(channel) && role !== 'admin') continue
     const access = await canAccessChannel(event, user?.id ?? null, role, channel)
+    // Fase 16-F: en un canal de visibilidad privada o secreta, el
+    // contenido NO sale en el feed de quien no tiene acceso — ni
+    // como anticipo. (El anticipo es cosa de los canales pagos con
+    // visibilidad pública, como hasta ahora.)
+    if (channelVisibility(channel) !== 'public' && !access) continue
     if (channel.type === 'paid' && !access && r.status === 'published') {
       // Fase 15 — tarjeta bloqueada de un canal pago según el ajuste
       // «dónde aparecen» del tenant: 'feed' la muestra en el feed (el

@@ -24,18 +24,24 @@ import { randomBytes } from 'node:crypto'
 const LIMITS: Record<string, number> = {
   image: 5 * 1024 * 1024, avatar: 2 * 1024 * 1024, cover: 2 * 1024 * 1024,
   audio: 15 * 1024 * 1024, file: 15 * 1024 * 1024, branding: 2 * 1024 * 1024,
+  // Fase 16-F: portada de un canal (banner de su página), máx. 5 MB.
+  // A diferencia de 'cover'/'avatar', NO toca el perfil de nadie:
+  // solo guarda el archivo; asignarlo al canal es del PUT de canales
+  // (que exige rol admin y valida la URL).
+  channel: 5 * 1024 * 1024,
 }
 const AUDIO_TYPES: Record<string, string> = {
   'audio/mpeg': 'mp3', 'audio/mp4': 'm4a', 'audio/ogg': 'ogg',
   'audio/wav': 'wav', 'audio/x-wav': 'wav', 'audio/webm': 'webm',
 }
 const TYPE_SETS: Record<string, Record<string, string>> = {
-  image: IMAGE_TYPES, avatar: IMAGE_TYPES, cover: IMAGE_TYPES, branding: IMAGE_TYPES,
+  image: IMAGE_TYPES, avatar: IMAGE_TYPES, cover: IMAGE_TYPES, branding: IMAGE_TYPES, channel: IMAGE_TYPES,
   audio: AUDIO_TYPES, file: { ...LIBRARY_TYPES, ...AUDIO_TYPES },
 }
 const TYPE_MESSAGES: Record<string, string> = {
   image: 'Solo se permiten imágenes PNG, JPG, WebP o GIF.',
   branding: 'Solo se permiten imágenes PNG, JPG, WebP o GIF.',
+  channel: 'Solo se permiten imágenes PNG, JPG, WebP o GIF.',
   audio: 'Solo se permiten audios MP3, M4A, OGG, WAV o WebM.',
   file: 'Tipo de archivo no permitido.',
 }
@@ -56,7 +62,7 @@ export default defineEventHandler(async (event) => {
   if (!ext) throw createError({ statusCode: 415, message: TYPE_MESSAGES[kind] || TYPE_MESSAGES.file! })
   if (filePart.data.length > limit)
     throw createError({ statusCode: 413, message: `El archivo supera el máximo de ${Math.round(limit / 1024 / 1024)} MB.` })
-  const folder = kind === 'avatar' ? 'avatars' : kind === 'cover' ? 'covers' : kind === 'branding' ? 'branding' : 'posts'
+  const folder = kind === 'avatar' ? 'avatars' : kind === 'cover' ? 'covers' : kind === 'branding' ? 'branding' : kind === 'channel' ? 'channels' : 'posts'
   const key = `${folder}/${Date.now().toString(36)}-${randomBytes(6).toString('hex')}.${ext}`
   const stored = await saveFile(event, key, new Uint8Array(filePart.data), contentType)
   const db = await dbFor(event)

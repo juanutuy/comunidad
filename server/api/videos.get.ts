@@ -1,5 +1,5 @@
 // Agregador de videos: publicaciones con media_type='video'.
-import { POST_SELECT, canAccessChannel, channelBySlug, currentAuth, resolveTenant, serializePost } from '../utils/community'
+import { POST_SELECT, canAccessChannel, channelBySlug, channelVisibility, currentAuth, resolveTenant, serializePost } from '../utils/community'
 import { dbFor } from '../utils/db'
 import { getPrivacySettings, requireSessionUnlessPublic } from '../utils/privacy'
 import { hiddenFilterSql } from '../utils/blocks'
@@ -22,6 +22,9 @@ export default defineEventHandler(async (event) => {
     // bloqueadas de canales pagos siguen la misma regla «dónde
     // aparecen» del feed.
     if (ch.type === 'private' && !access) continue
+    // Fase 16-F: visibilidad privada/secreta sin acceso = el video
+    // no existe en esta superficie (igual que en el feed).
+    if (channelVisibility(ch) !== 'public' && !access) continue
     if (ch.type === 'paid' && !access) {
       if (priv.paidLockedWhere !== 'feed') continue
       if (!user && priv.visibility !== 'public') continue

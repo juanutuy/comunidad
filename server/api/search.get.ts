@@ -2,7 +2,7 @@
 // Respeta el acceso a canales: las publicaciones de canales pagos o
 // privados sin acceso aparecen SOLO como teaser (igual que en el feed),
 // nunca con el cuerpo completo.
-import { POST_SELECT, canAccessChannel, channelBySlug, currentAuth, isChannelArchived, resolveTenant, serializePost } from '../utils/community'
+import { POST_SELECT, canAccessChannel, channelBySlug, channelContentType, channelVisibility, currentAuth, isChannelArchived, resolveTenant, serializePost } from '../utils/community'
 import type { ChannelRow } from '../utils/community'
 import { getPrivacySettings } from '../utils/privacy'
 import { courseListed } from '../utils/courses'
@@ -43,6 +43,9 @@ export default defineEventHandler(async (event) => {
     if (isChannelArchived(ch) && role !== 'admin') continue
     const access = await canAccessChannel(event, user?.id ?? null, role, ch)
     if (ch.type === 'private' && !access) continue // privado sin acceso: ni el teaser sale del canal
+    // Fase 16-F: visibilidad privada/secreta sin acceso = el post no
+    // existe en la búsqueda (el anticipo es solo de pagos públicos).
+    if (channelVisibility(ch) !== 'public' && !access) continue
     // Fase 15: «dónde aparecen» también limpia la búsqueda — con
     // 'channel' o 'hidden', la tarjeta bloqueada no sale acá (como en
     // la referencia: «Main feed and search stay clear»).
@@ -56,7 +59,16 @@ export default defineEventHandler(async (event) => {
     if (isChannelArchived(c as { archived_at?: string }) && role !== 'admin') continue
     const access = user ? await canAccessChannel(event, user.id, role, c as unknown as ChannelRow) : c.type === 'free'
     if (c.type === 'private' && !access) continue
-    channels.push({ id: c.id, slug: c.slug, name: c.name, icon: c.icon, description: c.description, type: c.type, priceCents: c.price_cents, hasAccess: access })
+    // Fase 16-F: un canal secreto sin acceso no existe en la
+    // búsqueda; uno de visibilidad privada sí (metadatos), marcado.
+    if (channelVisibility(c as unknown as ChannelRow) === 'secret' && !access) continue
+    channels.push({
+      id: c.id, slug: c.slug, name: c.name, icon: c.icon, description: c.description, type: c.type, priceCents: c.price_cents,
+      contentType: channelContentType(c as unknown as ChannelRow),
+      coverUrl: (c.cover_url as string) || '',
+      visibility: channelVisibility(c as unknown as ChannelRow),
+      hasAccess: access,
+    })
   }
 
   // Fase 8: la búsqueda respeta la visibilidad como el catálogo

@@ -28,7 +28,13 @@ export default defineEventHandler(async (event) => {
     for (const r of rows) {
       const ch = (await channelBySlug(event, tenant.id, r.channel_slug as string))!
       const access = await canAccessChannel(event, me?.id ?? null, role, ch)
-      if (ch.type === 'free' || access) out.push(await serializePost(event, r, me?.id ?? null, access, role))
+      // Fase 16-F: solo viaja lo que el lector puede abrir. (Antes
+      // los canales 'free' empujaban siempre la tarjeta serializada
+      // con el acceso calculado; con la visibilidad privada/secreta
+      // un canal gratuito sin acceso concedido filtraría su anticipo
+      // por acá. Para el resto el cálculo no cambia: canAccessChannel
+      // ya devuelve true en todo lo que antes salía.)
+      if (access) out.push(await serializePost(event, r, me?.id ?? null, access, role))
     }
     return out
   }

@@ -2,7 +2,7 @@
 // Sin acceso al canal: solo anticipo (locked), según las reglas del
 // tenant (Fase 15). Un canal privado, para quien no tiene acceso, no
 // existe: ni su nombre ni sus publicaciones salen por esta ruta.
-import { POST_SELECT, canAccessChannel, channelBySlug, currentAuth, isChannelArchived, resolveTenant, serializePost } from '../utils/community'
+import { POST_SELECT, canAccessChannel, channelBySlug, channelVisibility, currentAuth, isChannelArchived, resolveTenant, serializePost } from '../utils/community'
 import { dbFor } from '../utils/db'
 import { getPrivacySettings, requireSessionUnlessPublic } from '../utils/privacy'
 import { blockedByMe } from '../utils/blocks'
@@ -32,6 +32,12 @@ export default defineEventHandler(async (event) => {
   // tarjeta con el anticipo guardado: el título y el resumen de un
   // canal «solo para miembros» salían sin sesión).
   if (channel.type === 'private' && !access)
+    throw createError({ statusCode: 404, message: 'Publicación no encontrada.' })
+  // Fase 16-F: con visibilidad privada o secreta, el detalle directo
+  // tampoco filtra nada sin acceso (la pantalla de bloqueo y la
+  // compra viven en la página del canal, no acá). Con visibilidad
+  // pública la regla de siempre aplica (arriba/abajo: anticipo).
+  if (channelVisibility(channel) !== 'public' && !access)
     throw createError({ statusCode: 404, message: 'Publicación no encontrada.' })
   const priv = await getPrivacySettings(event, tenant.id)
   // Fase 15: leer no es participar. Con el anticipo en modo «completo»

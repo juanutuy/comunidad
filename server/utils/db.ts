@@ -141,6 +141,7 @@ CREATE INDEX IF NOT EXISTS certificate_blueprints_tenant ON certificate_blueprin
 CREATE TABLE IF NOT EXISTS certificates (id INTEGER PRIMARY KEY AUTOINCREMENT, tenant_id INTEGER NOT NULL, user_id INTEGER NOT NULL, course_id INTEGER NOT NULL, blueprint_id INTEGER, code TEXT NOT NULL, member_name TEXT NOT NULL DEFAULT '', course_title TEXT NOT NULL DEFAULT '', community_name TEXT NOT NULL DEFAULT '', finished_at TEXT NOT NULL DEFAULT '', design_snapshot TEXT NOT NULL DEFAULT '{}', issued_at TEXT NOT NULL);
 CREATE UNIQUE INDEX IF NOT EXISTS certificates_code ON certificates (code);
 CREATE UNIQUE INDEX IF NOT EXISTS certificates_unique ON certificates (tenant_id, user_id, course_id);
+CREATE TABLE IF NOT EXISTS app_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL DEFAULT '');
 `
 
 // Migraciones aditivas (Fase 2) para bases creadas en la Fase 1 — ya hay
@@ -310,6 +311,27 @@ const MIGRATIONS = [
   // hasta que alguien elige otro idioma).
   `ALTER TABLE users ADD COLUMN locale TEXT`,
   `ALTER TABLE tenants ADD COLUMN default_locale TEXT NOT NULL DEFAULT 'es'`,
+  // Fase 16-F: canales como el original. TRES columnas aditivas y
+  // un eje nuevo, sin repurpose de `type` (que sigue siendo el eje
+  // de ACCESO: 'free'|'private'|'paid'):
+  //   - content_type: 'post' | 'image' (qué se publica en el canal;
+  //     el de imagen suma vistas de galería y álbum).
+  //   - cover_url: portada del canal (banner de su página).
+  //   - visibility: 'public' | 'private' | 'secret' — eje SEPARADO
+  //     del acceso: 'public' = listado y comportamiento de siempre;
+  //     'private' = listado (nombre/descripción visibles) pero
+  //     contenido bloqueado hasta cumplir el acceso; 'secret' = no
+  //     listado para quien no tiene acceso y su página da 404.
+  //   El default 'public' reproduce lo que hoy se ve en los canales
+  //   free/paid; el backfill de initDb pasa los type='private' a
+  //   visibility='private' (listados para miembros, como hoy los
+  //   muestra el lateral).
+  //   - posts.album: álbum opcional de un post en un canal de
+  //     imagen (texto libre; NULL/vacío = sin álbum).
+  `ALTER TABLE channels ADD COLUMN content_type TEXT NOT NULL DEFAULT 'post'`,
+  `ALTER TABLE channels ADD COLUMN cover_url TEXT NOT NULL DEFAULT ''`,
+  `ALTER TABLE channels ADD COLUMN visibility TEXT NOT NULL DEFAULT 'public'`,
+  `ALTER TABLE posts ADD COLUMN album TEXT NOT NULL DEFAULT ''`,
 ]
 
 async function runMigrations(db: AsyncDb): Promise<void> {
@@ -345,6 +367,33 @@ async function initDb(db: AsyncDb): Promise<void> {
   await seedIfEmpty(db)
   await backfillLessonContent(db)
   await backfillPlans(db)
+  // Fase 16-F: backfills de UNA SOLA VEZ (marca en app_meta). Sin la
+  // marca, re-aplicarlos desharía decisiones posteriores del admin.
+  //   1) Visibilidad inicial según el eje de acceso de siempre:
+  //      los canales type='private' quedan visibility='private'
+  //      (listados para miembros, que es donde el lateral ya los
+  //      muestra; su contenido sigue exigiendo la membresía).
+  //   2) Semilla de seguimientos: hasta esta fase el lateral
+  //      mostraba TODOS los canales listados; desde la 16-F el
+  //      lateral muestra los SEGUIDOS (seguir/dejar de seguir es el
+  //      menú contextual del canal). Para no vaciar los laterales
+  //      existentes, cada membresía pasa a seguir todos los canales
+  //      no archivados y no secretos de su tenant — exactamente lo
+  //      que hoy ve en su lateral. Los miembros nuevos reciben la
+  //      misma semilla al crearse su membresía (ensureMembership).
+  try {
+    const done = await db.prepare("SELECT value FROM app_meta WHERE key = 'fase16f_backfill'").get()
+    if (!done) {
+      await db.prepare("UPDATE channels SET visibility = 'private' WHERE type = 'private' AND visibility = 'public'").run()
+      await db.prepare(`INSERT OR IGNORE INTO follows (tenant_id, user_id, channel_id)
+        SELECT m.tenant_id, m.user_id, c.id FROM memberships m
+        JOIN channels c ON c.tenant_id = m.tenant_id
+        WHERE (c.archived_at IS NULL OR c.archived_at = '')
+          AND (c.visibility IS NULL OR c.visibility <> 'secret')`).run()
+      await db.prepare("INSERT OR REPLACE INTO app_meta (key, value) VALUES ('fase16f_backfill', '1')").run()
+    }
+  }
+  catch { /* bases muy anteriores sin alguna columna: el backfill se reintenta en el próximo arranque */ }
 }
 
 // --- Adaptador D1 ---

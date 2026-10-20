@@ -1,7 +1,7 @@
 // Detalle de un canal: datos, seguimiento, acceso y sus publicaciones.
 // Si el canal es pago/privado y el usuario no tiene acceso, las
 // publicaciones se devuelven bloqueadas (solo teaser).
-import { POST_SELECT, canAccessChannel, channelBySlug, currentAuth, isChannelArchived, publishDuePosts, resolveTenant, serializePost } from '../../utils/community'
+import { POST_SELECT, canAccessChannel, channelBySlug, channelContentType, channelVisibility, currentAuth, isChannelArchived, publishDuePosts, resolveTenant, serializePost } from '../../utils/community'
 import { dbFor } from '../../utils/db'
 import { getPrivacySettings, requireSessionUnlessPublic } from '../../utils/privacy'
 import { hiddenFilterSql } from '../../utils/blocks'
@@ -25,6 +25,14 @@ export default defineEventHandler(async (event) => {
   // (404 también acá: ni el nombre ni sus publicaciones se filtran).
   if (channel.type === 'private' && !access)
     throw createError({ statusCode: 404, message: 'Canal no encontrado.' })
+  const visibility = channelVisibility(channel)
+  // Fase 16-F: un canal SECRETO sin acceso tampoco existe (404, como
+  // el privado de siempre). Uno con visibilidad PRIVADA sin acceso
+  // SÍ abre su página, pero como pantalla de bloqueo: cabecera y
+  // aviso (y compra si tiene precio), sin una sola publicación.
+  if (visibility === 'secret' && !access)
+    throw createError({ statusCode: 404, message: 'Canal no encontrado.' })
+  const visibilityLocked = visibility === 'private' && !access
   const priv = await getPrivacySettings(event, tenant.id)
   // Fase 15: con «dónde aparecen» en 'hidden', el no comprador no ve
   // ni las tarjetas bloqueadas: la página del canal queda como su
@@ -48,11 +56,16 @@ export default defineEventHandler(async (event) => {
     channel: {
       id: channel.id, slug: channel.slug, name: channel.name, icon: channel.icon,
       description: channel.description, type: channel.type, priceCents: channel.price_cents,
+      contentType: channelContentType(channel),
+      coverUrl: channel.cover_url || '',
+      visibility,
+      groupId: channel.group_id,
       archived: isChannelArchived(channel),
       postPermission: channel.post_permission || 'members',
       following, hasAccess: access,
+      visibilityLocked,
     },
-    posts: hideLockedPosts
+    posts: hideLockedPosts || visibilityLocked
       ? []
       : await Promise.all(rows.map(r => serializePost(event, r, user?.id ?? null, access, role))),
   }
