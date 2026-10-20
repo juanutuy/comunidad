@@ -1822,6 +1822,152 @@ respondiendo. Build y typecheck en cero; `test-realtime.mjs`
 PASS. Base local limpia al cerrar: 4 usuarios semilla, 7
 publicaciones y cero mensajes de prueba QA-RT.
 
+## Fase 16-F (hecha) — canales como el original: modal único, edición en contexto, grupos y tipo Imagen
+
+Pedido de Juan con capturas del original (19-oct-2026): en canales
+el original edita DIRECTO — menú «⋯» por canal en el lateral y en
+la cabecera del canal, modal de creación con tarjetas de tipo,
+visibilidad de tres estados y grupos — y la página de canal es
+independiente, sin el lateral derecho del feed. Todo eso quedó
+construido con código y textos propios.
+
+**Los tres ejes del canal (no confundirlos).** `channels.type`
+SIGUE siendo el eje de ACCESO de siempre (`free` / `private` =
+solo miembros / `paid`), el que usan `canAccessChannel` y el
+serializador de anticipos; no se tocó su significado. La fase suma
+dos columnas aditivas:
+
+- `content_type`: `'post' | 'image'` (default `'post'`) — qué se
+  publica en el canal; el de imagen suma las vistas Galería/Álbum.
+- `visibility`: `'public' | 'private' | 'secret'` (default
+  `'public'`) — eje SEPARADO del acceso. Y `cover_url` para la
+  portada. **Mapeo de la migración** (una sola vez, con marca en
+  `app_meta`): cada canal conserva su comportamiento actual —
+  `free`/`paid` quedan `'public'` (listados, con el anticipo y la
+  compra de siempre) y `type='private'` queda `'private'`
+  (listado para miembros, que es donde el lateral ya lo mostraba,
+  con la membresía como acceso). Semántica nueva: `'private'` =
+  listado (nombre y descripción visibles en lateral, directorio y
+  búsqueda) pero **contenido bloqueado** hasta cumplir el acceso
+  (membresía si el acceso es «solo miembros», compra/suscripción
+  si es pago, acceso concedido si es gratuito) — su página abre
+  como pantalla de bloqueo con portada y metadatos y **cero**
+  publicaciones, y su contenido no sale por feed, búsqueda,
+  videos, perfiles, detalle directo (404) ni notificaciones;
+  `'secret'` = no listado para quien no tiene acceso y su página
+  responde 404, como respondía un canal sin acceso.
+
+**Modal único de canal** (`ChannelFormModal` + `useChannelEditor`,
+montado en los layouts de miembro y de consola): tarjetas de tipo
+(Publicación / Imagen, con sus textos), nombre con prefijo `#`,
+descripción corta con contador `/280`, radios de visibilidad con
+la explicación de cada estado, acceso (Gratuito / Solo miembros /
+Pago) con precio en la moneda del tenant cuando es pago, quién
+puede publicar, grupo y portada (subida nueva `kind='channel'` de
+`/api/uploads`: imagen de hasta 5 MB que NO toca el perfil de
+nadie; asignarla es del PUT de canales). La consola
+(Administrar canales) abre ESTE modal para crear y editar — el
+formulario básico anterior se retiró — y su tabla conserva
+grupo, tipo de contenido, acceso, visibilidad, estado archivado
+y seguidores. Un solo editor, un solo par de endpoints
+(`POST`/`PUT /api/admin/channels`, solo admin).
+
+**Edición en contexto (mapa de menús).** El menú «⋯» de un canal
+es el mismo componente (`ChannelContextMenu`) en el lateral, el
+panel móvil, el directorio y la cabecera de la página del canal:
+
+| Entrada | Quién | Qué hace |
+|---|---|---|
+| Seguir canal / Dejar de seguir | miembro | el canal entra/sale de SU lateral |
+| Copiar ID | miembro | copia el id numérico, con toast |
+| Agregar/Cambiar portada | admin (solo en la cabecera) | subida directa + el mismo PUT |
+| Editar canal | admin | el modal único |
+| Precios | admin | el modal único enfocado en el precio |
+| Gestionar miembros | equipo (admin/moderador) | modal con buscar, conceder y quitar acceso |
+| Eliminar canal | admin | confirmación y la cascada de siempre |
+
+**Seguir** usa la relación `follows` que ya existía (la consola ya
+contaba «Seguidores»): seguir = el canal aparece en el lateral
+del usuario; dejar de seguir lo quita del lateral **sin quitar el
+acceso** (sigue en el directorio `/channels`, en la búsqueda y
+abrible). El lateral y el panel móvil ahora filtran por
+seguimiento. Para no vaciar laterales con el cambio, una semilla
+de una sola vez hizo que cada membresía existente siguiera todos
+los canales listados de su tenant, y las membresías nuevas nacen
+igual (`ensureMembership`). Conceder acceso desde «Gestionar
+miembros» también hace seguir el canal (si no, el acceso sería
+invisible); quitar el acceso NO quita el seguimiento (es del
+miembro). **Gestionar miembros** gestiona el ACCESO CONCEDIDO
+(`channel_access`, la «invitación» de los canales cerrados) con
+endpoints nuevos `GET/POST/DELETE /api/admin/channels/[id]/members`
+con guard de equipo — verificado por API: conceder abre la página
+y el feed del miembro, quitar devuelve el bloqueo.
+
+**Grupos.** La tabla `channel_groups` y `channels.group_id` ya
+existían (la consola ya agrupaba); lo nuevo es gestionarlos en
+contexto: encabezado de grupo en el lateral y el panel móvil con
+«+» (admin: crear canal con ese grupo preseleccionado) y menú
+«⋯» (Ver canales → el directorio nuevo `/channels`; Editar grupo:
+renombrar/reordenar; Eliminar grupo). El **grupo por defecto es
+el primero del orden** (en la semilla, «General»): no se puede
+eliminar y es el destino de los canales cuando se elimina otro
+grupo — ningún canal se borra al borrar un grupo. Endpoints:
+`POST /api/admin/channel-groups`, `PUT/DELETE
+/api/admin/channel-groups/[id]` (solo admin).
+
+**Página de canal independiente.** Cabecera propia: portada (o la
+franja de marca), `# nombre`, distintivos (acceso, visibilidad,
+tipo Imagen) y su menú «⋯». **Sin riel derecho** (el layout lo
+suprime en `/channels/*`, como ya hacía en el perfil): el centro
+se ensancha y el marco fijo de la 16-E queda intacto. La portada
+se cambia desde el menú de la cabecera o desde el modal.
+
+**Canal tipo Imagen.** Bajo la cabecera, el conmutador **Feed |
+Galería | Álbum**: Feed = las tarjetas clásicas; Galería =
+cuadrícula con la imagen de cada publicación que tenga una (clic
+abre el detalle; las publicaciones sin imagen NO aparecen en la
+galería, solo en el Feed); Álbum = las publicaciones agrupadas
+por `posts.album` (columna aditiva; «Sin álbum» al final). El
+compositor muestra el campo «Álbum» SOLO en canales de imagen
+(crear y editar), y los endpoints de crear/editar post lo aceptan
+solo si el canal es de imagen — en un canal de post se ignora.
+
+**Mapeos honestos (decididos, no improvisados).** Sin entrada
+«Paywalls» separada: el acceso pago ES el precio del canal y
+«Precios» es su única puerta — la duplicada sería la redundancia
+que se caza en QA. Sin «Lock Screen»: su función no está
+verificada en nuestras auditorías del original, no se inventa;
+queda documentado acá como NO construido y por qué.
+
+**Dos fugas cerradas por la batería de esta fase** (seguir ≠
+acceso): el perfil devolvía los canales que el dueño sigue sin
+filtrar visibilidad — y esa respuesta viaja en el payload de
+todas las páginas vía la tarjeta de nivel del panel móvil —, así
+que un canal secreto seguido y revocado filtraba su nombre en
+todo el sitio; ahora el perfil filtra por lo que el LECTOR puede
+conocer. Y `notifyNewPost` avisaba el título de un post nuevo a
+TODOS los seguidores del canal: en canales de visibilidad
+privada/secreta ahora solo avisa a seguidores con acceso.
+
+Verificación local por contenido (`scripts/test-fase16f.mjs`,
+**78 PASS / 0 FAIL**, contra `wrangler dev` con D1 local): ejes y
+migración (sala-privada → visibilidad privada con acceso por
+membresía; free/paid → pública), crear canales tipo post e
+imagen y editar nombre/precio/visibilidad por el MISMO endpoint
+que usan el modal y la consola, visibilidad privada listada con
+bloqueo y sin una sola fuga (feed, búsqueda, videos, detalle,
+notificaciones, perfil y payload SSR), secreta con 404 y no
+listada, gestionar miembros concediendo y quitando acceso real,
+seguir/dejar de seguir sin perder acceso, grupos (crear, mover,
+eliminar → grupo por defecto intacto, el por defecto no se
+elimina), álbum aceptado solo en canal de imagen con galería
+derivable (2 con imagen, la nota fuera) y agrupación correcta, la
+página del canal SIN región `right-rail` en el HTML servido y el
+feed con la suya, y limpieza total hasta la semilla (4 usuarios /
+7 posts / 5 canales / 3 grupos). Regresiones: `test-realtime.mjs`
+PASS, `test-fase16e` 24/24, `test-fase16d` 49/49, `test-fase17`
+45/45 y `test-fase18` 29/29. Build y typecheck en cero.
+
 ## Pendiente a propósito (fuera de esta fase)
 
 - Migraciones versionadas con `drizzle-kit` para D1 (hoy: esquema
@@ -1829,3 +1975,6 @@ publicaciones y cero mensajes de prueba QA-RT.
 - La activación en vivo de Stripe, del proveedor de correo y de los
   dominios: es cargar los secretos/pasos de cuenta de arriba, sin tocar
   código.
+- «Lock Screen» del menú de canal del original: función no
+  verificada en las auditorías; no construido a propósito (ver
+  Fase 16-F, mapeos honestos).

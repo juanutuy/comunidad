@@ -4,6 +4,8 @@
 import type { H3Event } from 'h3'
 import { nowIso, dbFor } from './db'
 import { publishRealtime, roomUser } from './realtime'
+import { canAccessChannel, channelVisibility } from './community'
+import type { ChannelRow } from './community'
 
 export interface NotifyInput {
   tenantId: number
@@ -73,7 +75,17 @@ export async function notifyNewPost(
   const db = await dbFor(event)
   const link = `/p/${channelSlug}/${post.slug}`
   const followers = await db.prepare('SELECT user_id FROM follows WHERE tenant_id = ? AND channel_id = ?').all(tenantId, channel.id) as { user_id: number }[]
+  // Fase 16-F: seguir un canal NO es tener acceso. En un canal de
+  // visibilidad privada o secreta, la notificación (que lleva el
+  // título del post y el nombre del canal) solo va a seguidores CON
+  // acceso; en canales públicos queda el comportamiento de siempre.
+  const chRow = await db.prepare('SELECT * FROM channels WHERE id = ? AND tenant_id = ?').get(channel.id, tenantId) as unknown as ChannelRow | undefined
+  const strictNotify = !!chRow && channelVisibility(chRow) !== 'public'
   for (const f of followers) {
+    if (strictNotify && chRow) {
+      const m = await db.prepare('SELECT role FROM memberships WHERE tenant_id = ? AND user_id = ?').get(tenantId, f.user_id) as { role: string } | undefined
+      if (!(await canAccessChannel(event, f.user_id, m?.role ?? null, chRow))) continue
+    }
     await notify(event, {
       tenantId, userId: f.user_id, actorId: author.id, type: 'new_post',
       title: options.anonymous

@@ -3,7 +3,8 @@
 // Fase 6: portada y sitio web, conteos de seguidores/siguiendo y si el
 // visitante lo sigue, pestaña de Eventos (sus RSVP) y Guardados — estos
 // últimos SOLO se devuelven cuando el perfil es el del propio usuario.
-import { POST_SELECT, canAccessChannel, channelBySlug, currentAuth, resolveTenant, serializePost } from '../../utils/community'
+import { POST_SELECT, canAccessChannel, channelBySlug, channelVisibility, currentAuth, isChannelArchived, resolveTenant, serializePost } from '../../utils/community'
+import type { ChannelRow } from '../../utils/community'
 import { badgesFor, levelFor, memberStats } from '../../utils/levels'
 import { getGamification, levelBadgesFor } from '../../utils/gamification'
 import { isOnline } from '../../utils/chat'
@@ -51,7 +52,18 @@ export default defineEventHandler(async (event) => {
   const comments = iBlockedThem ? [] : await db.prepare(`SELECT c.body, c.created_at, p.title AS post_title, p.slug AS post_slug, ch.slug AS channel_slug
     FROM comments c JOIN posts p ON p.id = c.post_id JOIN channels ch ON ch.id = p.channel_id
     WHERE c.author_id = ? AND c.tenant_id = ? AND p.status = 'published' ORDER BY c.created_at DESC LIMIT 20`).all(user.id, tenant.id)
-  const channels = await db.prepare(`SELECT c.name, c.slug FROM follows f JOIN channels c ON c.id = f.channel_id WHERE f.tenant_id = ? AND f.user_id = ?`).all(tenant.id, user.id)
+  // Fase 16-F: los canales que el dueño SIGUE se filtran por lo que
+  // el LECTOR puede conocer: un canal secreto sin acceso para el
+  // lector no se nombra ni acá (esta respuesta viaja en el payload
+  // de TODAS las páginas vía la tarjeta de nivel del panel móvil),
+  // y un canal archivado ya no es un destino válido.
+  const followedRows = await db.prepare(`SELECT c.* FROM follows f JOIN channels c ON c.id = f.channel_id WHERE f.tenant_id = ? AND f.user_id = ?`).all(tenant.id, user.id) as unknown as ChannelRow[]
+  const channels: { name: string, slug: string }[] = []
+  for (const fc of followedRows) {
+    if (isChannelArchived(fc)) continue
+    if (channelVisibility(fc) === 'secret' && !(await canAccessChannel(event, me?.id ?? null, role, fc))) continue
+    channels.push({ name: fc.name, slug: fc.slug })
+  }
   const stats = await memberStats(event, tenant.id, user.id as number)
   // Fase 9: nivel e insignias de nivel según la configuración de
   // gamificación del tenant (la tarjeta «Insignias ganadas» del perfil).
