@@ -22,7 +22,7 @@ import { dbFor } from './db'
 
 export interface GamLevel { id: number, name: string, min: number, icon: string }
 
-export type PointAction = 'post' | 'comment' | 'reaction_received' | 'course_enroll' | 'course_complete' | 'event_rsvp'
+export type PointAction = 'post' | 'comment' | 'reaction_received' | 'comment_reaction' | 'course_enroll' | 'course_complete' | 'event_rsvp'
 
 export interface GamificationConfig {
   levels: GamLevel[] // ordenados por umbral ascendente
@@ -41,6 +41,10 @@ export const DEFAULT_POINTS: Record<PointAction, number> = {
   post: 10,
   comment: 3,
   reaction_received: 2,
+  // Fase 16-G: misma convención que reaction_received (los puntos
+  // los recibe el AUTOR del contenido, recalculados desde las filas
+  // de comment_reactions): 1 punto por reacción en sus comentarios.
+  comment_reaction: 1,
   course_enroll: 5,
   course_complete: 50,
   event_rsvp: 10,
@@ -51,6 +55,7 @@ export const POINT_ACTION_META: { action: PointAction, label: string, descriptio
   { action: 'post', label: 'Publicar una publicación', description: 'Puntos por cada publicación publicada. Se recalculan con el valor actual.' },
   { action: 'comment', label: 'Comentar', description: 'Puntos por cada comentario. Se recalculan con el valor actual.' },
   { action: 'reaction_received', label: 'Recibir una reacción', description: 'Puntos por cada reacción que reciben las publicaciones del miembro. Se recalculan con el valor actual.' },
+  { action: 'comment_reaction', label: 'Recibir una reacción en un comentario', description: 'Puntos por cada reacción que reciben los comentarios del miembro. Se recalculan con el valor actual.' },
   { action: 'course_enroll', label: 'Inscribirse a un curso', description: 'Hito único por curso: se registra con el valor vigente al inscribirse.' },
   { action: 'course_complete', label: 'Completar un curso', description: 'Hito único por curso: se registra con el valor vigente al completarlo.' },
   { action: 'event_rsvp', label: 'Confirmar asistencia a un evento', description: 'Hito único por evento: se registra con el valor vigente al confirmar.' },

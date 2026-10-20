@@ -109,8 +109,10 @@ export const reactions = sqliteTable('reactions', {
   tenantId: integer('tenant_id').notNull(),
   postId: integer('post_id').notNull().references(() => posts.id),
   userId: integer('user_id').notNull(),
-  type: text('type', { enum: ['love', 'like', 'fire', 'clap'] }).notNull(),
-}, t => [uniqueIndex('reactions_unique').on(t.postId, t.userId, t.type)])
+  // Fase 16-G: el tipo es un emoji del catálogo (utils/reactions.ts);
+  // antes eran las palabras like/love/fire/clap (migradas a emoji).
+  type: text('type').notNull(),
+}, t => [uniqueIndex('reactions_unique').on(t.postId, t.userId)])
 
 export const comments = sqliteTable('comments', {
   id: integer('id').primaryKey({ autoIncrement: true }),
@@ -119,7 +121,24 @@ export const comments = sqliteTable('comments', {
   authorId: integer('author_id').notNull().references(() => users.id),
   body: text('body').notNull(),
   createdAt: text('created_at').notNull(),
+  // Fase 16-G (migración aditiva): hilo de un nivel (NULL = raíz) y
+  // un adjunto opcional, espejo del adjunto principal de posts.
+  parentId: integer('parent_id'),
+  mediaType: text('media_type').notNull().default('none'),
+  mediaUrl: text('media_url').notNull().default(''),
+  mediaName: text('media_name').notNull().default(''),
 })
+
+// Fase 16-G: reacciones a comentarios, misma semántica que las de
+// publicaciones (un emoji por usuario y comentario, del catálogo).
+export const commentReactions = sqliteTable('comment_reactions', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  tenantId: integer('tenant_id').notNull(),
+  commentId: integer('comment_id').notNull().references(() => comments.id),
+  userId: integer('user_id').notNull(),
+  type: text('type').notNull(),
+  createdAt: text('created_at').notNull().default(''),
+}, t => [uniqueIndex('comment_reactions_unique').on(t.commentId, t.userId)])
 
 export const bookmarks = sqliteTable('bookmarks', {
   id: integer('id').primaryKey({ autoIncrement: true }),

@@ -9,6 +9,7 @@ import { dbFor } from './db'
 import { msg } from './i18n'
 import { getReviewEnabled } from './moderation'
 import { getPrivacySettings, paidTeaserText, truncateTitle } from './privacy'
+import { summarizeReactionRows } from './reactions'
 import { sanitizeHtml } from './sanitize'
 
 export interface TenantRow {
@@ -275,12 +276,15 @@ export async function serializePost(event: H3Event, row: Record<string, unknown>
   const db = await dbFor(event)
   const postId = row.id as number
   const canInteract = opts?.canInteract ?? fullAccess
+  // Fase 16-G: conteos por emoji del catálogo (las filas legadas ya
+  // viajaron a emoji en la migración), resumen con total y top, y MI
+  // reacción (una sola por usuario desde esta fase; null = ninguna).
   const reactionRows = await db.prepare('SELECT type, COUNT(*) AS n FROM reactions WHERE post_id = ? GROUP BY type').all(postId) as { type: string, n: number }[]
-  const reactions: Record<string, number> = { love: 0, like: 0, fire: 0, clap: 0 }
-  for (const r of reactionRows) reactions[r.type] = r.n
-  const myReactions = userId
-    ? (await db.prepare('SELECT type FROM reactions WHERE post_id = ? AND user_id = ?').all(postId, userId) as { type: string }[]).map(r => r.type)
-    : []
+  const reactionSummary = summarizeReactionRows(reactionRows)
+  const myReactionRow = userId
+    ? await db.prepare('SELECT type FROM reactions WHERE post_id = ? AND user_id = ?').get(postId, userId) as { type: string } | undefined
+    : undefined
+  const myReaction = myReactionRow?.type ?? null
   const commentCount = (await db.prepare('SELECT COUNT(*) AS n FROM comments WHERE post_id = ?').get(postId) as { n: number }).n
   const bookmarked = userId
     ? !!await db.prepare('SELECT id FROM bookmarks WHERE post_id = ? AND user_id = ?').get(postId, userId)
@@ -391,7 +395,7 @@ export async function serializePost(event: H3Event, row: Record<string, unknown>
     createdAt: row.created_at,
     author: authorView,
     channel: { name: row.channel_name, slug: row.channel_slug, type: row.channel_type },
-    reactions, myReactions, commentCount, bookmarked, poll,
+    reactions: reactionSummary.counts, reactionTop: reactionSummary.top, reactionTotal: reactionSummary.total, myReaction, commentCount, bookmarked, poll,
   }
 }
 

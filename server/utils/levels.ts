@@ -37,6 +37,7 @@ export interface MemberStats {
   posts: number
   comments: number
   reactionsReceived: number
+  commentReactionsReceived: number
   coursesCompleted: number
   bookmarks: number
   points: number
@@ -48,6 +49,9 @@ export async function memberStats(event: H3Event, tenantId: number, userId: numb
   const posts = await one("SELECT COUNT(*) AS n FROM posts WHERE author_id = ? AND tenant_id = ? AND status = 'published'", userId, tenantId)
   const comments = await one('SELECT COUNT(*) AS n FROM comments WHERE author_id = ? AND tenant_id = ?', userId, tenantId)
   const reactionsReceived = await one('SELECT COUNT(*) AS n FROM reactions r JOIN posts p ON p.id = r.post_id WHERE p.author_id = ? AND p.tenant_id = ?', userId, tenantId)
+  // Fase 16-G: reacciones recibidas en los comentarios propios
+  // (acción 'comment_reaction', misma convención de recálculo).
+  const commentReactionsReceived = await one('SELECT COUNT(*) AS n FROM comment_reactions cr JOIN comments c ON c.id = cr.comment_id WHERE c.author_id = ? AND c.tenant_id = ?', userId, tenantId).catch(() => 0)
   const bookmarks = await one('SELECT COUNT(*) AS n FROM bookmarks WHERE user_id = ? AND tenant_id = ?', userId, tenantId)
   // Cursos completados: cursos del tenant donde el usuario completó
   // TODAS las lecciones (y el curso tiene al menos una lección).
@@ -63,7 +67,7 @@ export async function memberStats(event: H3Event, tenantId: number, userId: numb
   // Fase 9: los valores base salen de la configuración del tenant.
   const extra = await extraPoints(event, tenantId, userId).catch(() => 0)
   const { points: values } = await getGamification(event, tenantId)
-  return { posts, comments, reactionsReceived, coursesCompleted, bookmarks, points: posts * values.post + comments * values.comment + reactionsReceived * values.reaction_received + extra }
+  return { posts, comments, reactionsReceived, commentReactionsReceived, coursesCompleted, bookmarks, points: posts * values.post + comments * values.comment + reactionsReceived * values.reaction_received + commentReactionsReceived * values.comment_reaction + extra }
 }
 
 export interface Badge { id: string, name: string, description: string, icon: string, earned: boolean }

@@ -127,17 +127,28 @@ export async function seedIfEmpty(db: AsyncDb) {
     'Este canal es solo para miembros registrados. Aquí coordinamos las pruebas internas y los adelantos antes de publicarlos en el resto de la comunidad.', 'Coordinación interna de miembros.', 'none', '', 0, daysAgo(0, 9))
 
   const mkComment = async (postId: number, authorId: number, body: string, created: string) =>
-    run('INSERT INTO comments (tenant_id, post_id, author_id, body, created_at) VALUES (?, ?, ?, ?, ?)', tenantId, postId, authorId, body, created)
-  await mkComment(pWelcome, member, '¡Hola! Soy Marco, creo contenido para pequeños negocios y quiero mejorar mi constancia al publicar.', daysAgo(6, 11))
-  await mkComment(pWelcome, lucia, 'Lucía por aquí, diseñadora. Feliz de ayudar con recursos visuales cuando los necesiten.', daysAgo(6, 12))
+    insert('INSERT INTO comments (tenant_id, post_id, author_id, body, created_at) VALUES (?, ?, ?, ?, ?)', tenantId, postId, authorId, body, created)
+  const cWelcomeMember = await mkComment(pWelcome, member, '¡Hola! Soy Marco, creo contenido para pequeños negocios y quiero mejorar mi constancia al publicar.', daysAgo(6, 11))
+  const cWelcomeLucia = await mkComment(pWelcome, lucia, 'Lucía por aquí, diseñadora. Feliz de ayudar con recursos visuales cuando los necesiten.', daysAgo(6, 12))
   await mkComment(pVideo, diego, 'El punto del guion corto me cambió la forma de grabar. Gracias por compartirlo.', daysAgo(4, 16))
   await mkComment(pPaid, member, 'La plantilla se ve justo como lo que necesito para ordenar mi mes.', daysAgo(1, 13))
+  // Fase 16-G: una respuesta de ejemplo (hilo de un nivel) y
+  // reacciones en comentarios, para que la demo nazca mostrando el
+  // hilo y el resumen de emojis de los comentarios.
+  await run('INSERT INTO comments (tenant_id, post_id, author_id, body, created_at, parent_id) VALUES (?, ?, ?, ?, ?, ?)',
+    tenantId, pWelcome, admin, '¡Bienvenido, Marco! La constancia es justo el tema del taller de este mes: traé tus dudas a la sesión en vivo.', daysAgo(6, 13), cWelcomeMember)
+  const mkCommentReaction = async (commentId: number, userId: number, type: string, created: string) =>
+    run('INSERT OR IGNORE INTO comment_reactions (tenant_id, comment_id, user_id, type, created_at) VALUES (?, ?, ?, ?, ?)', tenantId, commentId, userId, type, created)
+  await mkCommentReaction(cWelcomeMember, lucia, '❤️', daysAgo(6, 14))
+  await mkCommentReaction(cWelcomeLucia, diego, '👍', daysAgo(6, 15))
 
+  // Fase 16-G: las reacciones de la semilla ya nacen como emojis del
+  // catálogo (antes eran las palabras love/like/fire/clap).
   const mkReaction = async (postId: number, userId: number, type: string) =>
     run('INSERT OR IGNORE INTO reactions (tenant_id, post_id, user_id, type) VALUES (?, ?, ?, ?)', tenantId, postId, userId, type)
-  await mkReaction(pWelcome, member, 'love'); await mkReaction(pWelcome, lucia, 'love'); await mkReaction(pWelcome, diego, 'clap')
-  await mkReaction(pVideo, admin, 'fire'); await mkReaction(pVideo, lucia, 'like'); await mkReaction(pVideo, diego, 'fire')
-  await mkReaction(pPaid, lucia, 'love')
+  await mkReaction(pWelcome, member, '❤️'); await mkReaction(pWelcome, lucia, '❤️'); await mkReaction(pWelcome, diego, '👏')
+  await mkReaction(pVideo, admin, '🔥'); await mkReaction(pVideo, lucia, '👍'); await mkReaction(pVideo, diego, '🔥')
+  await mkReaction(pPaid, lucia, '❤️')
 
   // Chat del canal general (Fase 3): conversación semilla breve.
   const mkChat = async (channelId: number, authorId: number, body: string, created: string) =>

@@ -1,11 +1,15 @@
-// Reaccionar a una publicación (toggle por tipo: love/like/fire/clap).
-// Al AGREGAR una reacción se notifica al autor de la publicación.
+// Reaccionar a una publicación (Fase 16-G): UNA reacción por
+// usuario, un emoji del catálogo (utils/reactions.ts). Elegir un
+// emoji sin tener ninguno lo crea; elegir OTRO lo reemplaza; elegir
+// el MISMO lo quita. Solo la CREACIÓN (de ninguno a uno) notifica al
+// autor y suma en su puntaje: los puntos por reacción se recalculan
+// desde las filas (gamification 'reaction_received'), así que
+// reemplazar no cambia ningún conteo y quitar la reacción lo resta.
 import { canAccessChannel, currentAuth, requireCanWrite, requireUser, resolveTenant } from '../../../utils/community'
 import type { ChannelRow } from '../../../utils/community'
-import { dbFor } from '../../../utils/db'
+import { dbFor, nowIso } from '../../../utils/db'
 import { notify } from '../../../utils/notify'
-
-const TYPES = ['love', 'like', 'fire', 'clap']
+import { isReactionType, summarizeReactionRows } from '../../../utils/reactions'
 
 export default defineEventHandler(async (event) => {
   const tenant = await resolveTenant(event)
@@ -13,7 +17,8 @@ export default defineEventHandler(async (event) => {
   const { role } = await currentAuth(event, tenant.id)
   const postId = Number(getRouterParam(event, 'id'))
   const body = await readBody<{ type?: string }>(event)
-  if (!TYPES.includes(body.type || '')) throw createError({ statusCode: 400, message: 'Tipo de reacción inválido.' })
+  if (!isReactionType(body.type)) throw createError({ statusCode: 400, message: 'Tipo de reacción inválido.' })
+  const type = body.type
   // Fase 14: un miembro restringido lee pero no participa.
   await requireCanWrite(event, tenant.id, user.id)
   const db = await dbFor(event)
@@ -28,16 +33,26 @@ export default defineEventHandler(async (event) => {
   // solo pueden reaccionar su autor y los admins.
   if (post.status !== 'published' && post.author_id !== user.id && role !== 'admin')
     throw createError({ statusCode: 404, message: 'Publicación no encontrada.' })
-  const existing = await db.prepare('SELECT id FROM reactions WHERE post_id = ? AND user_id = ? AND type = ?').get(postId, user.id, body.type)
-  if (existing) await db.prepare('DELETE FROM reactions WHERE id = ?').run((existing as { id: number }).id)
+  const mine = await db.prepare('SELECT id, type FROM reactions WHERE post_id = ? AND user_id = ?').get(postId, user.id) as { id: number, type: string } | undefined
+  let myReaction: string | null
+  if (mine && mine.type === type) {
+    await db.prepare('DELETE FROM reactions WHERE id = ?').run(mine.id)
+    myReaction = null
+  }
+  else if (mine) {
+    await db.prepare('UPDATE reactions SET type = ? WHERE id = ?').run(type, mine.id)
+    myReaction = type
+  }
   else {
-    await db.prepare('INSERT INTO reactions (tenant_id, post_id, user_id, type) VALUES (?, ?, ?, ?)').run(tenant.id, postId, user.id, body.type)
+    await db.prepare('INSERT INTO reactions (tenant_id, post_id, user_id, type) VALUES (?, ?, ?, ?)').run(tenant.id, postId, user.id, type)
+    myReaction = type
     await notify(event, {
       tenantId: tenant.id, userId: post.author_id, actorId: user.id, type: 'reaction',
-      title: `${user.name} reaccionó a tu publicación «${post.title}»`,
+      title: `${user.name} reaccionó ${type} a tu publicación «${post.title}»`,
       link: `/p/${post.channel_slug}/${post.slug}`,
     })
   }
-  const counts = await db.prepare('SELECT type, COUNT(*) AS n FROM reactions WHERE post_id = ? GROUP BY type').all(postId)
-  return { reactions: counts, active: !existing }
+  const counts = await db.prepare('SELECT type, COUNT(*) AS n FROM reactions WHERE post_id = ? GROUP BY type').all(postId) as { type: string, n: number }[]
+  const summary = summarizeReactionRows(counts)
+  return { reactions: summary.counts, reactionTop: summary.top, reactionTotal: summary.total, myReaction, changedAt: nowIso() }
 })

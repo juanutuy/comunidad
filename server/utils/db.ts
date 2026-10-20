@@ -59,8 +59,10 @@ CREATE UNIQUE INDEX IF NOT EXISTS channel_access_unique ON channel_access (tenan
 CREATE TABLE IF NOT EXISTS posts (id INTEGER PRIMARY KEY AUTOINCREMENT, tenant_id INTEGER NOT NULL, channel_id INTEGER NOT NULL, author_id INTEGER NOT NULL, slug TEXT NOT NULL, title TEXT NOT NULL, body TEXT NOT NULL DEFAULT '', teaser TEXT NOT NULL DEFAULT '', media_type TEXT NOT NULL DEFAULT 'none', media_url TEXT NOT NULL DEFAULT '', pinned INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL);
 CREATE UNIQUE INDEX IF NOT EXISTS posts_channel_slug ON posts (channel_id, slug);
 CREATE TABLE IF NOT EXISTS reactions (id INTEGER PRIMARY KEY AUTOINCREMENT, tenant_id INTEGER NOT NULL, post_id INTEGER NOT NULL, user_id INTEGER NOT NULL, type TEXT NOT NULL);
-CREATE UNIQUE INDEX IF NOT EXISTS reactions_unique ON reactions (post_id, user_id, type);
+CREATE UNIQUE INDEX IF NOT EXISTS reactions_unique ON reactions (post_id, user_id);
 CREATE TABLE IF NOT EXISTS comments (id INTEGER PRIMARY KEY AUTOINCREMENT, tenant_id INTEGER NOT NULL, post_id INTEGER NOT NULL, author_id INTEGER NOT NULL, body TEXT NOT NULL, created_at TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS comment_reactions (id INTEGER PRIMARY KEY AUTOINCREMENT, tenant_id INTEGER NOT NULL, comment_id INTEGER NOT NULL, user_id INTEGER NOT NULL, type TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT '');
+CREATE UNIQUE INDEX IF NOT EXISTS comment_reactions_unique ON comment_reactions (comment_id, user_id);
 CREATE TABLE IF NOT EXISTS bookmarks (id INTEGER PRIMARY KEY AUTOINCREMENT, tenant_id INTEGER NOT NULL, post_id INTEGER NOT NULL, user_id INTEGER NOT NULL);
 CREATE UNIQUE INDEX IF NOT EXISTS bookmarks_unique ON bookmarks (tenant_id, post_id, user_id);
 CREATE TABLE IF NOT EXISTS courses (id INTEGER PRIMARY KEY AUTOINCREMENT, tenant_id INTEGER NOT NULL, slug TEXT NOT NULL, title TEXT NOT NULL, description TEXT NOT NULL DEFAULT '', level TEXT NOT NULL DEFAULT 'Principiante', price_cents INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL);
@@ -332,6 +334,33 @@ const MIGRATIONS = [
   `ALTER TABLE channels ADD COLUMN cover_url TEXT NOT NULL DEFAULT ''`,
   `ALTER TABLE channels ADD COLUMN visibility TEXT NOT NULL DEFAULT 'public'`,
   `ALTER TABLE posts ADD COLUMN album TEXT NOT NULL DEFAULT ''`,
+  // Fase 16-G: comentarios y reacciones como el original.
+  //   - comments.parent_id: hilo de UN nivel (NULL = comentario raíz;
+  //     una respuesta a otra respuesta cuelga de la raíz, ver
+  //     comments.post.ts). Nullable a propósito: las filas viejas
+  //     son raíces sin tocar su contenido.
+  //   - comments.media_*: UN adjunto por comentario, espejo del
+  //     adjunto principal de posts (media_type 'none'|'image'|
+  //     'video'|'file', media_url, media_name = nombre visible).
+  //   - reactions: el tipo pasa de palabra (like/love/fire/clap) a
+  //     emoji del catálogo de utils/reactions.ts. El mapeo es
+  //     inyectivo (cuatro destinos distintos), así que ninguna fila
+  //     colisiona al mapear; después se COLAPSAN las filas múltiples
+  //     legadas del mismo (post, usuario) conservando la más
+  //     reciente (id mayor) y el índice único pasa a (post_id,
+  //     user_id): una sola reacción por usuario y publicación.
+  //     La tabla comment_reactions vive en CREATE_SQL.
+  `ALTER TABLE comments ADD COLUMN parent_id INTEGER`,
+  `ALTER TABLE comments ADD COLUMN media_type TEXT NOT NULL DEFAULT 'none'`,
+  `ALTER TABLE comments ADD COLUMN media_url TEXT NOT NULL DEFAULT ''`,
+  `ALTER TABLE comments ADD COLUMN media_name TEXT NOT NULL DEFAULT ''`,
+  `UPDATE reactions SET type = '👍' WHERE type = 'like'`,
+  `UPDATE reactions SET type = '❤️' WHERE type = 'love'`,
+  `UPDATE reactions SET type = '🔥' WHERE type = 'fire'`,
+  `UPDATE reactions SET type = '👏' WHERE type = 'clap'`,
+  `DELETE FROM reactions WHERE id NOT IN (SELECT MAX(id) FROM reactions GROUP BY post_id, user_id)`,
+  `DROP INDEX IF EXISTS reactions_unique`,
+  `CREATE UNIQUE INDEX reactions_unique ON reactions (post_id, user_id)`,
 ]
 
 async function runMigrations(db: AsyncDb): Promise<void> {
