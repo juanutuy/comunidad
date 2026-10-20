@@ -81,13 +81,3 @@ export function badgesFor(stats: MemberStats): Badge[] {
     { id: 'coleccionista', name: 'Coleccionista', description: 'Guardó 5 publicaciones o más', icon: 'i-lucide-bookmark', earned: stats.bookmarks >= 5 },
   ]
 }
-
-// ¿El usuario tiene acceso al contenido premium del tenant? Admin, o
-// algún acceso registrado a un canal pago (misma vía que el paywall).
-export async function hasPremiumAccess(event: H3Event, tenantId: number, userId: number, role: string | null): Promise<boolean> {
-  if (role === 'admin') return true
-  const db = await dbFor(event)
-  const row = await db.prepare(`SELECT ca.id FROM channel_access ca JOIN channels c ON c.id = ca.channel_id
-    WHERE ca.tenant_id = ? AND ca.user_id = ? AND c.type = 'paid' LIMIT 1`).get(tenantId, userId)
-  return !!row
-}

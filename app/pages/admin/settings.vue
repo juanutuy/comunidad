@@ -533,22 +533,8 @@ async function save() {
           <div v-for="zone in [{ value: 'header' as const, label: 'Cabecera (barra superior)' }, { value: 'sidebar' as const, label: 'Lateral' }]" :key="zone.value">
             <p class="mb-2 text-sm font-semibold">{{ zone.label }}</p>
             <div class="space-y-2">
-              <div v-for="{ item, index } in navZoneItems(zone.value)" :key="item.id" class="flex flex-wrap items-center gap-2 rounded-lg border border-default p-2.5">
-                <div class="flex flex-col">
-                  <UButton size="xs" color="neutral" variant="ghost" icon="i-lucide-chevron-up" aria-label="Subir" @click="moveNav(index, -1)" />
-                  <UButton size="xs" color="neutral" variant="ghost" icon="i-lucide-chevron-down" aria-label="Bajar" @click="moveNav(index, 1)" />
-                </div>
-                <UInput v-model="item.label" class="w-44" maxlength="60" aria-label="Texto del enlace" />
-                <UInput v-if="item.custom" v-model="item.url" class="min-w-52 flex-1" placeholder="https://… o /ruta" aria-label="Dirección del enlace" />
-                <span v-else class="min-w-52 flex-1 truncate text-sm text-muted">{{ item.url }} <UBadge color="neutral" variant="subtle" size="sm">Integrado</UBadge></span>
-                <USelect
-                  :model-value="item.zone" size="sm" class="w-32" aria-label="Zona del enlace"
-                  :items="[{ label: 'Cabecera', value: 'header' }, { label: 'Lateral', value: 'sidebar' }]"
-                  @update:model-value="v => { item.zone = v as 'header' | 'sidebar' }"
-                />
-                <USwitch v-model="item.visible" aria-label="Mostrar en el menú" />
-                <UButton v-if="item.custom" size="sm" color="error" variant="ghost" icon="i-lucide-trash-2" aria-label="Borrar enlace" @click="removeNavItem(index)" />
-              </div>
+              <NavLinkEditor v-for="{ item, index } in navZoneItems(zone.value)" :key="item.id"
+                v-model="form.navMenu[index]!" @move="moveNav(index, $event)" @remove="removeNavItem(index)" />
             </div>
           </div>
           <div class="rounded-lg border border-dashed border-default p-3">
@@ -587,11 +573,8 @@ async function save() {
           <div>
             <p class="text-sm font-semibold">Redes sociales</p>
             <div class="mt-2 space-y-2">
-              <div v-for="(s, i) in form.socialLinks" :key="i" class="flex items-center gap-2">
-                <USelect v-model="s.platform" :items="SOCIAL_PLATFORM_OPTIONS" class="w-40" />
-                <UInput v-model="s.url" class="flex-1" placeholder="https://…" />
-                <UButton color="error" variant="ghost" icon="i-lucide-trash-2" aria-label="Quitar red social" @click="removeSocial(i)" />
-              </div>
+              <SocialLinkEditor v-for="(_, i) in form.socialLinks" :key="i" v-model="form.socialLinks[i]!"
+                :platforms="SOCIAL_PLATFORM_OPTIONS" @remove="removeSocial(i)" />
               <UButton v-if="form.socialLinks.length < 10" size="sm" variant="soft" icon="i-lucide-plus" label="Agregar red social" @click="addSocial" />
             </div>
           </div>

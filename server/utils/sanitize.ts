@@ -91,18 +91,7 @@ function safeEmbedUrl(raw: string): string | null {
   return url
 }
 
-// Convierte una URL de video pública (YouTube/Vimeo) en su URL de
-// embed; devuelve null si no es un video reconocible.
-export function videoEmbedUrl(raw: string): string | null {
-  const url = (raw || '').trim()
-  if (!url) return null
-  if (safeEmbedUrl(url)) return url
-  const yt = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/shorts\/)([\w-]{6,})/)
-  if (yt) return `https://www.youtube.com/embed/${yt[1]}`
-  const vm = url.match(/vimeo\.com\/(\d+)/)
-  if (vm) return `https://player.vimeo.com/video/${vm[1]}`
-  return null
-}
+export { videoEmbedUrl } from '../../shared/embeds'
 
 interface TagToken { kind: 'open' | 'close' | 'selfclose', name: string, attrs: Map<string, string> }
 

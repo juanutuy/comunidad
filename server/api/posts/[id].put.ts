@@ -8,14 +8,17 @@
 // el adjunto principal (mediaType/mediaUrl/attachmentName) cuando
 // vienen en el cuerpo — con las mismas validaciones que al crear. El
 // anónimo NO se acepta acá: se fija solo al crear (Fase 8).
-import { channelBySlug, channelContentType, requireUser, resolveTenant } from '../../utils/community'
+import { canAccessChannel, currentAuth, isChannelArchived, isStaff, channelPostPermission, requireCanWrite, channelBySlug, channelContentType, requireUser, resolveTenant } from '../../utils/community'
 import { dbFor, nowIso } from '../../utils/db'
+import { getReviewEnabled } from '../../utils/moderation'
 import { msg } from '../../utils/i18n'
 import { htmlToText, sanitizeHtml } from '../../utils/sanitize'
 
 export default defineEventHandler(async (event) => {
   const tenant = await resolveTenant(event)
   const user = await requireUser(event, tenant.id)
+  await requireCanWrite(event, tenant.id, user.id)
+  const { role } = await currentAuth(event, tenant.id)
   const postId = Number(getRouterParam(event, 'id'))
   const body = await readBody<{ title?: string, body?: string, bodyHtml?: string, scheduledAt?: string, allowComments?: boolean, mediaType?: string, mediaUrl?: string, attachmentName?: string, album?: string }>(event)
   const db = await dbFor(event)
@@ -23,6 +26,10 @@ export default defineEventHandler(async (event) => {
   if (!post) throw createError({ statusCode: 404, message: await msg(event, tenant.id, 'posts.notFound') })
   if (post.author_id !== user.id)
     throw createError({ statusCode: 403, message: await msg(event, tenant.id, 'posts.onlyAuthorEdit') })
+  const channel = await db.prepare('SELECT * FROM channels WHERE id = ? AND tenant_id = ?').get(post.channel_id, tenant.id)
+  if (!channel || isChannelArchived(channel)) throw createError({ statusCode: 404, message: 'Canal no encontrado.' })
+  if (!await canAccessChannel(event, user.id, role, channel) || (channelPostPermission(channel) === 'staff' && !isStaff(role)))
+    throw createError({ statusCode: 403, message: 'No tenés permiso para editar en este canal.' })
   let title = (body.title || '').trim()
   // Fase 8: si el editor manda cuerpo rico, se sanitiza y el texto
   // plano se deriva (igual que al crear). El anónimo NO se toca acá:
@@ -47,6 +54,7 @@ export default defineEventHandler(async (event) => {
   // el adjunto/comentarios quedan como están). En una encuesta el
   // adjunto no existe (al crear nace en 'none'): se ignora.
   const sets = ['title = ?', 'body = ?', 'body_html = ?', 'teaser = ?', 'edited_at = ?']
+  if (post.status === 'published' && role !== 'admin' && await getReviewEnabled(event, tenant.id)) sets.push("status = 'review'")
   const vals: unknown[] = [title, text, bodyHtml ?? '', text.slice(0, 160), nowIso()]
   if (scheduledAt) { sets.push('scheduled_at = ?'); vals.push(scheduledAt) }
   if (typeof body.allowComments === 'boolean') { sets.push('allow_comments = ?'); vals.push(body.allowComments ? 1 : 0) }

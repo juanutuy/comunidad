@@ -6,6 +6,7 @@
 // en Node), la publicación es un no-op silencioso: el cliente degrada a
 // polling corto contra la misma API REST.
 import type { H3Event } from 'h3'
+import { sessionSecret } from '../../shared/session'
 
 interface DurableNamespaceLike {
   idFromName: (name: string) => unknown
@@ -38,7 +39,7 @@ export async function realtimeAvailable(event: H3Event): Promise<boolean> {
   const ns = realtimeNamespace(event)
   if (!ns) return false
   try {
-    const secret = (useRuntimeConfig().sessionSecret as string) || 'dev-only'
+    const secret = sessionSecret(useRuntimeConfig().sessionSecret, import.meta.dev)
     const stub = ns.get(ns.idFromName('health:0'))
     const res = await stub.fetch('https://rt/presence', {
       headers: { 'x-rt-key': secret },
@@ -58,7 +59,7 @@ export async function publishRealtime(event: H3Event, room: string, payload: Rec
   try {
     const ns = realtimeNamespace(event)
     if (!ns) return
-    const secret = (useRuntimeConfig().sessionSecret as string) || 'dev-only'
+    const secret = sessionSecret(useRuntimeConfig().sessionSecret, import.meta.dev)
     const stub = ns.get(ns.idFromName(room))
     await stub.fetch('https://rt/publish', {
       method: 'POST',

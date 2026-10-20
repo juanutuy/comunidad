@@ -1,12 +1,12 @@
 // Aprobar un pago manual (Fase 17, solo admin): recién ACÁ el pago
-// pasa a 'paid' y se concede el acceso, con grantPaymentAccess — la
+// pasa a 'paid' y se concede el acceso, con paymentGrantCommands — la
 // misma función que usa el webhook de Stripe. Antes de esta
 // aprobación el comprador no tenía nada, aunque hubiera declarado
 // el pago: declarar no es cobrar.
 import { requireAdmin, resolveTenant } from '../../../../utils/community'
 import { dbFor, nowIso } from '../../../../utils/db'
 import { notify } from '../../../../utils/notify'
-import { grantPaymentAccess, periodEndForInterval } from '../../../../utils/payments'
+import { paymentGrantCommands, periodEndForInterval } from '../../../../utils/payments'
 
 export default defineEventHandler(async (event) => {
   const tenant = await resolveTenant(event)
@@ -19,8 +19,6 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 409, message: 'Este pago ya fue revisado.' })
 
   const now = nowIso()
-  await db.prepare("UPDATE payments SET status = 'paid', decided_by = ?, decided_at = ?, updated_at = ? WHERE id = ?")
-    .run(admin.id, now, now, payment.id)
 
   let periodEnd = ''
   let productName = ''
@@ -41,7 +39,11 @@ export default defineEventHandler(async (event) => {
     link = co ? `/courses/${co.slug}` : '/courses'
   }
 
-  await grantPaymentAccess(db, payment, { source: 'manual', periodEnd })
+  const results = await db.batch([
+    ...paymentGrantCommands(payment, { source: 'manual', periodEnd }),
+    { sql: "UPDATE payments SET status = 'paid', decided_by = ?, decided_at = ?, updated_at = ? WHERE id = ? AND status = 'pending'", params: [admin.id, now, now, payment.id] },
+  ])
+  if (!results.at(-1)?.changes) throw createError({ statusCode: 409, message: 'Este pago ya fue revisado.' })
   await notify(event, {
     tenantId: tenant.id, userId: Number(payment.user_id), actorId: admin.id, type: 'payment',
     title: `Tu pago fue aprobado: ya tenés acceso a ${productName}`,

@@ -87,12 +87,8 @@ export function lessonAvailability(
 export async function courseCurriculum(event: H3Event, courseId: number, includeDrafts = false): Promise<{ chapter: Record<string, unknown>, lessons: LessonRow[] }[]> {
   const db = await dbFor(event)
   const chapterRows = await db.prepare('SELECT * FROM chapters WHERE course_id = ? ORDER BY sort, id').all(courseId) as Record<string, unknown>[]
-  const out: { chapter: Record<string, unknown>, lessons: LessonRow[] }[] = []
-  for (const ch of chapterRows) {
-    const lessons = (await db.prepare(`SELECT * FROM lessons WHERE chapter_id = ?${includeDrafts ? '' : " AND status = 'published'"} ORDER BY sort, id`).all(ch.id) as unknown as LessonRow[])
-      .map(l => ({ ...l, chapter_title: ch.title as string }))
-    out.push({ chapter: ch, lessons })
-  }
+  const lessons = await db.prepare(`SELECT l.* FROM lessons l JOIN chapters ch ON ch.id = l.chapter_id WHERE ch.course_id = ?${includeDrafts ? '' : " AND l.status = 'published'"} ORDER BY l.sort, l.id`).all(courseId) as LessonRow[]
+  const out = chapterRows.map(ch => ({ chapter: ch, lessons: lessons.filter(l => l.chapter_id === ch.id).map(l => ({ ...l, chapter_title: ch.title as string })) }))
   return out
 }
 

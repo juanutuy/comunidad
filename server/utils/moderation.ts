@@ -15,6 +15,7 @@
 // 'moderation' al autor) NO tienen preferencia propia en Ajustes de
 // cuenta: son avisos operativos y siempre llegan (ver notify.ts).
 import type { H3Event } from 'h3'
+import type { DbCommand } from './db'
 import { dbFor } from './db'
 import { notify } from './notify'
 
@@ -46,16 +47,7 @@ export async function notifyAdmins(event: H3Event, tenantId: number, actorId: nu
 // (misma cascada que DELETE /api/posts/[id]).
 export async function deletePostCascade(event: H3Event, tenantId: number, postId: number, channelSlug: string, postSlug: string): Promise<void> {
   const db = await dbFor(event)
-  await db.prepare('DELETE FROM poll_votes WHERE post_id = ?').run(postId)
-  await db.prepare('DELETE FROM poll_options WHERE post_id = ?').run(postId)
-  await db.prepare('DELETE FROM reactions WHERE post_id = ?').run(postId)
-  // Fase 16-G: las reacciones de los comentarios del post también
-  // se van (antes de borrar los comentarios que las referencian).
-  await db.prepare('DELETE FROM comment_reactions WHERE comment_id IN (SELECT id FROM comments WHERE post_id = ?)').run(postId)
-  await db.prepare('DELETE FROM comments WHERE post_id = ?').run(postId)
-  await db.prepare('DELETE FROM bookmarks WHERE post_id = ?').run(postId)
-  await db.prepare('DELETE FROM notifications WHERE tenant_id = ? AND link = ?').run(tenantId, `/p/${channelSlug}/${postSlug}`)
-  await db.prepare('DELETE FROM posts WHERE id = ?').run(postId)
+  await db.batch(postDeletionCommands(tenantId, postId, channelSlug, postSlug))
 }
 
 // Borrado de UN comentario con su cascada (Fase 16-G): si es raíz,
@@ -66,7 +58,18 @@ export async function deleteCommentCascade(event: H3Event, commentId: number): P
   const db = await dbFor(event)
   const replies = await db.prepare('SELECT id FROM comments WHERE parent_id = ?').all(commentId) as { id: number }[]
   const ids = [commentId, ...replies.map(r => Number(r.id))]
-  const placeholders = ids.map(() => '?').join(',')
-  await db.prepare(`DELETE FROM comment_reactions WHERE comment_id IN (${placeholders})`).run(...ids)
-  await db.prepare(`DELETE FROM comments WHERE id IN (${placeholders})`).run(...ids)
+  await db.batch([
+    { sql: 'DELETE FROM comment_reactions WHERE comment_id IN (SELECT value FROM json_each(?))', params: [JSON.stringify(ids)] },
+    { sql: 'DELETE FROM comments WHERE id IN (SELECT value FROM json_each(?))', params: [JSON.stringify(ids)] },
+  ])
+}
+
+export function postDeletionCommands(tenantId: number, postId: number, channelSlug: string, postSlug: string): DbCommand[] {
+  return [
+    { sql: 'DELETE FROM comment_reactions WHERE comment_id IN (SELECT id FROM comments WHERE tenant_id = ? AND post_id = ?)', params: [tenantId, postId] },
+    { sql: "DELETE FROM reports WHERE tenant_id = ? AND ((target_type = 'post' AND target_id = ?) OR (target_type = 'comment' AND target_id IN (SELECT id FROM comments WHERE post_id = ?)))", params: [tenantId, postId, postId] },
+    ...['poll_votes', 'poll_options', 'reactions', 'comments', 'bookmarks', 'user_hidden_posts'].map(table => ({ sql: `DELETE FROM ${table} WHERE tenant_id = ? AND post_id = ?`, params: [tenantId, postId] })),
+    { sql: 'DELETE FROM notifications WHERE tenant_id = ? AND link = ?', params: [tenantId, `/p/${channelSlug}/${postSlug}`] },
+    { sql: 'DELETE FROM posts WHERE tenant_id = ? AND id = ?', params: [tenantId, postId] },
+  ]
 }

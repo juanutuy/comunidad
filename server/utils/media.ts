@@ -32,41 +32,32 @@ export interface UploadRow {
 
 export interface FileLocations { labels: string[], libraryItemId: number | null }
 
-export async function findFileLocations(db: AsyncDb, tenantId: number, upload: UploadRow): Promise<FileLocations> {
-  const url = `/api/files/${upload.key}`
-  const labels: string[] = []
-  let libraryItemId: number | null = null
-  const add = async (sql: string, params: unknown[], label: (row: Record<string, unknown>) => string) => {
-    try {
-      const rows = await db.prepare(sql).all(...params) as Record<string, unknown>[]
-      for (const r of rows) labels.push(label(r))
-    }
-    catch { /* tabla/columna ausente en bases muy viejas: se omite */ }
+/** Resolve every reference for a page in one SQL statement, without a query per file. */
+export async function findFilesLocations(db: AsyncDb, tenantId: number, uploads: UploadRow[]): Promise<Map<number, FileLocations>> {
+  const out = new Map(uploads.map(u => [u.id, { labels: [] as string[], libraryItemId: null as number | null }]))
+  if (!uploads.length) return out
+  const rows = await db.prepare(`WITH selected AS (
+    SELECT id, key, '/api/files/' || key AS url FROM uploads WHERE tenant_id = ? AND id IN (SELECT value FROM json_each(?))
+  )
+  SELECT s.id AS upload_id, 'Foto de perfil de ' || u.name AS label, NULL AS library_id FROM selected s JOIN users u ON u.avatar_url = s.url JOIN memberships m ON m.user_id = u.id AND m.tenant_id = ?
+  UNION ALL SELECT s.id, 'Portada de perfil de ' || u.name, NULL FROM selected s JOIN users u ON u.cover_url = s.url JOIN memberships m ON m.user_id = u.id AND m.tenant_id = ?
+  UNION ALL SELECT s.id, 'Publicación «' || p.title || '»', NULL FROM selected s JOIN posts p ON p.media_url = s.url OR instr(p.body_html, s.url) > 0 WHERE p.tenant_id = ?
+  UNION ALL SELECT s.id, 'Comentario en «' || p.title || '»', NULL FROM selected s JOIN comments cm ON cm.media_url = s.url JOIN posts p ON p.id = cm.post_id WHERE p.tenant_id = ?
+  UNION ALL SELECT s.id, 'Portada del canal «' || c.name || '»', NULL FROM selected s JOIN channels c ON c.cover_url = s.url WHERE c.tenant_id = ?
+  UNION ALL SELECT s.id, 'Imagen del curso «' || c.title || '»', NULL FROM selected s JOIN courses c ON c.image_url = s.url OR c.banner_url = s.url WHERE c.tenant_id = ?
+  UNION ALL SELECT s.id, 'Archivo de la lección «' || l.title || '»', NULL FROM selected s JOIN lessons l ON l.file_url = s.url OR l.resource_url = s.url OR l.video_url = s.url OR instr(l.content_html, s.url) > 0 JOIN chapters ch ON ch.id = l.chapter_id JOIN courses c ON c.id = ch.course_id WHERE c.tenant_id = ?
+  UNION ALL SELECT s.id, 'Ítem de biblioteca «' || l.title || '»', l.id FROM selected s JOIN library_items l ON l.file_key = s.key WHERE l.tenant_id = ?
+  UNION ALL SELECT s.id, 'Marca de la comunidad', NULL FROM selected s JOIN tenants t ON t.logo_url = s.url OR t.logo_dark_url = s.url OR t.icon_url = s.url OR t.favicon_url = s.url WHERE t.id = ?`)
+    .all(tenantId, JSON.stringify(uploads.map(u => u.id)), tenantId, tenantId, tenantId, tenantId, tenantId, tenantId, tenantId, tenantId, tenantId) as { upload_id: number, label: string, library_id: number | null }[]
+  for (const row of rows) {
+    const entry = out.get(row.upload_id)!
+    if (!entry.labels.includes(row.label)) entry.labels.push(row.label)
+    if (row.library_id !== null) entry.libraryItemId ??= row.library_id
   }
-  await add('SELECT name FROM users WHERE avatar_url = ?', [url], r => `Foto de perfil de ${r.name}`)
-  await add('SELECT name FROM users WHERE cover_url = ?', [url], r => `Portada de perfil de ${r.name}`)
-  await add('SELECT title FROM posts WHERE tenant_id = ? AND media_url = ?', [tenantId, url], r => `Adjunto de la publicación «${r.title}»`)
-  // El cuerpo rico incrusta la URL tal cual; el LIKE va escapado
-  // para que % y _ de la clave no actúen como comodines.
-  const likeUrl = `%${url.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_')}%`
-  await add("SELECT title FROM posts WHERE tenant_id = ? AND body_html LIKE ? ESCAPE '\\'", [tenantId, likeUrl], r => `Contenido de la publicación «${r.title}»`)
-  await add('SELECT title FROM courses WHERE tenant_id = ? AND image_url = ?', [tenantId, url], r => `Miniatura del curso «${r.title}»`)
-  await add('SELECT title FROM courses WHERE tenant_id = ? AND banner_url = ?', [tenantId, url], r => `Banner del curso «${r.title}»`)
-  await add('SELECT title FROM lessons WHERE tenant_id = ? AND (file_url = ? OR resource_url = ? OR video_url = ?)', [tenantId, url, url, url], r => `Archivo de la lección «${r.title}»`)
-  const items = await db.prepare('SELECT id, title FROM library_items WHERE tenant_id = ? AND file_key = ?').all(tenantId, upload.key) as Record<string, unknown>[]
-  for (const r of items) {
-    labels.push(`Ítem de la biblioteca «${r.title}»`)
-    if (libraryItemId === null) libraryItemId = Number(r.id)
-  }
-  await add('SELECT id FROM tenants WHERE id = ? AND (logo_url = ? OR logo_dark_url = ? OR icon_url = ? OR favicon_url = ?)', [tenantId, url, url, url, url], () => 'Marca de la comunidad (logo, icono o favicon)')
-  return { labels, libraryItemId }
+  return out
 }
 
-// La URL pública solo existe para archivos fuera de `library/` (la
-// ruta /api/files los sirve; los de biblioteca bajan por su ruta con
-// control de acceso). La descarga del admin: pública si existe; si
-// es de biblioteca con ítem, la ruta de descarga del ítem; si es un
-// archivo de biblioteca sin ítem (huérfano), la ruta cruda del admin.
+// Resource URLs retain their authorization checks. Library files use their download route.
 export function mediaUrls(upload: UploadRow, libraryItemId: number | null): { url: string | null, downloadUrl: string } {
   const publicUrl = upload.key.startsWith('library/') ? null : `/api/files/${upload.key}`
   const downloadUrl = publicUrl

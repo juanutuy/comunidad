@@ -1,3 +1,4 @@
+import { postMetadata } from '../../utils/postMetadata'
 // Perfil público de un miembro: datos, nivel e insignias (Fase 2), sus
 // publicaciones, comentarios y canales.
 // Fase 6: portada y sitio web, conteos de seguidores/siguiendo y si el
@@ -25,6 +26,7 @@ export default defineEventHandler(async (event) => {
   // Fase 5: si bloqueé a esta persona, su contenido no se me muestra.
   const iBlockedThem = (await blockedByMe(event, tenant.id, me?.id ?? null)).has(Number(user.id))
   const serializeVisible = async (rows: Record<string, unknown>[]) => {
+    const metadata = await postMetadata(event, rows, me?.id ?? null)
     const out = []
     for (const r of rows) {
       const ch = (await channelBySlug(event, tenant.id, r.channel_slug as string))!
@@ -35,7 +37,7 @@ export default defineEventHandler(async (event) => {
       // un canal gratuito sin acceso concedido filtraría su anticipo
       // por acá. Para el resto el cálculo no cambia: canAccessChannel
       // ya devuelve true en todo lo que antes salía.)
-      if (access) out.push(await serializePost(event, r, me?.id ?? null, access, role))
+      if (access) out.push(await serializePost(event, r, me?.id ?? null, access, role, { metadata: metadata.get(Number(r.id)) }))
     }
     return out
   }

@@ -4,7 +4,7 @@
 //   canal pago del tenant (misma regla que el contenido premium).
 // Cuenta la descarga en la base antes de entregar el archivo.
 import { currentAuth, resolveTenant } from '../../../utils/community'
-import { hasPremiumAccess } from '../../../utils/levels'
+import { hasPaidEntitlement } from '../../../utils/privacy'
 import { getPrivacySettings } from '../../../utils/privacy'
 import { readFile } from '../../../utils/storage'
 import { dbFor } from '../../../utils/db'
@@ -27,7 +27,7 @@ export default defineEventHandler(async (event) => {
       throw createError({ statusCode: 401, message: 'Iniciá sesión para descargar este recurso.' })
   }
   else if (item.locked) {
-    if (!(await hasPremiumAccess(event, tenant.id, user.id, role)))
+    if (!(await hasPaidEntitlement(event, tenant.id, user.id, role)))
       throw createError({ statusCode: 403, message: 'Este recurso es solo para miembros con acceso premium.' })
   }
   const file = await readFile(event, String(item.file_key))

@@ -8,9 +8,11 @@ export default defineNuxtConfig({
 
   runtimeConfig: {
     // Solo servidor. Valor por defecto SOLO para desarrollo local.
-    sessionSecret: process.env.NUXT_SESSION_SECRET || 'dev-only-cambiar-en-produccion',
+    sessionSecret: process.env.NUXT_SESSION_SECRET || '',
+    demoSeed: process.env.NUXT_DEMO_SEED !== 'false',
     // Ruta del archivo SQLite local (en producción se usa el binding D1).
     dbPath: process.env.DB_PATH || '',
+    uploadsPath: process.env.NUXT_UPLOADS_PATH || '',
     // Fase 4 — Stripe (en oscuro hasta cargar los secretos del Worker
     // NUXT_STRIPE_SECRET_KEY / NUXT_STRIPE_WEBHOOK_SECRET; sin ellos la
     // app no cobra y la UI lo indica).
@@ -31,7 +33,7 @@ export default defineNuxtConfig({
   },
 
   nitro: {
-    preset: 'cloudflare_module',
+    preset: process.env.NITRO_PRESET || 'cloudflare_module',
     externals: {
       // better-sqlite3 es el driver LOCAL (dev): la capa de datos
       // (server/utils/db.ts) lo importa de forma perezosa solo cuando NO
@@ -45,7 +47,7 @@ export default defineNuxtConfig({
   // dominios personalizados por tenant con el header Host en local.
   // En producción (workerd) no hay esta restricción.
   vite: {
-    server: { allowedHosts: true },
+    server: { allowedHosts: ['.localhost', ...(process.env.NUXT_DEV_ALLOWED_HOSTS || '').split(',').filter(Boolean)] },
   },
 
   modules: ['@nuxt/ui'],

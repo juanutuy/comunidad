@@ -8,3 +8,8 @@ data/*.db-*
 *.log
 .DS_Store
 data/uploads/
+
+.dev.vars
+.dev.vars.*
+.env.*
+!.env.example

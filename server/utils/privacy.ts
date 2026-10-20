@@ -13,6 +13,7 @@
 // elegible, y devuelven formas reducidas.
 import type { H3Event } from 'h3'
 import { dbFor } from './db'
+import { activeSubscription } from '../../shared/access'
 
 // ---------- Barra lateral del feed ----------
 
@@ -278,10 +279,5 @@ export async function hasPaidEntitlement(event: H3Event, tenantId: number, userI
   const acc = await db.prepare(`SELECT ca.id FROM channel_access ca JOIN channels c ON c.id = ca.channel_id
     WHERE ca.tenant_id = ? AND ca.user_id = ? AND c.type = 'paid' LIMIT 1`).get(tenantId, userId)
   if (acc) return true
-  try {
-    const sub = await db.prepare("SELECT id FROM member_subscriptions WHERE tenant_id = ? AND user_id = ? AND status = 'active' LIMIT 1")
-      .get(tenantId, userId)
-    return !!sub
-  }
-  catch { return false }
+  return activeSubscription((sql, ...params) => db.prepare(sql).get(...params), tenantId, userId)
 }

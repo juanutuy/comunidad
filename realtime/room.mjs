@@ -18,9 +18,8 @@
 //   - los POST /publish los hacen las rutas REST vía server/utils/realtime.ts.
 // Ambos caminos mandan el secreto compartido en `x-rt-key`; sin él, 403.
 
-function rtSecret(env) {
-  return env.NUXT_SESSION_SECRET || 'dev-only-cambiar-en-produccion'
-}
+import { sessionSecret } from '../shared/session.ts'
+import { authorizeSocket } from './authorization.mjs'
 
 export class RealtimeRoom {
   constructor(ctx, env) {
@@ -42,49 +41,44 @@ export class RealtimeRoom {
     return [...byId.values()]
   }
 
-  broadcast(payload, exclude = null) {
+  async broadcast(payload, exclude = null) {
     const msg = JSON.stringify(payload)
     for (const ws of this.ctx.getWebSockets()) {
       if (exclude && ws === exclude) continue
+      if (!await this.validate(ws)) continue
       try { ws.send(msg) }
       catch { /* socket cerrado a mitad de camino: se ignora */ }
     }
   }
 
-  broadcastPresence(exclude = null) {
-    this.broadcast({ type: 'presence', users: this.users(exclude) }, exclude)
+  async broadcastPresence(exclude = null) {
+    await this.broadcast({ type: 'presence', users: this.users(exclude) }, exclude)
   }
 
   async fetch(request) {
-    if (request.headers.get('x-rt-key') !== rtSecret(this.env)) {
+    if (request.headers.get('x-rt-key') !== sessionSecret(this.env.NUXT_SESSION_SECRET)) {
       return new Response('Forbidden', { status: 403 })
     }
     const url = new URL(request.url)
 
     if (url.pathname === '/connect') {
-      let name = request.headers.get('x-rt-user-name') || ''
-      try { name = decodeURIComponent(name) }
-      catch { /* venía sin codificar: se usa tal cual */ }
-      const identity = {
-        userId: Number(request.headers.get('x-rt-user-id')),
-        name,
-        slug: request.headers.get('x-rt-user-slug') || '',
-        room: request.headers.get('x-rt-room') || '',
-      }
-      if (!identity.userId) return new Response('Bad identity', { status: 400 })
+      let identity
+      try { identity = JSON.parse(decodeURIComponent(request.headers.get('x-rt-identity') || '')) }
+      catch { return new Response('Bad identity', { status: 400 }) }
+      if (!await authorizeSocket(this.env, identity)) return new Response('Forbidden', { status: 403 })
       const pair = new WebSocketPair()
       const client = pair[0]
       const server = pair[1]
       server.serializeAttachment(identity)
       this.ctx.acceptWebSocket(server)
       // Presencia inicial para el que entra y aviso al resto de la sala.
-      this.broadcastPresence()
+      await this.broadcastPresence()
       return new Response(null, { status: 101, webSocket: client })
     }
 
     if (url.pathname === '/publish' && request.method === 'POST') {
       const payload = await request.json().catch(() => null)
-      if (payload && typeof payload === 'object') this.broadcast(payload)
+      if (payload && typeof payload === 'object') await this.broadcast(payload)
       return new Response('ok')
     }
 
@@ -95,7 +89,17 @@ export class RealtimeRoom {
     return new Response('Not found', { status: 404 })
   }
 
-  webSocketMessage(ws, message) {
+  async validate(ws) {
+    try {
+      if (await authorizeSocket(this.env, ws.deserializeAttachment())) return true
+    }
+    catch (error) { console.error('Realtime authorization failed', error) }
+    try { ws.close(1008, 'Access expired or revoked') } catch { /* already closed */ }
+    return false
+  }
+
+  async webSocketMessage(ws, message) {
+    if (!await this.validate(ws) || String(message).length > 1024) return
     let data
     try { data = JSON.parse(String(message)) }
     catch { return }
@@ -109,20 +113,20 @@ export class RealtimeRoom {
       try { a = ws.deserializeAttachment() || {} }
       catch { /* sin identidad: no se reenvía */ }
       if (a.userId) {
-        this.broadcast({ type: 'typing', user: { id: a.userId, name: a.name, slug: a.slug } }, ws)
+        await this.broadcast({ type: 'typing', user: { id: a.userId, name: a.name, slug: a.slug } }, ws)
       }
     }
     // Cualquier otro mensaje del cliente se ignora: enviar mensajes de
     // chat/DM es responsabilidad de la API REST (queda persistido).
   }
 
-  webSocketClose(ws) {
+  async webSocketClose(ws) {
     // El socket que se cierra puede seguir apareciendo en
     // getWebSockets() durante el evento: se lo excluye de la foto.
-    this.broadcastPresence(ws)
+    await this.broadcastPresence(ws)
   }
 
-  webSocketError(ws) {
-    this.broadcastPresence(ws)
+  async webSocketError(ws) {
+    await this.broadcastPresence(ws)
   }
 }

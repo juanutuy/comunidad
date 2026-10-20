@@ -2,7 +2,7 @@
 // (transferencia, billetera, enlace del admin) y la compra queda
 // PENDIENTE de revisión. Este endpoint NUNCA concede acceso: el
 // acceso lo da recién un admin al aprobar desde Ingresos → Pagos
-// pendientes (grantPaymentAccess, la misma concesión del webhook).
+// pendientes (paymentGrantCommands, la misma concesión del webhook).
 // Sin métodos manuales activos responde 409, igual que Stripe en
 // oscuro: la app no finge canales de cobro que no existen.
 import { requireUser, resolveTenant } from '../../utils/community'

@@ -3,7 +3,8 @@ const api = useApi()
 const { t } = useI18n()
 const { initials } = useFormat()
 interface RankRow { id: number, name: string, slug: string, avatarUrl: string, posts: number, comments: number, reactionsReceived: number, points: number, level: string }
-const { data } = await useAsyncData('leaderboard', () => api<{ ranking: RankRow[] }>('/api/leaderboard'))
+const offset = ref(0)
+const { data } = await useAsyncData('leaderboard', () => api<{ ranking: RankRow[], nextOffset: number | null }>('/api/leaderboard', { query: { offset: offset.value } }), { watch: [offset] })
 const medals = ['text-amber-500', 'text-neutral-400', 'text-amber-700']
 </script>
 
@@ -16,7 +17,7 @@ const medals = ['text-amber-500', 'text-neutral-400', 'text-amber-700']
     <UCard :ui="{ body: 'p-0 sm:p-0' }">
       <ul class="divide-y divide-default">
         <li v-for="(r, i) in data?.ranking || []" :key="r.id" class="flex items-center gap-3 px-4 py-3">
-          <span class="w-8 text-center font-bold" :class="medals[i] || 'text-muted'">{{ i + 1 }}</span>
+          <span class="w-8 text-center font-bold" :class="medals[offset + i] || 'text-muted'">{{ offset + i + 1 }}</span>
           <UAvatar :src="r.avatarUrl || undefined" :text="initials(r.name)" />
           <div class="min-w-0 flex-1">
             <p class="flex flex-wrap items-center gap-2">
@@ -29,5 +30,6 @@ const medals = ['text-amber-500', 'text-neutral-400', 'text-amber-700']
         </li>
       </ul>
     </UCard>
+    <ListPagination :offset="offset" :next-offset="data?.nextOffset ?? null" @update:offset="offset = $event" />
   </div>
 </template>

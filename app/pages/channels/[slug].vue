@@ -23,8 +23,11 @@ interface ChannelDetail {
     following: boolean, hasAccess: boolean, archived?: boolean, postPermission?: string, visibilityLocked?: boolean
   }
   posts: PostView[]
+  nextOffset: number | null
 }
-const { data, refresh } = await useAsyncData(() => `channel-${slug.value}`, () => api<ChannelDetail>(`/api/channels/${slug.value}`), { watch: [slug] })
+const offset = ref(0)
+watch(slug, () => { offset.value = 0 })
+const { data, refresh } = await useAsyncData(() => `channel-${slug.value}`, () => api<ChannelDetail>(`/api/channels/${slug.value}`, { query: { offset: offset.value } }), { watch: [slug, offset] })
 const tab = ref('posts')
 const tabItems = computed(() => [
   { label: t('channel.postsTab'), value: 'posts', icon: 'i-lucide-newspaper' },
@@ -222,6 +225,7 @@ async function buyAccess() {
             </div>
             <UAlert v-if="!data.posts.length" color="neutral" variant="soft" :title="t('channel.noPostsTitle')" :description="t('channel.noPostsText')" />
           </template>
+          <ListPagination :offset="offset" :next-offset="data.nextOffset" @update:offset="offset = $event" />
         </div>
         <UCard v-else class="mt-4">
           <ChannelChat v-if="user && data.channel.hasAccess" :slug="slug" />

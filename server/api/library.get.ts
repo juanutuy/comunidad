@@ -4,7 +4,7 @@
 // verifica el candado. Los items semilla sin archivo quedan como
 // metadatos/enlaces de referencia (hasFile = false).
 import { currentAuth, resolveTenant } from '../utils/community'
-import { hasPremiumAccess } from '../utils/levels'
+import { hasPaidEntitlement } from '../utils/privacy'
 import { dbFor } from '../utils/db'
 import { getPrivacySettings } from '../utils/privacy'
 
@@ -30,7 +30,7 @@ export default defineEventHandler(async (event) => {
     ? await db.prepare('SELECT * FROM library_items WHERE tenant_id = ? ORDER BY created_at DESC').all(tenant.id)
     : await db.prepare('SELECT * FROM library_items WHERE tenant_id = ? AND kind = ? ORDER BY created_at DESC').all(tenant.id, kind)) as Record<string, unknown>[]
   const { user, role } = await currentAuth(event, tenant.id)
-  const premium = user ? await hasPremiumAccess(event, tenant.id, user.id, role) : false
+  const premium = user ? await hasPaidEntitlement(event, tenant.id, user.id, role) : false
   return {
     items: rows.map(i => ({
       id: i.id, title: i.title, kind: i.kind, category: i.category,

@@ -29,9 +29,16 @@ function emptyState(): PostCommentsState {
 export function usePostComments() {
   const states = useState<Record<number, PostCommentsState>>('post-comments', () => ({}))
   const api = useApi()
+  const identity = useState<SessionUser | null>('auth-user')
+  const tenant = useState<TenantInfo | null>('auth-tenant')
+  const contextKey = () => `${tenant.value?.id}:${identity.value?.id}`
 
   function state(postId: number): PostCommentsState {
-    if (!states.value[postId]) states.value[postId] = emptyState()
+    if (!states.value[postId]) {
+      const ids = Object.keys(states.value)
+      if (ids.length >= 100) delete states.value[Number(ids[0])]
+      states.value[postId] = emptyState()
+    }
     return states.value[postId]!
   }
 
@@ -50,8 +57,10 @@ export function usePostComments() {
     const s = state(postId)
     if (s.loaded || s.loading) return
     s.loading = true
+    const context = contextKey()
     try {
       const res = await api<{ comments: CommentNode[], total: number, withheld: boolean }>(`/api/posts/${postId}/comments`)
+      if (context !== contextKey()) return
       s.roots = res.comments
       s.total = res.total
       s.withheld = !!res.withheld

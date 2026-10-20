@@ -34,11 +34,11 @@ export async function saveFile(event: any, key: string, data: Uint8Array, conten
     await r2.put(key, data, { httpMetadata: { contentType } })
   }
   else {
-    const { mkdirSync, writeFileSync } = await import('node:fs')
+    const { mkdir, writeFile } = await import('node:fs/promises')
     const { dirname, join } = await import('node:path')
-    const full = join(process.cwd(), 'data', 'uploads', key)
-    mkdirSync(dirname(full), { recursive: true })
-    writeFileSync(full, data)
+    const full = join((useRuntimeConfig().uploadsPath as string) || join(process.cwd(), 'data', 'uploads'), key)
+    await mkdir(dirname(full), { recursive: true })
+    await writeFile(full, data)
   }
   return { key, url: `/api/files/${key}` }
 }
@@ -52,14 +52,14 @@ export async function deleteFile(event: any, key: string): Promise<void> {
     if (typeof r2.delete === 'function') await r2.delete(key)
     return
   }
-  const { existsSync, unlinkSync } = await import('node:fs')
+  const { unlink } = await import('node:fs/promises')
   const { join } = await import('node:path')
   const safe = key.split('/').filter(p => p && p !== '..' && p !== '.').join('/')
-  const full = join(process.cwd(), 'data', 'uploads', safe)
-  if (existsSync(full)) unlinkSync(full)
+  const full = join((useRuntimeConfig().uploadsPath as string) || join(process.cwd(), 'data', 'uploads'), safe)
+  try { await unlink(full) } catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error }
 }
 
-export interface ReadFile { data: Uint8Array, contentType: string }
+export interface ReadFile { data: Uint8Array | ReadableStream<Uint8Array>, contentType: string }
 
 const TYPE_BY_EXT: Record<string, string> = {
   png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp', gif: 'image/gif',
@@ -79,16 +79,15 @@ export async function readFile(event: any, key: string): Promise<ReadFile | null
   if (r2) {
     const obj = await r2.get(key)
     if (!obj) return null
-    const buf = new Uint8Array(await new Response(obj.body as BodyInit).arrayBuffer())
-    return { data: buf, contentType: obj.httpMetadata?.contentType || contentTypeFor(key) }
+    return { data: obj.body as ReadableStream<Uint8Array>, contentType: obj.httpMetadata?.contentType || contentTypeFor(key) }
   }
-  const { existsSync, readFileSync } = await import('node:fs')
+  const { readFile: readLocalFile } = await import('node:fs/promises')
   const { join } = await import('node:path')
   // Clave interna generada por la app; aun así se normaliza la ruta.
   const safe = key.split('/').filter(p => p && p !== '..' && p !== '.').join('/')
-  const full = join(process.cwd(), 'data', 'uploads', safe)
-  if (!existsSync(full)) return null
-  return { data: new Uint8Array(readFileSync(full)), contentType: contentTypeFor(safe) }
+  const full = join((useRuntimeConfig().uploadsPath as string) || join(process.cwd(), 'data', 'uploads'), safe)
+  try { return { data: new Uint8Array(await readLocalFile(full)), contentType: contentTypeFor(safe) } }
+  catch (error) { if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null; throw error }
 }
 
 // Validación de subidas: tipos y tamaños (Fase 2).

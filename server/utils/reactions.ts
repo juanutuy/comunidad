@@ -8,10 +8,8 @@
 // legadas a su emoji (like→👍, love→❤️, fire→🔥, clap→👏) y colapsa
 // las filas múltiples conservando la más reciente.
 
-export const REACTION_CATALOG: string[] = [
-  '👍', '❤️', '😍', '🫀', '😂', '🥳', '🎉', '👏', '🔥', '💯',
-  '🚀', '💪', '😮', '🤯', '👀', '🤔', '💡', '🙏', '🤝', '😢', '😡',
-]
+import { REACTION_CATALOG } from '../../shared/reactions'
+export { REACTION_CATALOG } from '../../shared/reactions'
 
 const CATALOG_SET = new Set(REACTION_CATALOG)
 

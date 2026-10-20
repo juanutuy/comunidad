@@ -18,8 +18,9 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 409, message: 'Este pago ya fue revisado.' })
 
   const now = nowIso()
-  await db.prepare("UPDATE payments SET status = 'rejected', decided_by = ?, decided_at = ?, updated_at = ? WHERE id = ?")
+  const decision = await db.prepare("UPDATE payments SET status = 'rejected', decided_by = ?, decided_at = ?, updated_at = ? WHERE id = ? AND status = 'pending'")
     .run(admin.id, now, now, payment.id)
+  if (!decision.changes) throw createError({ statusCode: 409, message: 'Este pago ya fue revisado.' })
 
   let productName = 'tu compra'
   if (payment.kind === 'channel') {

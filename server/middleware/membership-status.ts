@@ -11,7 +11,8 @@
 // nada: cada endpoint decide como siempre.
 import { currentAuth, resolveTenant } from '../utils/community'
 
-const OPEN_PREFIXES = ['/api/tenant', '/api/auth/', '/api/invite/']
+const OPEN_PREFIXES = ['/api/auth/', '/api/invite/']
+const OPEN_PATHS = new Set(['/api/tenant', '/api/stripe/webhook', '/api/cron/digest'])
 const MESSAGES: Record<string, string> = {
   pending: 'Tu solicitud de ingreso está en revisión. Te avisaremos cuando un administrador la resuelva.',
   declined: 'Tu solicitud de ingreso no fue aprobada. Podés volver a solicitar el ingreso desde el registro cuando pase el tiempo de espera.',
@@ -21,10 +22,11 @@ const MESSAGES: Record<string, string> = {
 export default defineEventHandler(async (event) => {
   const path = getRequestURL(event).pathname
   if (!path.startsWith('/api/')) return
-  if (OPEN_PREFIXES.some(p => path.startsWith(p))) return
+  if (OPEN_PATHS.has(path) || OPEN_PREFIXES.some(p => path.startsWith(p))) return
   const tenant = await resolveTenant(event)
   const { user, status } = await currentAuth(event, tenant.id)
-  if (!user || !status) return
+  if (!user) return
+  if (!status) throw createError({ statusCode: 403, message: 'No sos miembro de esta comunidad.' })
   const message = MESSAGES[status]
   if (message) throw createError({ statusCode: 403, message })
 })

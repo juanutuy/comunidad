@@ -70,8 +70,8 @@ export async function fetchCommentTree(event: H3Event, tenantId: number, postId:
   const countsByComment = new Map<number, ReactionSummaryData>()
   const mineByComment = new Map<number, string>()
   if (ids.length) {
-    const placeholders = ids.map(() => '?').join(',')
-    const reactionRows = await db.prepare(`SELECT comment_id, type, COUNT(*) AS n FROM comment_reactions WHERE comment_id IN (${placeholders}) GROUP BY comment_id, type`).all(...ids) as { comment_id: number, type: string, n: number }[]
+    const placeholders = 'SELECT value FROM json_each(?)'
+    const reactionRows = await db.prepare(`SELECT comment_id, type, COUNT(*) AS n FROM comment_reactions WHERE comment_id IN (${placeholders}) GROUP BY comment_id, type`).all(JSON.stringify(ids)) as { comment_id: number, type: string, n: number }[]
     const grouped = new Map<number, { type: string, n: number }[]>()
     for (const r of reactionRows) {
       const list = grouped.get(Number(r.comment_id)) || []
@@ -80,7 +80,7 @@ export async function fetchCommentTree(event: H3Event, tenantId: number, postId:
     }
     for (const [cid, list] of grouped) countsByComment.set(cid, summarizeReactionRows(list))
     if (userId) {
-      const mine = await db.prepare(`SELECT comment_id, type FROM comment_reactions WHERE comment_id IN (${placeholders}) AND user_id = ?`).all(...ids, userId) as { comment_id: number, type: string }[]
+      const mine = await db.prepare(`SELECT comment_id, type FROM comment_reactions WHERE comment_id IN (${placeholders}) AND user_id = ?`).all(JSON.stringify(ids), userId) as { comment_id: number, type: string }[]
       for (const m of mine) mineByComment.set(Number(m.comment_id), m.type)
     }
   }

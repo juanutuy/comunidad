@@ -22,7 +22,8 @@ export default defineEventHandler(async (event) => {
   const m = await db.prepare('SELECT role, status FROM memberships WHERE tenant_id = ? AND user_id = ?').get(tenant.id, link.user_id) as { role: string, status?: string } | undefined
   if (!m || (m.status || 'active') !== 'active')
     throw createError({ statusCode: 403, message: 'Esta cuenta no puede entrar a la comunidad en este momento.' })
-  await db.prepare('UPDATE access_links SET used_at = ? WHERE id = ?').run(nowIso(), link.id)
+  const consumed = await db.prepare("UPDATE access_links SET used_at = ? WHERE id = ? AND used_at = '' AND expires_at > ?").run(nowIso(), link.id, nowIso())
+  if (!consumed.changes) throw createError({ statusCode: 400, message: 'Este enlace ya fue utilizado o venció.' })
   const user = await db.prepare('SELECT * FROM users WHERE id = ?').get(link.user_id) as import('../../utils/community').UserRow
   setSession(event, user.id, (user as { token_version?: number }).token_version ?? 0)
   return { user: { ...publicUser(user), role: m.role }, status: 'active' }

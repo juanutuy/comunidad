@@ -1,3 +1,4 @@
+import { readLimitedBody } from '../utils/request'
 // Subida de archivos autenticada (Fase 2).
 // kind=image  → imagen para adjuntar a una publicación (máx. 5 MB)
 // kind=avatar → foto de perfil del usuario actual (máx. 2 MB); además de
@@ -16,7 +17,7 @@
 //               (que exige rol admin y valida la URL).
 // Los archivos van a R2 (binding FILES) en el Worker o a data/uploads/
 // en desarrollo local (ver server/utils/storage.ts).
-import { requireUser, resolveTenant } from '../utils/community'
+import { requireCanWrite, requireUser, resolveTenant } from '../utils/community'
 import { nowIso, dbFor } from '../utils/db'
 import { IMAGE_TYPES, LIBRARY_TYPES, saveFile } from '../utils/storage'
 import { randomBytes } from 'node:crypto'
@@ -49,6 +50,8 @@ const TYPE_MESSAGES: Record<string, string> = {
 export default defineEventHandler(async (event) => {
   const tenant = await resolveTenant(event)
   const user = await requireUser(event, tenant.id)
+  await requireCanWrite(event, tenant.id, user.id)
+  await readLimitedBody(event, 16 * 1024 * 1024)
   const form = await readMultipartFormData(event)
   const filePart = form?.find(p => p.name === 'file')
   const kindPart = form?.find(p => p.name === 'kind')

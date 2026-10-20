@@ -46,18 +46,14 @@ export async function getJoinSettings(event: H3Event, tenantId: number): Promise
 // el auto-ingreso igual lo agrega — es una decisión explícita del
 // administrador al configurarlo.
 export async function applyAutoJoin(event: H3Event, tenantId: number, userId: number): Promise<void> {
-  try {
-    const { autoJoinChannels } = await getJoinSettings(event, tenantId)
-    if (!autoJoinChannels.length) return
-    const db = await dbFor(event)
-    for (const channelId of autoJoinChannels) {
-      const ch = await db.prepare('SELECT id FROM channels WHERE tenant_id = ? AND id = ?').get(tenantId, channelId)
-      if (!ch) continue
-      await db.prepare('INSERT OR IGNORE INTO follows (tenant_id, user_id, channel_id) VALUES (?, ?, ?)')
-        .run(tenantId, userId, channelId)
-    }
+  const { autoJoinChannels } = await getJoinSettings(event, tenantId)
+  const db = await dbFor(event)
+  await db.prepare(`INSERT OR IGNORE INTO follows (tenant_id, user_id, channel_id)
+    SELECT ?, ?, id FROM channels WHERE tenant_id = ? AND archived_at = '' AND visibility <> 'secret'`).run(tenantId, userId, tenantId)
+  for (const channelId of autoJoinChannels) {
+    await db.prepare(`INSERT OR IGNORE INTO follows (tenant_id, user_id, channel_id)
+      SELECT ?, ?, id FROM channels WHERE tenant_id = ? AND id = ? AND archived_at = ''`).run(tenantId, userId, tenantId, channelId)
   }
-  catch { /* el auto-ingreso nunca debe romper un alta */ }
 }
 
 // ---------- Cooldown tras un rechazo ----------

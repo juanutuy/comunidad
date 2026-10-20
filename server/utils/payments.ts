@@ -6,10 +6,10 @@
 // conceda exactamente lo mismo que uno confirmado por la pasarela.
 //
 // Regla de oro heredada de la Fase 4: crear un pago NUNCA concede;
-// solo concede grantPaymentAccess, y solo se la llama con el pago ya
+// solo concede paymentGrantCommands, y solo se la llama con el pago ya
 // confirmado (webhook firmado) o aprobado por un admin (manual).
 import type { H3Event } from 'h3'
-import type { AsyncDb } from './db'
+import type { AsyncDb, DbCommand } from './db'
 import { dbFor, nowIso } from './db'
 import { serverMessage } from './i18n'
 import type { AppLocale } from './i18n'
@@ -92,28 +92,35 @@ export function periodEndForInterval(interval: string, fromIso = nowIso()): stri
 // período calculado del intervalo del plan.
 export interface GrantOptions {
   source: 'stripe' | 'manual'
+  subscriptionStatus?: 'active' | 'inactive' | 'canceled'
+  stripeEventCreated?: number
   periodEnd?: string
   stripeSubscriptionId?: string
   stripeCustomerId?: string
 }
 
-export async function grantPaymentAccess(db: AsyncDb, payment: Record<string, unknown>, opts: GrantOptions): Promise<void> {
+/** Commands are committed together with the payment state and webhook receipt. */
+export function paymentGrantCommands(payment: Record<string, unknown>, opts: GrantOptions): DbCommand[] {
   const now = nowIso()
-  const tenantId = Number(payment.tenant_id)
-  const userId = Number(payment.user_id)
-  if (payment.kind === 'channel') {
-    await db.prepare('INSERT OR IGNORE INTO channel_access (tenant_id, user_id, channel_id, source, created_at) VALUES (?, ?, ?, ?, ?)')
-      .run(tenantId, userId, Number(payment.item_id), opts.source, now)
-  }
-  else if (payment.kind === 'course') {
-    await db.prepare('INSERT OR IGNORE INTO enrollments (tenant_id, course_id, user_id, created_at) VALUES (?, ?, ?, ?)')
-      .run(tenantId, Number(payment.item_id), userId, now)
-  }
-  else if (payment.kind === 'plan') {
-    const planId = Number(payment.plan_id || payment.item_id)
-    await db.prepare(`INSERT INTO member_subscriptions (tenant_id, user_id, plan_id, status, source, stripe_subscription_id, stripe_customer_id, current_period_end, created_at, updated_at)
-      VALUES (?, ?, ?, 'active', ?, ?, ?, ?, ?, ?)
-      ON CONFLICT(tenant_id, user_id, plan_id) DO UPDATE SET status = 'active', stripe_subscription_id = excluded.stripe_subscription_id, stripe_customer_id = excluded.stripe_customer_id, current_period_end = CASE WHEN excluded.current_period_end != '' THEN excluded.current_period_end ELSE member_subscriptions.current_period_end END, updated_at = excluded.updated_at`)
-      .run(tenantId, userId, planId, opts.source, opts.stripeSubscriptionId || '', opts.stripeCustomerId || '', opts.periodEnd || '', now, now)
-  }
+  const id = Number(payment.id)
+  const pending = " FROM payments WHERE id = ? AND status = 'pending'"
+  if (payment.kind === 'channel') return [{
+    sql: `INSERT OR IGNORE INTO channel_access (tenant_id, user_id, channel_id, source, created_at) SELECT tenant_id, user_id, item_id, ?, ?${pending}`,
+    params: [opts.source, now, id],
+  }]
+  if (payment.kind === 'course') return [{
+    sql: `INSERT OR IGNORE INTO enrollments (tenant_id, course_id, user_id, created_at) SELECT tenant_id, item_id, user_id, ?${pending}`,
+    params: [now, id],
+  }]
+  if (payment.kind === 'plan') return [{
+    sql: `INSERT INTO member_subscriptions (tenant_id, user_id, plan_id, status, source, stripe_subscription_id, stripe_customer_id, current_period_end, created_at, updated_at, stripe_event_created)
+      SELECT tenant_id, user_id, CASE WHEN plan_id > 0 THEN plan_id ELSE item_id END, ?, ?, ?, ?, ?, ?, ?, ?${pending}
+      ON CONFLICT(tenant_id, user_id, plan_id) DO UPDATE SET status = excluded.status, source = excluded.source,
+        stripe_subscription_id = excluded.stripe_subscription_id, stripe_customer_id = excluded.stripe_customer_id,
+        current_period_end = excluded.current_period_end, updated_at = excluded.updated_at, stripe_event_created = excluded.stripe_event_created
+      WHERE excluded.source = 'manual' OR member_subscriptions.stripe_subscription_id <> excluded.stripe_subscription_id
+        OR (member_subscriptions.stripe_event_created <= excluded.stripe_event_created AND member_subscriptions.status <> 'canceled')`,
+    params: [opts.subscriptionStatus || 'active', opts.source, opts.stripeSubscriptionId || '', opts.stripeCustomerId || '', opts.periodEnd || '', now, now, opts.stripeEventCreated || 0, id],
+  }]
+  throw createError({ statusCode: 400, message: 'Tipo de pago inválido.' })
 }

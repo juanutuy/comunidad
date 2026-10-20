@@ -5,7 +5,7 @@
 // un miembro NO admin lo manda a 'review' (no a 'published'): así un
 // post rechazado que vuelve a borradores y se reenvía pasa otra vez
 // por la cola. Si quien publica es admin, sale directo.
-import { currentAuth, requireCanWrite, requireUser, resolveTenant } from '../../../utils/community'
+import { canAccessChannel, channelPostPermission, isChannelArchived, isStaff, currentAuth, requireCanWrite, requireUser, resolveTenant } from '../../../utils/community'
 import { nowIso, dbFor } from '../../../utils/db'
 import { getReviewEnabled } from '../../../utils/moderation'
 import { notifyNewPost } from '../../../utils/notify'
@@ -21,6 +21,10 @@ export default defineEventHandler(async (event) => {
   if (!post) throw createError({ statusCode: 404, message: 'Publicación no encontrada.' })
   if (post.author_id !== user.id && role !== 'admin')
     throw createError({ statusCode: 403, message: 'Solo el autor puede publicar este borrador.' })
+  const channel = await db.prepare('SELECT * FROM channels WHERE id = ? AND tenant_id = ?').get(post.channel_id, tenant.id)
+  if (!channel || isChannelArchived(channel)) throw createError({ statusCode: 404, message: 'Canal no encontrado.' })
+  if (!await canAccessChannel(event, user.id, role, channel) || (channelPostPermission(channel) === 'staff' && !isStaff(role)))
+    throw createError({ statusCode: 403, message: 'No tenés permiso para publicar en este canal.' })
   // Fase 14: publicar es participar — no con la cuenta restringida.
   await requireCanWrite(event, tenant.id, user.id)
   if (post.status === 'published') return { ok: true, already: true }

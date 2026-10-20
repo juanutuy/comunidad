@@ -1,67 +1,37 @@
-// Feed principal: publicaciones de canales públicos + seguidos por el
-// usuario. Las de canales pagos/privados sin acceso van como teaser.
-import { POST_SELECT, canAccessChannel, channelBySlug, channelVisibility, currentAuth, isChannelArchived, publishDuePosts, resolveTenant, serializePost } from '../utils/community'
+import { POST_SELECT, channelVisibility, currentAuth, publishDuePosts, resolveTenant, serializePost } from '../utils/community'
 import { dbFor } from '../utils/db'
 import { getPrivacySettings, requireSessionUnlessPublic } from '../utils/privacy'
 import { hiddenFilterSql } from '../utils/blocks'
+import { activeSubscription, channelAccessDecision } from '../../shared/access'
+import { postMetadata } from '../utils/postMetadata'
+import { pagination } from '../utils/pagination'
+import type { ChannelRow } from '../utils/community'
 
 export default defineEventHandler(async (event) => {
   const tenant = await resolveTenant(event)
   const { user, role } = await currentAuth(event, tenant.id)
-  // Endurecimiento Fase 15: comunidad privada = el feed no se lee sin sesión.
   await requireSessionUnlessPublic(event, tenant.id, user)
   const db = await dbFor(event)
   await publishDuePosts(event, tenant.id)
-  const hf = hiddenFilterSql(user?.id ?? null)
-  // Fase 7: orden del feed elegido por el lector. «Recientes» (desc,
-  // por defecto) deja los fijados primero; «Antiguos» (asc) es
-  // cronológico simple, sin destacar fijados — así lo hace la
-  // referencia y evita que un anuncio viejo bloquee el orden.
-  const sort = getQuery(event).sort === 'asc' ? 'asc' : 'desc'
-  const orderBy = sort === 'asc' ? 'p.created_at ASC' : 'p.pinned DESC, p.created_at DESC'
-  const rows = await db.prepare(`${POST_SELECT} WHERE p.tenant_id = ? AND p.status = 'published'${hf.sql} ORDER BY ${orderBy} LIMIT 50`).all(tenant.id, ...hf.params) as Record<string, unknown>[]
-  // Fase 12: los posts en revisión SOLO aparecen en el feed de su
-  // autor y de los admins (con la insignia «En revisión» que pinta
-  // PostCard desde `status`). Para el resto no existen.
-  if (user) {
-    const reviewRows = role === 'admin'
-      ? await db.prepare(`${POST_SELECT} WHERE p.tenant_id = ? AND p.status = 'review'${hf.sql} ORDER BY p.created_at DESC LIMIT 50`).all(tenant.id, ...hf.params) as Record<string, unknown>[]
-      : await db.prepare(`${POST_SELECT} WHERE p.tenant_id = ? AND p.status = 'review' AND p.author_id = ?${hf.sql} ORDER BY p.created_at DESC LIMIT 50`).all(tenant.id, user.id, ...hf.params) as Record<string, unknown>[]
-    rows.push(...reviewRows)
-    rows.sort((a, b) => sort === 'asc'
-      ? String(a.created_at).localeCompare(String(b.created_at))
-      : (Number(b.pinned) - Number(a.pinned)) || String(b.created_at).localeCompare(String(a.created_at)))
-  }
-  const followed = new Set(user
-    ? (await db.prepare('SELECT channel_id FROM follows WHERE tenant_id = ? AND user_id = ?').all(tenant.id, user.id) as unknown as { channel_id: number }[]).map(f => f.channel_id)
-    : [])
   const priv = await getPrivacySettings(event, tenant.id)
-  const posts = []
-  for (const r of rows) {
-    const channel = (await channelBySlug(event, tenant.id, r.channel_slug as string))!
-    // Fase 16: los posts de un canal archivado salen del feed de los
-    // miembros (quedan guardados; el admin los sigue viendo).
-    if (isChannelArchived(channel) && role !== 'admin') continue
-    const access = await canAccessChannel(event, user?.id ?? null, role, channel)
-    // Fase 16-F: en un canal de visibilidad privada o secreta, el
-    // contenido NO sale en el feed de quien no tiene acceso — ni
-    // como anticipo. (El anticipo es cosa de los canales pagos con
-    // visibilidad pública, como hasta ahora.)
-    if (channelVisibility(channel) !== 'public' && !access) continue
-    if (channel.type === 'paid' && !access && r.status === 'published') {
-      // Fase 15 — tarjeta bloqueada de un canal pago según el ajuste
-      // «dónde aparecen» del tenant: 'feed' la muestra en el feed (el
-      // valor por defecto, como en la referencia); 'channel' la deja
-      // solo en la página del canal; 'hidden' no la muestra en
-      // ninguna parte hasta la compra.
-      if (priv.paidLockedWhere !== 'feed') continue
-      // Un visitante solo ve tarjetas bloqueadas en el modo público:
-      // en el modo privado su feed queda como siempre (canales
-      // abiertos), sin superficies de venta nuevas.
-      if (!user && priv.visibility !== 'public') continue
-    }
-    else if (channel.type !== 'free' && !followed.has(channel.id) && !access) continue
-    posts.push(await serializePost(event, r, user?.id ?? null, access, role))
-  }
-  return { posts }
+  const { limit, offset } = pagination(event)
+  const sort = getQuery(event).sort === 'asc' ? 'asc' : 'desc'
+  const channels = await db.prepare('SELECT * FROM channels WHERE tenant_id = ?').all(tenant.id) as ChannelRow[]
+  const direct = new Set(user ? (await db.prepare('SELECT channel_id FROM channel_access WHERE tenant_id = ? AND user_id = ?').all(tenant.id, user.id)).map(r => r.channel_id) : [])
+  const subscribed = user ? await activeSubscription((sql, ...params) => db.prepare(sql).get(...params), tenant.id, user.id) : false
+  const access = new Map(channels.map(c => [c.id, channelAccessDecision(c, user?.id ?? null, role, direct.has(c.id), subscribed)]))
+  const visible = channels.filter(c => {
+    if (c.archived_at && role !== 'admin') return false
+    if (access.get(c.id)) return true
+    return channelVisibility(c) === 'public' && c.type === 'paid' && priv.paidLockedWhere === 'feed' && (!!user || priv.visibility === 'public')
+  }).map(c => c.id)
+  const hf = hiddenFilterSql(user?.id ?? null)
+  const order = sort === 'asc' ? 'p.created_at ASC, p.id ASC' : 'p.pinned DESC, p.created_at DESC, p.id DESC'
+  const rows = await db.prepare(`${POST_SELECT} WHERE p.tenant_id = ? AND p.channel_id IN (SELECT value FROM json_each(?))
+    AND (p.status = 'published' OR (p.status = 'review' AND (? = 'admin' OR p.author_id = ?)))${hf.sql}
+    ORDER BY ${order} LIMIT ? OFFSET ?`).all(tenant.id, JSON.stringify(visible), role, user?.id ?? null, ...hf.params, limit + 1, offset)
+  const page = rows.slice(0, limit)
+  const metadata = await postMetadata(event, page, user?.id ?? null)
+  const posts = await Promise.all(page.map(r => serializePost(event, r, user?.id ?? null, access.get(r.channel_id_raw) ?? false, role, { metadata: metadata.get(r.id) })))
+  return { posts, nextOffset: rows.length > limit ? offset + limit : null }
 })

@@ -1,3 +1,5 @@
+> Nota: decisiones históricas. La arquitectura operativa actual y migraciones están descritas en [README](../README.md) y [Despliegue](DESPLIEGUE.md).
+
 # Cómo se creó esta plataforma
 
 Documento de origen y método: qué se encargó, con qué reglas se construyó, qué

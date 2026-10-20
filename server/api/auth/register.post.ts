@@ -1,3 +1,4 @@
+import { limitAuthAttempts } from '../../utils/authLimits'
 // Registro: crea el usuario y su membresía, y abre sesión.
 // Fase 14 — tres caminos de ingreso:
 //   - Con invitación válida (token): la invitación ES la aprobación —
@@ -13,7 +14,7 @@
 // puede volver a solicitar cuando pasó el cooldown configurado.
 // En todos los caminos de alta activa se aplica el auto-ingreso a
 // canales del tenant.
-import { hashPassword, setSession } from '../../utils/auth'
+import { hashPassword, setSession, verifyPassword } from '../../utils/auth'
 import { publicUser, resolveTenant } from '../../utils/community'
 import { nowIso, dbFor, slugify } from '../../utils/db'
 import { eventLocale, msg, resolveEventLocale, setLocaleCookie } from '../../utils/i18n'
@@ -32,14 +33,15 @@ interface RegisterBody {
 
 export default defineEventHandler(async (event) => {
   const body = await readBody<RegisterBody>(event)
-  const name = (body.name || '').trim()
-  const email = (body.email || '').trim().toLowerCase()
-  const password = body.password || ''
+  const name = typeof body.name === 'string' ? body.name.trim().slice(0, 120) : ''
+  const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : ''
+  const password = typeof body.password === 'string' ? body.password : ''
+  await limitAuthAttempts(event, email)
   const db = await dbFor(event)
   const tenant = await resolveTenant(event)
   // Fase 18: los errores del registro salen en el idioma resuelto
   // del visitante (cookie o defecto de la comunidad).
-  if (!name || !email.includes('@') || password.length < 8)
+  if (!name || (email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) || password.length < 8 || password.length > 1024 || (body.answers !== undefined && !Array.isArray(body.answers)))
     throw createError({ statusCode: 400, message: await msg(event, tenant.id, 'auth.registerInvalid') })
   const join = await getJoinSettings(event, tenant.id)
 
@@ -64,12 +66,15 @@ export default defineEventHandler(async (event) => {
   let userId: number
   let reapplying = false
   if (existing) {
+    // A pre-existing global identity must prove ownership before joining or reapplying.
+    if (!verifyPassword(password, existing.password_hash))
+      throw createError({ statusCode: 409, message: await msg(event, tenant.id, 'auth.emailTaken') })
     const m = await db.prepare('SELECT status FROM memberships WHERE tenant_id = ? AND user_id = ?').get(tenant.id, existing.id) as { status: string } | undefined
     // Único reingreso posible con el mismo correo: la solicitud fue
     // rechazada en ESTE tenant y ya pasó el cooldown.
-    if (!m || (m.status || 'active') !== 'declined')
+    if (m && (m.status || 'active') !== 'declined')
       throw createError({ statusCode: 409, message: await msg(event, tenant.id, 'auth.emailTaken') })
-    if (!invitation) {
+    if (m && !invitation) {
       const until = await joinCooldownUntil(event, tenant.id, existing.id)
       if (until) {
         const locale = await eventLocale(event, tenant.id)
@@ -77,11 +82,9 @@ export default defineEventHandler(async (event) => {
         throw createError({ statusCode: 403, message: await msg(event, tenant.id, 'auth.cooldown', { date: fecha }) })
       }
     }
-    // Se renueva la solicitud: contraseña nueva y nombre actualizado.
-    await db.prepare('UPDATE users SET password_hash = ?, name = ?, token_version = token_version + 1 WHERE id = ?')
-      .run(hashPassword(password), name, existing.id)
+    // Reapplication changes the membership, never global credentials or name.
     userId = existing.id
-    reapplying = true
+    reapplying = !!m
   }
   else {
     let slug = slugify(name)

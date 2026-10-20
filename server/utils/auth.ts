@@ -2,6 +2,7 @@
 // en cookie httpOnly firmada con HMAC-SHA256. Sin dependencias externas.
 import { createHmac, randomBytes, scryptSync, timingSafeEqual } from 'node:crypto'
 import type { H3Event } from 'h3'
+import { parseSessionCookie, sessionSecret } from '../../shared/session'
 
 export function hashPassword(password: string): string {
   const salt = randomBytes(16)
@@ -10,6 +11,7 @@ export function hashPassword(password: string): string {
 }
 
 export function verifyPassword(password: string, stored: string): boolean {
+  if (typeof password !== 'string' || password.length > 1024 || !/^scrypt:[a-f0-9]{32}:[a-f0-9]{128}$/.test(stored)) return false
   const parts = stored.split(':')
   if (parts.length !== 3 || parts[0] !== 'scrypt') return false
   const salt = Buffer.from(parts[1]!, 'hex')
@@ -19,7 +21,7 @@ export function verifyPassword(password: string, stored: string): boolean {
 }
 
 function secret(): string {
-  return (useRuntimeConfig().sessionSecret as string) || 'dev-only'
+  return sessionSecret(useRuntimeConfig().sessionSecret, import.meta.dev)
 }
 
 function sign(payload: string): string {
@@ -32,7 +34,7 @@ export function setSession(event: H3Event, userId: number, version = 0) {
   const payload: SessionPayload = { uid: userId, exp: Date.now() + 1000 * 60 * 60 * 24 * 7, v: version }
   const body = Buffer.from(JSON.stringify(payload)).toString('base64url')
   setCookie(event, 'cm_session', `${body}.${sign(body)}`, {
-    httpOnly: true, sameSite: 'lax', path: '/', maxAge: 60 * 60 * 24 * 7,
+    httpOnly: true, secure: !import.meta.dev && getRequestURL(event).protocol === 'https:', sameSite: 'lax', path: '/', maxAge: 60 * 60 * 24 * 7,
   })
 }
 
@@ -41,17 +43,5 @@ export function destroySession(event: H3Event) {
 }
 
 export function readSession(event: H3Event): SessionPayload | null {
-  const cookie = getCookie(event, 'cm_session')
-  if (!cookie) return null
-  const [body, sig] = cookie.split('.')
-  if (!body || !sig) return null
-  const expected = sign(body)
-  if (sig.length !== expected.length) return null
-  if (!timingSafeEqual(Buffer.from(sig), Buffer.from(expected))) return null
-  try {
-    const payload = JSON.parse(Buffer.from(body, 'base64url').toString('utf8')) as SessionPayload
-    if (payload.exp < Date.now()) return null
-    return payload
-  }
-  catch { return null }
+  return parseSessionCookie(getCookie(event, 'cm_session'), secret())
 }

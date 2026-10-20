@@ -8,13 +8,15 @@ const api = useApi()
 // Fase 7: orden del feed (Recientes = fijados primero y más nuevos;
 // Antiguos = cronológico simple). El parámetro viaja al endpoint.
 const sort = ref<'desc' | 'asc'>('desc')
+const offset = ref(0)
+watch(sort, () => { offset.value = 0 })
 const sortOptions = computed(() => [
   { label: t('feed.latest'), value: 'desc' as const, icon: 'i-lucide-arrow-down-wide-narrow' },
   { label: t('feed.oldest'), value: 'asc' as const, icon: 'i-lucide-arrow-up-narrow-wide' },
 ])
 const { data, refresh } = await useAsyncData('feed',
-  () => api<{ posts: PostView[] }>('/api/feed', { query: { sort: sort.value } }),
-  { watch: [sort] })
+  () => api<{ posts: PostView[], nextOffset: number | null }>('/api/feed', { query: { sort: sort.value, offset: offset.value } }),
+  { watch: [sort, offset] })
 </script>
 
 <template>
@@ -45,6 +47,7 @@ const { data, refresh } = await useAsyncData('feed',
     </UAlert>
 
     <PostCard v-for="post in data?.posts || []" :key="post.id" :post="post" @changed="refresh" />
+    <ListPagination :offset="offset" :next-offset="data?.nextOffset ?? null" @update:offset="offset = $event" />
     <UAlert v-if="!(data?.posts?.length)" color="neutral" variant="soft" :title="t('feed.emptyTitle')" :description="t('feed.emptyText')" />
   </div>
 </template>

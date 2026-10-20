@@ -6,7 +6,7 @@
 // Acceso: solo admin.
 import { requireAdmin, resolveTenant } from '../../utils/community'
 import { dbFor } from '../../utils/db'
-import { findFileLocations, formatBytes, mediaKind, mediaUrls } from '../../utils/media'
+import { findFilesLocations, formatBytes, mediaKind, mediaUrls } from '../../utils/media'
 import type { UploadRow } from '../../utils/media'
 
 const KINDS = ['image', 'video', 'audio', 'file'] as const
@@ -39,9 +39,10 @@ export default defineEventHandler(async (event) => {
     FROM uploads u LEFT JOIN users usr ON usr.id = u.user_id
     WHERE u.tenant_id = ?${typeFilter} ORDER BY u.created_at DESC, u.id DESC LIMIT ? OFFSET ?`)
     .all(tenant.id, limit, offset) as (UploadRow & { uploader_name: string | null, uploader_slug: string | null })[]
+  const locationsByFile = await findFilesLocations(db, tenant.id, rows)
   const files = []
   for (const r of rows) {
-    const locations = await findFileLocations(db, tenant.id, r)
+    const locations = locationsByFile.get(r.id)!
     const urls = mediaUrls(r, locations.libraryItemId)
     files.push({
       id: r.id, filename: r.filename || r.key, key: r.key,

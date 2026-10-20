@@ -1,3 +1,4 @@
+import { postMetadata } from '../utils/postMetadata'
 // Búsqueda global del tenant: publicaciones, canales, cursos y miembros.
 // Respeta el acceso a canales: las publicaciones de canales pagos o
 // privados sin acceso aparecen SOLO como teaser (igual que en el feed),
@@ -35,6 +36,7 @@ export default defineEventHandler(async (event) => {
       : await db.prepare(`${POST_SELECT} WHERE p.tenant_id = ? AND p.status = 'review' AND p.author_id = ? AND (p.title LIKE ? OR p.body LIKE ?)${hf.sql} ORDER BY p.created_at DESC LIMIT 10`).all(tenant.id, user.id, like, like, ...hf.params) as Record<string, unknown>[]
     postRows.push(...reviewRows)
   }
+  const metadata = await postMetadata(event, postRows, user?.id ?? null)
   const posts = []
   for (const r of postRows) {
     const ch = (await channelBySlug(event, tenant.id, r.channel_slug as string))!
@@ -50,7 +52,7 @@ export default defineEventHandler(async (event) => {
     // 'channel' o 'hidden', la tarjeta bloqueada no sale acá (como en
     // la referencia: «Main feed and search stay clear»).
     if (ch.type === 'paid' && !access && priv.paidLockedWhere !== 'feed') continue
-    posts.push(await serializePost(event, r, user?.id ?? null, access, role))
+    posts.push(await serializePost(event, r, user?.id ?? null, access, role, { metadata: metadata.get(Number(r.id)) }))
   }
 
   const channelRows = await db.prepare('SELECT * FROM channels WHERE tenant_id = ? AND (name LIKE ? OR description LIKE ?) ORDER BY sort LIMIT 10').all(tenant.id, like, like) as Record<string, unknown>[]

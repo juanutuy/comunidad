@@ -3,7 +3,10 @@
 // Todo es asíncrono: la capa de datos (server/utils/db.ts) devuelve
 // Promesas tanto en SQLite local como en Cloudflare D1.
 import type { H3Event } from 'h3'
+import { postMetadata } from './postMetadata'
+import type { PostMetadata } from './postMetadata'
 import { readSession } from './auth'
+import { channelAccess, tenantForHost } from '../../shared/access'
 import { isOnline } from './chat'
 import { dbFor } from './db'
 import { msg } from './i18n'
@@ -61,23 +64,9 @@ export function channelPostPermission(channel: { post_permission?: string | null
 
 export async function resolveTenant(event: H3Event): Promise<TenantRow> {
   const db = await dbFor(event)
-  const host = (getRequestHost(event) || '').split(':')[0]!.toLowerCase()
-  // Fase 4: dominio personalizado — coincidencia EXACTA del host contra
-  // tenant_domains, antes que cualquier otra regla.
-  if (host) {
-    try {
-      const byDomain = await db.prepare('SELECT t.* FROM tenant_domains d JOIN tenants t ON t.id = d.tenant_id WHERE d.domain = ?').get(host) as TenantRow | undefined
-      if (byDomain) return byDomain
-    }
-    catch { /* bases anteriores sin la tabla: seguir con subdominio */ }
-  }
-  const sub = host.split('.')[0]!
-  if (sub && !['localhost', 'www', '127'].includes(sub)) {
-    const bySlug = await db.prepare('SELECT * FROM tenants WHERE slug = ?').get(sub) as TenantRow | undefined
-    if (bySlug) return bySlug
-  }
-  const demo = await db.prepare('SELECT * FROM tenants ORDER BY id LIMIT 1').get() as TenantRow
-  return demo
+  const tenant = await tenantForHost((sql, ...params) => db.prepare(sql).get(...params), getRequestHost(event))
+  if (!tenant) throw createError({ statusCode: 404, message: 'Comunidad no encontrada.' })
+  return tenant as TenantRow
 }
 
 export function publicUser(u: UserRow) {
@@ -99,9 +88,6 @@ export function isStaff(role: string | null | undefined): boolean {
 export function canModerate(role: string | null | undefined): boolean {
   return role === 'admin' || role === 'moderator'
 }
-export function canManageCourses(role: string | null | undefined): boolean {
-  return role === 'admin' || role === 'course_manager'
-}
 
 export async function currentAuth(event: H3Event, tenantId: number) {
   const session = readSession(event)
@@ -117,32 +103,10 @@ export async function currentAuth(event: H3Event, tenantId: number) {
   return { user, role: m?.role ?? null, status: m ? (m.status || 'active') : null }
 }
 
-export async function ensureMembership(event: H3Event, tenantId: number, userId: number, role = 'member') {
-  const db = await dbFor(event)
-  const res = await db.prepare('INSERT OR IGNORE INTO memberships (tenant_id, user_id, role) VALUES (?, ?, ?)')
-    .run(tenantId, userId, role)
-  // Fase 16-F: una membresía NUEVA nace siguiendo los canales
-  // listados del tenant (no archivados, no secretos): es lo que el
-  // lateral siempre mostró y ahora el lateral filtra por
-  // seguimiento (seguir/dejar de seguir vive en el menú del canal).
-  // El auto-ingreso configurado por el admin corre aparte y suma
-  // sus canales aunque sean secretos.
-  if (res.changes > 0) {
-    try {
-      await db.prepare(`INSERT OR IGNORE INTO follows (tenant_id, user_id, channel_id)
-        SELECT ?, ?, c.id FROM channels c WHERE c.tenant_id = ?
-          AND (c.archived_at IS NULL OR c.archived_at = '')
-          AND (c.visibility IS NULL OR c.visibility <> 'secret')`)
-        .run(tenantId, userId, tenantId)
-    }
-    catch { /* la semilla de seguimientos nunca rompe un alta */ }
-  }
-}
-
 export async function requireUser(event: H3Event, tenantId: number): Promise<UserRow> {
   const { user, status } = await currentAuth(event, tenantId)
   if (!user) throw createError({ statusCode: 401, message: await msg(event, tenantId, 'auth.signInRequired') })
-  await ensureMembership(event, tenantId, user.id)
+  if (!status) throw createError({ statusCode: 403, message: 'No sos miembro de esta comunidad.' })
   // Fase 14: estados que NO dan acceso a la comunidad. 'pending' =
   // solicitud de ingreso en revisión; 'declined' = solicitud
   // rechazada; 'suspended' = cuenta suspendida por un administrador.
@@ -193,45 +157,8 @@ export async function requireCourseManager(event: H3Event, tenantId: number): Pr
 }
 
 export async function canAccessChannel(event: H3Event, userId: number | null, role: string | null, channel: ChannelRow): Promise<boolean> {
-  // Fase 16-F: con visibilidad 'public' manda la regla de siempre
-  // (la de abajo). Con 'private' o 'secret' el acceso es ESTRICTO:
-  // ni el canal gratuito se abre solo — hace falta el acceso
-  // concedido (invitación/compra/manual), la membresía cuando el
-  // acceso es «solo miembros» o la suscripción cuando es pago.
-  if (channelVisibility(channel) === 'public') {
-    if (channel.type === 'free') return true
-    if (!userId) return false
-    if (role === 'admin') return true
-    if (channel.type === 'private') return !!role // miembro del tenant
-    // paid: acceso directo (demo/stripe) o membresía activa del tenant
-    // (los planes incluyen acceso a los canales pagos — Fase 4).
-    const db = await dbFor(event)
-    const row = await db.prepare('SELECT id FROM channel_access WHERE tenant_id = ? AND user_id = ? AND channel_id = ?')
-      .get(channel.tenant_id, userId, channel.id)
-    if (row) return true
-    try {
-      const sub = await db.prepare("SELECT id FROM member_subscriptions WHERE tenant_id = ? AND user_id = ? AND status = 'active'")
-        .get(channel.tenant_id, userId)
-      return !!sub
-    }
-    catch { return false }
-  }
-  if (!userId) return false
-  if (role === 'admin') return true
   const db = await dbFor(event)
-  const row = await db.prepare('SELECT id FROM channel_access WHERE tenant_id = ? AND user_id = ? AND channel_id = ?')
-    .get(channel.tenant_id, userId, channel.id)
-  if (row) return true
-  if (channel.type === 'private') return !!role // la membresía ES el acceso
-  if (channel.type === 'paid') {
-    try {
-      const sub = await db.prepare("SELECT id FROM member_subscriptions WHERE tenant_id = ? AND user_id = ? AND status = 'active'")
-        .get(channel.tenant_id, userId)
-      return !!sub
-    }
-    catch { return false }
-  }
-  return false // free + visibilidad privada/secreta: solo acceso concedido
+  return channelAccess((sql, ...params) => db.prepare(sql).get(...params), userId, role, channel)
 }
 
 // Fase 5 — publicación perezosa de posts programados: en Workers no
@@ -272,45 +199,16 @@ export interface PollView {
 // comprador LEE el post entero pero no comenta, reacciona ni vota —
 // interactuar sigue exigiendo el acceso comprado. Sin opts, interactuar
 // equivale a tener acceso completo (el comportamiento de siempre).
-export async function serializePost(event: H3Event, row: Record<string, unknown>, userId: number | null, fullAccess: boolean, viewerRole: string | null = null, opts?: { canInteract?: boolean }) {
-  const db = await dbFor(event)
+export async function serializePost(event: H3Event, row: Record<string, unknown>, userId: number | null, fullAccess: boolean, viewerRole: string | null = null, opts?: { canInteract?: boolean, metadata?: PostMetadata }) {
   const postId = row.id as number
   const canInteract = opts?.canInteract ?? fullAccess
   // Fase 16-G: conteos por emoji del catálogo (las filas legadas ya
   // viajaron a emoji en la migración), resumen con total y top, y MI
   // reacción (una sola por usuario desde esta fase; null = ninguna).
-  const reactionRows = await db.prepare('SELECT type, COUNT(*) AS n FROM reactions WHERE post_id = ? GROUP BY type').all(postId) as { type: string, n: number }[]
-  const reactionSummary = summarizeReactionRows(reactionRows)
-  const myReactionRow = userId
-    ? await db.prepare('SELECT type FROM reactions WHERE post_id = ? AND user_id = ?').get(postId, userId) as { type: string } | undefined
-    : undefined
-  const myReaction = myReactionRow?.type ?? null
-  const commentCount = (await db.prepare('SELECT COUNT(*) AS n FROM comments WHERE post_id = ?').get(postId) as { n: number }).n
-  const bookmarked = userId
-    ? !!await db.prepare('SELECT id FROM bookmarks WHERE post_id = ? AND user_id = ?').get(postId, userId)
-    : false
-  // Fase 5: si el post es una encuesta, se adjuntan opciones, conteos,
-  // porcentajes y el voto del usuario actual (solo con acceso completo:
-  // en un canal bloqueado la encuesta también queda detrás del teaser).
-  let poll: PollView | null = null
-  if (row.kind === 'poll' && canInteract) {
-    const optionRows = await db.prepare('SELECT * FROM poll_options WHERE post_id = ? ORDER BY sort, id').all(postId) as Record<string, unknown>[]
-    const voteRows = await db.prepare('SELECT option_id, COUNT(*) AS n FROM poll_votes WHERE post_id = ? GROUP BY option_id').all(postId) as { option_id: number, n: number }[]
-    const counts = new Map(voteRows.map(v => [Number(v.option_id), Number(v.n)]))
-    const totalVotes = voteRows.reduce((acc, v) => acc + Number(v.n), 0)
-    const myVote = userId
-      ? await db.prepare('SELECT option_id FROM poll_votes WHERE post_id = ? AND user_id = ?').get(postId, userId) as { option_id: number } | undefined
-      : undefined
-    poll = {
-      options: optionRows.map(o => ({
-        id: Number(o.id), label: String(o.label),
-        votes: counts.get(Number(o.id)) ?? 0,
-        pct: totalVotes ? Math.round(((counts.get(Number(o.id)) ?? 0) / totalVotes) * 100) : 0,
-      })),
-      totalVotes,
-      myOptionId: myVote ? Number(myVote.option_id) : null,
-    }
-  }
+  const metadata = opts?.metadata ?? (await postMetadata(event, [row], userId)).get(postId)!
+  const reactionSummary = summarizeReactionRows(metadata.reactions)
+  const { myReaction, commentCount, bookmarked } = metadata
+  const poll = canInteract ? metadata.poll : null
   // Fase 8: post anónimo REAL. Para cualquier lector que no sea el
   // propio autor ni un admin, el autor se reemplaza por «Anónimo» sin
   // slug, sin avatar y sin presencia: ningún campo de la respuesta
@@ -408,11 +306,4 @@ export const POST_SELECT = `SELECT p.*, u.name AS author_name, u.slug AS author_
 export async function channelBySlug(event: H3Event, tenantId: number, slug: string): Promise<ChannelRow | undefined> {
   const db = await dbFor(event)
   return await db.prepare('SELECT * FROM channels WHERE tenant_id = ? AND slug = ?').get(tenantId, slug) as ChannelRow | undefined
-}
-
-export async function postAccess(event: H3Event, tenant: TenantRow, row: Record<string, unknown>) {
-  const { user, role } = await currentAuth(event, tenant.id)
-  const channel = (await channelBySlug(event, tenant.id, row.channel_slug as string))!
-  const access = await canAccessChannel(event, user?.id ?? null, role, channel)
-  return { user, role, channel, access }
 }

@@ -1,1 +1,51 @@
-{"dependencies":{"@iconify-json/lucide":"^1.2.139","@nuxt/ui":"^4.11.3","@tiptap/extension-image":"^3.32.0","@tiptap/extension-link":"^3.32.0","@tiptap/extension-placeholder":"^3.32.0","@tiptap/extension-task-item":"^3.32.0","@tiptap/extension-task-list":"^3.32.0","@tiptap/extension-underline":"^3.32.0","@tiptap/starter-kit":"^3.32.0","@tiptap/suggestion":"^3.32.0","@tiptap/vue-3":"^3.32.0","better-sqlite3":"^12.4.1","drizzle-orm":"^0.45.1","nuxt":"^4.6.0","vue":"^3.5.43","vue-router":"^4.5.1"},"description":"Plataforma de comunidades (MVP) — Nuxt 4 + Nuxt UI v4, 100% Cloudflare (Workers + D1 + R2).","devDependencies":{"@types/better-sqlite3":"^7.6.13","@types/node":"^26.6.4","drizzle-kit":"^0.31.8","typescript":"^5.9.3","vue-tsc":"^2.2.12","wrangler":"^4.148.0","ws":"^8.22.0"},"engines":{"node":"^22.21.0 || ^24.11.0 || >=26.0.0"},"name":"comunidad-mvp","private":true,"scripts":{"build":"nuxi build","db:seed":"node scripts/check-db.mjs","dev":"nuxi dev","postinstall":"nuxi prepare","preview":"nuxi preview","typecheck":"nuxi typecheck"},"type":"module","version":"0.1.0"}
+{
+  "dependencies": {
+    "better-sqlite3": "^12.4.1"
+  },
+  "description": "Plataforma de comunidades (MVP) — Nuxt 4 + Nuxt UI v4, 100% Cloudflare (Workers + D1 + R2).",
+  "devDependencies": {
+    "@iconify-json/lucide": "^1.2.139",
+    "@nuxt/ui": "^4.11.3",
+    "@tiptap/extension-image": "^3.32.0",
+    "@tiptap/extension-link": "^3.32.0",
+    "@tiptap/extension-placeholder": "^3.32.0",
+    "@tiptap/extension-task-item": "^3.32.0",
+    "@tiptap/extension-task-list": "^3.32.0",
+    "@tiptap/extension-underline": "^3.32.0",
+    "@tiptap/starter-kit": "^3.32.0",
+    "@tiptap/suggestion": "^3.32.0",
+    "@tiptap/vue-3": "^3.32.0",
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/node": "^22.0.0",
+    "nuxt": "^4.6.0",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3",
+    "vue": "^3.5.43",
+    "vue-router": "^5.4.0",
+    "vue-tsc": "^3.3.13",
+    "wrangler": "^4.148.0",
+    "ws": "^8.22.0"
+  },
+  "engines": {
+    "node": "^22.21.0 || ^24.11.0 || >=26.0.0"
+  },
+  "name": "comunidad-mvp",
+  "private": true,
+  "scripts": {
+    "build": "nuxi build",
+    "dev": "nuxi dev",
+    "postinstall": "node scripts/prepare.mjs",
+    "preview": "nuxi preview",
+    "typecheck": "node scripts/typecheck.mjs",
+    "db:migrate": "tsx scripts/migrate.ts",
+    "test": "tsx --test tests/*.test.ts",
+    "test:integration": "tsx tests/integration.ts",
+    "db:bootstrap": "tsx scripts/bootstrap.ts",
+    "test:worker": "tsx tests/worker.ts"
+  },
+  "type": "module",
+  "version": "0.1.0",
+  "overrides": {
+    "esbuild": "^0.28.2"
+  }
+}

@@ -6,6 +6,7 @@
 import type { es } from './es'
 
 export const en: typeof es = {
+  pagination: { previous: 'Previous', next: 'Next' },
   common: {
     cancel: 'Cancel',
     save: 'Save',

@@ -6,6 +6,7 @@
 // comunidad (posts, nombres, reglas, textos legales) NO se traduce:
 // solo la interfaz.
 export const es = {
+  pagination: { previous: 'Anterior', next: 'Siguiente' },
   common: {
     cancel: 'Cancelar',
     save: 'Guardar',

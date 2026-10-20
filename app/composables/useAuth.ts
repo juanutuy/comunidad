@@ -63,9 +63,19 @@ export function useAuth() {
   // aplicaba (el HTML nacía sin sesión y en español).
   const i18n = useI18n()
 
+  const commentsState = useState<Record<number, unknown>>('post-comments', () => ({}))
+  const realtimeState = useState<boolean | null>('rt-available', () => null)
+  const nuxtApp = useNuxtApp()
+  function resetPrivateState() {
+    commentsState.value = {}
+    realtimeState.value = null
+    nuxtApp.runWithContext(() => clearNuxtData())
+  }
+
   async function fetchMe() {
     try {
       const data = await api<{ tenant: TenantInfo, user: SessionUser | null, status?: string | null, gates?: MyGates | null, locale?: string }>('/api/tenant')
+      if (user.value?.id !== data.user?.id || tenant.value?.id !== data.tenant?.id) resetPrivateState()
       tenant.value = data.tenant
       user.value = data.user
       status.value = data.status ?? null
@@ -82,6 +92,7 @@ export function useAuth() {
 
   async function login(email: string, password: string) {
     const data = await api<{ user: SessionUser, status?: string }>('/api/auth/login', { method: 'POST', body: { email, password } })
+    resetPrivateState()
     user.value = data.user
     status.value = data.status ?? 'active'
     await fetchMe()
@@ -93,6 +104,7 @@ export function useAuth() {
       method: 'POST',
       body: { name, email, password, inviteToken: extra?.inviteToken, answers: extra?.answers },
     })
+    resetPrivateState()
     user.value = data.user
     status.value = data.status ?? 'active'
     await fetchMe()
@@ -101,6 +113,7 @@ export function useAuth() {
 
   async function logout() {
     await api('/api/auth/logout', { method: 'POST' })
+    resetPrivateState()
     user.value = null
     status.value = null
     gates.value = null

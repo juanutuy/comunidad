@@ -1,10 +1,7 @@
 // Reacciones con emojis (Fase 16-G): el MISMO catálogo fijo y
 // ordenado que valida el servidor (server/utils/reactions.ts).
 // Una reacción por usuario y objetivo (post o comentario).
-export const REACTION_CATALOG: string[] = [
-  '👍', '❤️', '😍', '🫀', '😂', '🥳', '🎉', '👏', '🔥', '💯',
-  '🚀', '💪', '😮', '🤯', '👀', '🤔', '💡', '🙏', '🤝', '😢', '😡',
-]
+export { REACTION_CATALOG } from '#shared/reactions'
 
 export interface ReactionData {
   reactions: Record<string, number>

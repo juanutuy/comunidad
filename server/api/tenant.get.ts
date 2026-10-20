@@ -47,8 +47,8 @@ export default defineEventHandler(async (event) => {
     },
     // Fase 18: la elección personal cruda viaja en el usuario (null =
     // sigue el defecto de la comunidad); `locale` es el RESUELTO.
-    user: user ? { ...publicUser(user), role, locale: loc.userLocale } : null,
-    status: user ? (status || 'active') : null,
+    user: user && role ? { ...publicUser(user), role, locale: loc.userLocale } : null,
+    status: user && role ? status : null,
     gates,
     locale: loc.locale,
   }

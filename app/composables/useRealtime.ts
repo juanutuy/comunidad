@@ -8,6 +8,8 @@
 export interface RtMessage { type: string, [key: string]: unknown }
 
 export function useRealtime() {
+  const identity = useState<SessionUser | null>('auth-user', () => null)
+  const tenant = useState<TenantInfo | null>('auth-tenant', () => null)
   const available = useState<boolean | null>('rt-available', () => null)
 
   async function checkAvailable(): Promise<boolean> {
@@ -46,6 +48,14 @@ export function useRealtime() {
       }
       ws.onerror = () => { try { ws?.close() } catch { /* nada */ } }
     }
+    let stopIdentityWatch = () => {}
+    function close() {
+      closed = true
+      stopIdentityWatch()
+      if (retryTimer) clearTimeout(retryTimer)
+      try { ws?.close() } catch { /* already closed */ }
+    }
+    stopIdentityWatch = watch([() => identity.value?.id, () => tenant.value?.id], close)
     if (import.meta.client) open()
 
     return {
@@ -57,11 +67,7 @@ export function useRealtime() {
           ws.send(JSON.stringify({ type: 'typing' }))
         }
       },
-      close() {
-        closed = true
-        if (retryTimer) clearTimeout(retryTimer)
-        try { ws?.close() } catch { /* nada */ }
-      },
+      close,
     }
   }
 
