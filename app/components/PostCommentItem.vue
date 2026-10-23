@@ -17,6 +17,7 @@ const props = defineProps<{
 }>()
 
 const { user } = useAuth()
+const guestAccess = useGuestAccess()
 const { t } = useI18n()
 const { timeAgo, initials } = useFormat()
 const toast = useToast()
@@ -32,6 +33,7 @@ const isMine = computed(() => !!user.value && user.value.slug === props.node.aut
 const isStaff = computed(() => !!user.value && ['admin', 'moderator'].includes(user.value.role || ''))
 
 function openReply() {
+  if (!user.value) { guestAccess.requestAccess(); return }
   if (props.isReply && props.onReply) { props.onReply(); return }
   replyOpen.value = true
 }
@@ -42,7 +44,7 @@ function focusReply() {
 }
 
 async function onReact(emoji: string) {
-  if (!user.value) { toast.add({ title: t('composer.loginToReact'), color: 'warning' }); return }
+  if (!user.value) { guestAccess.requestAccess(); return }
   try { await commentsApi.react(props.postId, props.node.id, emoji) }
   catch (e) { toast.add({ title: t('comments.reactFailed'), description: (e as { data?: { message?: string } }).data?.message || '', color: 'error' }) }
 }

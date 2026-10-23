@@ -40,3 +40,24 @@ test('logout clears private comment state and discards a late response', async (
   for (let id = 10; id < 120; id++) comments.state(id)
   assert.ok(Object.keys(states.get('post-comments')!.value).length <= 100)
 })
+
+test('guest access keeps the current page or a requested profile as the sign-in destination', async () => {
+  const { useGuestAccess } = await import('../app/composables/useGuestAccess')
+  const states = new Map<string, ReturnType<typeof ref>>()
+  Object.assign(globalThis, {
+    useState: (key: string, initial: () => unknown) => {
+      if (!states.has(key)) states.set(key, ref(initial()))
+      return states.get(key)
+    },
+    useRoute: () => ({ fullPath: '/channels/general' }),
+  })
+  const guest = useGuestAccess()
+  guest.requestAccess('/profile/member')
+  assert.equal(guest.open.value, true)
+  assert.equal(guest.returnTo.value, '/profile/member')
+  guest.open.value = false
+  guest.requestAccess()
+  assert.equal(guest.returnTo.value, '/channels/general')
+  guest.requestAccess('//external.invalid')
+  assert.equal(guest.returnTo.value, '/channels/general')
+})

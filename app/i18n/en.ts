@@ -6,6 +6,7 @@
 import type { es } from './es'
 
 export const en: typeof es = {
+  guest: { profileTitle: 'Sign in to view this profile', profileDescription: 'Sign in to your account to meet the community members.', profileUnavailable: 'This profile is not available in this community.' },
   pagination: { previous: 'Previous', next: 'Next' },
   common: {
     cancel: 'Cancel',

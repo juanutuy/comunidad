@@ -87,6 +87,13 @@ try {
     }
     finally { run('UPDATE tenants SET name=?,name_en=?,icon_url=?,favicon_url=? WHERE id=?', original.name, original.name_en, original.icon_url, original.favicon_url, tenant) }
   })
+  await test('direct guest profile requests render an access prompt instead of an empty page', async () => {
+    const slug = one('SELECT slug FROM users WHERE id=?', adminId).slug
+    const response = await anon(`/profile/${slug}`)
+    assert.equal(response.status, 200)
+    assert.ok(response.text.includes('Inicia sesión para ver el perfil'))
+    assert.ok(!response.text.includes('data-frame="admin"'))
+  })
   await test('admin HTML redirects guests before rendering any console markup', async () => {
     for (const path of ['/admin', '/admin/channels', '/admin/members', '/admin/settings']) {
       const response = await anon(path)

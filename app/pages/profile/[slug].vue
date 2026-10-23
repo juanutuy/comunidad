@@ -6,6 +6,7 @@ const slug = computed(() => String(route.params.slug))
 const api = useApi()
 const toast = useToast()
 const { user } = useAuth()
+const guestAccess = useGuestAccess()
 const { t } = useI18n()
 const { fmtDate, fmtDateTime, timeAgo, initials } = useFormat()
 
@@ -29,7 +30,8 @@ interface ProfileData {
   events: ProfileEvent[]
   saved?: PostView[]
 }
-const { data, refresh } = await useAsyncData(() => `profile-${slug.value}`, () => api<ProfileData>(`/api/profiles/${slug.value}`), { watch: [slug] })
+const { data, error, refresh } = await useAsyncData(() => `profile-${slug.value}`, () => user.value ? api<ProfileData>(`/api/profiles/${slug.value}`) : Promise.resolve(null), { watch: [slug, () => user.value?.id] })
+onMounted(() => { if (!user.value) guestAccess.requestAccess() })
 
 const isOwn = computed(() => !!user.value && user.value.slug === slug.value)
 
@@ -145,7 +147,16 @@ const navItems = computed(() => {
 </script>
 
 <template>
-  <div v-if="data" class="space-y-5">
+  <UCard v-if="!user" class="mx-auto max-w-lg">
+    <div class="py-6 text-center">
+      <UIcon name="i-lucide-user-round-lock" class="mb-3 size-10 text-muted" />
+      <h1 class="text-xl font-semibold">{{ t('guest.profileTitle') }}</h1>
+      <p class="mt-2 text-sm text-muted">{{ t('guest.profileDescription') }}</p>
+      <UButton class="mt-5" icon="i-lucide-log-in" :label="t('nav.login')" @click="guestAccess.requestAccess()" />
+    </div>
+  </UCard>
+  <UAlert v-else-if="error" color="neutral" variant="soft" icon="i-lucide-user-round-x" :title="t('guest.profileUnavailable')" />
+  <div v-else-if="data" class="space-y-5">
     <UCard>
       <div class="relative">
         <div class="h-32 overflow-hidden rounded-lg bg-gradient-to-r from-primary/60 to-primary/20 sm:h-40">

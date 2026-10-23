@@ -1,5 +1,9 @@
 # Historial de cambios
 
+## 2026-10-23 — Acceso contextual a perfiles y comentarios
+
+Visitantes abren el modal de acceso antes de navegar a perfiles; se conserva el destino para continuar tras iniciar sesión. Las URLs directas presentan una pantalla de acceso y abren el modal al montar. Comentarios, respuestas y reacciones de comentarios comparten el mismo aviso de acceso. Errores de perfil ya no dejan el contenido vacío. Regresiones de SSR y destino de navegación.
+
 ## 2026-10-23 — Marca ServGT y nombres por idioma
 
 Nombre español e inglés configurables por comunidad y reactivos al idioma activo. Símbolo ServGT, favicon e iconos de instalación; marca visible en acceso, administración y navegación móvil. Manifest generado por tenant e idioma. Identificadores técnicos y contenido histórico conservados.

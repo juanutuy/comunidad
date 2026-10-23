@@ -60,7 +60,8 @@ async function submitComment(payload: { body: string, media: { mediaType: string
     <template v-else>
       <!-- Sin acceso: la conversación no viaja (detalle y tarjeta
            comparten el criterio del servidor). -->
-      <p v-if="s.withheld" class="text-sm text-muted">{{ t('postDetail.commentsMembersOnly') }}</p>
+      <UButton v-if="!user" color="neutral" variant="soft" icon="i-lucide-log-in" :label="t('postDetail.loginToComment')" @click="guestAccess.requestAccess()" />
+      <p v-else-if="s.withheld" class="text-sm text-muted">{{ t('postDetail.commentsMembersOnly') }}</p>
       <template v-else>
         <div class="mb-4 flex items-center gap-2">
           <h3 class="flex items-center gap-2 text-sm font-bold">

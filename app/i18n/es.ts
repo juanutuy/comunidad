@@ -6,6 +6,7 @@
 // comunidad (posts, nombres, reglas, textos legales) NO se traduce:
 // solo la interfaz.
 export const es = {
+  guest: { profileTitle: 'Inicia sesión para ver el perfil', profileDescription: 'Accede a tu cuenta para conocer a los miembros de la comunidad.', profileUnavailable: 'Este perfil no está disponible en esta comunidad.' },
   pagination: { previous: 'Anterior', next: 'Siguiente' },
   common: {
     cancel: 'Cancelar',

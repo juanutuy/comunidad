@@ -1,11 +1,16 @@
 <script setup lang="ts">
-const { open } = useGuestAccess()
+const { open, returnTo } = useGuestAccess()
 const { tenant } = useAuth()
 const { t } = useI18n()
+const route = useRoute()
 async function authenticated(status: string) {
   open.value = false
   if (['pending', 'declined'].includes(status)) {
     await navigateTo('/pending')
+    return
+  }
+  if (returnTo.value !== route.fullPath) {
+    await navigateTo(returnTo.value)
     return
   }
   await refreshNuxtData()

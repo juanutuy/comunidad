@@ -422,7 +422,8 @@ async function deletePost() {
           <!-- En un post bloqueado el botón sigue llevando al
                detalle (pantalla de acceso); en el resto EXPANDE la
                sección dentro de la tarjeta. -->
-          <NuxtLink v-if="localAllowComments && post.locked" :to="`/p/${post.channel.slug}/${post.slug}`" class="ml-1">
+          <UButton v-if="localAllowComments && !user" size="sm" color="neutral" variant="ghost" icon="i-lucide-message-circle" :label="t('post.commentsCount', { count: displayCommentCount })" class="ml-1" @click="guestAccess.requestAccess()" />
+          <NuxtLink v-else-if="localAllowComments && post.locked" :to="`/p/${post.channel.slug}/${post.slug}`" class="ml-1">
             <UButton size="sm" color="neutral" variant="ghost" icon="i-lucide-message-circle" :label="t('post.commentsCount', { count: displayCommentCount })" />
           </NuxtLink>
           <a v-else-if="localAllowComments && inlineComments === false" href="#post-comments" class="ml-1">
