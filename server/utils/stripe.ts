@@ -21,6 +21,20 @@ export function stripeEnabled(): boolean {
   return !!c.secretKey && !!c.webhookSecret
 }
 
+/** Cancel a recurring subscription immediately before account anonymization. */
+export async function cancelStripeSubscription(subscriptionId: string): Promise<void> {
+  const { secretKey } = stripeConfig()
+  if (!secretKey) throw createError({ statusCode: 409, message: 'Configura Stripe antes de eliminar una cuenta con una suscripción activa.' })
+  const res = await fetch(`https://api.stripe.com/v1/subscriptions/${encodeURIComponent(subscriptionId)}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${secretKey}` },
+  })
+  const data = await res.json() as { id?: string, status?: string, error?: { message?: string } }
+  if (!res.ok || data.id !== subscriptionId || data.status !== 'canceled') {
+    throw createError({ statusCode: 502, message: `Stripe no confirmó la cancelación de una suscripción: ${data.error?.message || res.status}` })
+  }
+}
+
 export interface CheckoutInput {
   mode: 'payment' | 'subscription'
   amountCents: number

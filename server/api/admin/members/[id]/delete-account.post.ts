@@ -6,6 +6,7 @@ import { destroySession } from '../../../../utils/auth'
 import { dbFor } from '../../../../utils/db'
 import { deleteFile } from '../../../../utils/storage'
 import { deleteCommentCascade, deletePostCascade } from '../../../../utils/moderation'
+import { cancelStripeSubscription } from '../../../../utils/stripe'
 
 export default defineEventHandler(async (event) => {
   const tenant = await resolveTenant(event)
@@ -25,6 +26,10 @@ export default defineEventHandler(async (event) => {
     const admins = Number((await db.prepare("SELECT COUNT(*) AS n FROM memberships WHERE tenant_id = ? AND role = 'admin'").get(membership.tenant_id) as { n: number }).n)
     if (admins <= 1) throw createError({ statusCode: 400, message: 'No se puede eliminar esta cuenta porque es la única administradora de una comunidad.' })
   }
+
+  // Cancel active recurring Stripe subscriptions before changing any local data.
+  const subscriptions = await db.prepare("SELECT stripe_subscription_id FROM member_subscriptions WHERE user_id = ? AND status <> 'canceled' AND stripe_subscription_id <> ''").all(targetId) as { stripe_subscription_id: string }[]
+  for (const subscription of subscriptions) await cancelStripeSubscription(subscription.stripe_subscription_id)
 
   if (body.content === 'delete') {
     const posts = await db.prepare(`SELECT p.id, p.tenant_id, p.slug, c.slug AS channel_slug FROM posts p JOIN channels c ON c.id = p.channel_id WHERE p.author_id = ?`).all(targetId) as { id: number, tenant_id: number, slug: string, channel_slug: string }[]
@@ -61,6 +66,7 @@ export default defineEventHandler(async (event) => {
     { sql: 'UPDATE posts SET body = \'\', body_html = \'\', teaser = \'\', media_type = \'none\', media_url = \'\', attachment_name = \'\' WHERE author_id = ?', params: [targetId] },
     { sql: 'UPDATE comments SET body = \'[comentario eliminado]\', media_type = \'none\', media_url = \'\', media_name = \'\' WHERE author_id = ?', params: [targetId] },
     { sql: 'UPDATE certificates SET member_name = \'Cuenta eliminada\' WHERE user_id = ?', params: [targetId] },
+    { sql: "UPDATE member_subscriptions SET status = 'canceled', stripe_customer_id = '', updated_at = ? WHERE user_id = ? AND stripe_subscription_id <> ''", params: [now, targetId] },
     { sql: "UPDATE email_log SET to_email = 'deleted@account.invalid', detail = '' WHERE user_id = ?", params: [targetId] },
     { sql: 'UPDATE membership_events SET actor_id = NULL WHERE actor_id = ?', params: [targetId] },
     { sql: 'DELETE FROM memberships WHERE user_id = ?', params: [targetId] },
