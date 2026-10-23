@@ -24,6 +24,7 @@ const { unread } = useNotifBadge()
 const open = ref(false)
 // Fase 5: filtro por tipo dentro del desplegable.
 const filter = ref('all')
+const loading = ref(false)
 const filterChips = computed(() => [
   { label: t('notifications.filterAll'), value: 'all' },
   { label: t('notifications.filterMentions'), value: 'mention' },
@@ -54,12 +55,14 @@ const typeIcons: Record<string, string> = {
 
 async function load() {
   if (!user.value) { items.value = []; unread.value = 0; return }
+  loading.value = true
   try {
     const data = await api<{ unread: number, notifications: NotificationView[] }>('/api/notifications')
     items.value = data.notifications
     unread.value = data.unread
   }
-  catch { /* sin sesión o sin red: la campana queda en cero */ }
+  catch { /* retry on the next opening */ }
+  finally { loading.value = false }
 }
 
 async function markAllRead() {
@@ -72,9 +75,9 @@ async function markAllRead() {
   catch { /* se reintenta en la próxima apertura */ }
 }
 
-function onOpenChange(value: boolean) {
+async function onOpenChange(value: boolean) {
   open.value = value
-  if (value) { load(); markAllRead() }
+  if (value) { filter.value = 'all'; await load(); await markAllRead() }
 }
 
 function go(n: NotificationView) {
@@ -102,40 +105,52 @@ onMounted(async () => {
 </script>
 
 <template>
-  <UPopover v-if="user" :open="open" @update:open="onOpenChange">
+  <UPopover v-if="user" :open="open" :content="{ align: 'end', sideOffset: 10, collisionPadding: 12 }" @update:open="onOpenChange">
     <UButton color="neutral" variant="ghost" icon="i-lucide-bell" class="relative" :aria-label="t('notifications.title')">
       <span v-if="unread" class="absolute -top-0.5 -right-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
         {{ unread > 9 ? '9+' : unread }}
       </span>
     </UButton>
     <template #content>
-      <div class="w-80 p-2">
-        <div class="flex items-center justify-between px-2 py-1">
-          <p class="text-sm font-bold">{{ t('notifications.title') }}</p>
-          <UButton to="/notifications" size="xs" color="neutral" variant="ghost" :label="t('notifications.seeAll')" @click="open = false" />
+      <section class="w-[min(24rem,calc(100vw-1.5rem))] overflow-hidden" :aria-label="t('notifications.title')">
+        <header class="flex items-center justify-between gap-3 border-b border-default px-5 py-4">
+          <h2 class="text-base font-semibold">{{ t('notifications.title') }}</h2>
+          <UButton color="neutral" variant="ghost" size="xs" icon="i-lucide-x" :aria-label="t('common.close')" @click="open = false" />
+        </header>
+        <div v-if="items.length" class="border-b border-default px-4 py-3">
+          <USelect v-model="filter" :items="filterChips" :aria-label="t('notifications.title')" icon="i-lucide-list-filter" class="w-full" />
         </div>
-        <div class="flex flex-wrap gap-1 px-2 pb-1">
-          <UButton
-            v-for="chip in filterChips" :key="chip.value" size="xs"
-            :color="filter === chip.value ? 'primary' : 'neutral'"
-            :variant="filter === chip.value ? 'soft' : 'ghost'"
-            :label="chip.label" @click="filter = chip.value"
-          />
+        <div v-if="loading && !items.length" class="flex min-h-52 items-center justify-center" role="status" :aria-label="t('common.loading')">
+          <UIcon name="i-lucide-loader-circle" class="animate-spin text-xl text-muted" />
         </div>
-        <ul v-if="visibleItems.length" class="max-h-80 divide-y divide-default overflow-y-auto">
+        <ul v-else-if="visibleItems.length" class="max-h-[min(26rem,60dvh)] divide-y divide-default overflow-y-auto py-1">
           <li v-for="n in visibleItems" :key="n.id">
-            <button class="flex w-full items-start gap-2.5 px-2 py-2.5 text-left hover:bg-elevated" :class="{ 'opacity-70': n.isRead }" @click="go(n)">
-              <UAvatar :src="n.actor?.avatarUrl || undefined" :text="n.actor ? initials(n.actor.name) : undefined" :icon="typeIcons[n.type] || 'i-lucide-bell'" size="sm" class="mt-0.5 shrink-0" />
-              <span class="min-w-0 flex-1">
-                <span class="block text-sm leading-snug">{{ n.title }}</span>
-                <span class="block text-xs text-muted">{{ timeAgo(n.createdAt) }}</span>
+            <button type="button" class="flex w-full items-start gap-3 px-5 py-4 text-left transition-colors hover:bg-elevated focus-visible:bg-elevated focus-visible:outline-none" @click="go(n)">
+              <span class="relative mt-0.5 shrink-0">
+                <UAvatar :src="n.actor?.avatarUrl || undefined" :text="n.actor ? initials(n.actor.name) : undefined" :icon="typeIcons[n.type] || 'i-lucide-bell'" size="md" />
+                <span v-if="n.actor" class="absolute -right-1 -bottom-1 flex size-4.5 items-center justify-center rounded-full bg-elevated ring-2 ring-default">
+                  <UIcon :name="typeIcons[n.type] || 'i-lucide-bell'" class="size-2.5 text-muted" />
+                </span>
               </span>
-              <span v-if="!n.isRead" class="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-primary" />
+              <span class="min-w-0 flex-1">
+                <span class="block text-sm leading-relaxed" :class="n.isRead ? 'text-default' : 'font-medium text-highlighted'">{{ n.title }}</span>
+                <span class="mt-1 block text-xs text-muted">{{ timeAgo(n.createdAt) }}</span>
+              </span>
+              <span v-if="!n.isRead" class="mt-2 size-2 shrink-0 rounded-full bg-primary" />
             </button>
           </li>
         </ul>
-        <p v-else class="px-2 py-4 text-center text-sm text-muted">{{ items.length ? t('notifications.nothingInFilter') : t('notifications.noNotificationsYet') }}</p>
-      </div>
+        <div v-else class="flex min-h-56 flex-col items-center justify-center px-7 py-8 text-center">
+          <span class="mb-4 flex size-12 items-center justify-center rounded-full bg-elevated">
+            <UIcon :name="items.length ? 'i-lucide-list-filter' : 'i-lucide-bell'" class="size-6 text-muted" />
+          </span>
+          <p class="text-sm font-semibold text-highlighted">{{ items.length ? t('notifications.emptyFilterTitle') : t('notifications.emptyTitle') }}</p>
+          <p class="mt-2 max-w-64 text-sm leading-relaxed text-muted">{{ items.length ? t('notifications.emptyFilterText') : t('notifications.emptyText') }}</p>
+        </div>
+        <footer class="border-t border-default p-2">
+          <UButton to="/notifications" block color="neutral" variant="ghost" trailing-icon="i-lucide-arrow-right" :label="t('notifications.seeAll')" @click="open = false" />
+        </footer>
+      </section>
     </template>
   </UPopover>
 </template>
