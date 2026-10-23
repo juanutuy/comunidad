@@ -22,9 +22,9 @@ const { initials } = useFormat()
 // que el lateral) y los mismos menús contextuales de canal/grupo.
 const { openCreate: openChannelCreate } = useChannelEditor()
 const displayGroups = computed(() => props.groups
-  .map(g => ({ ...g, channels: user.value ? g.channels.filter(c => c.following) : g.channels }))
+  .map(g => ({ ...g, channels: user.value ? g.channels.filter(c => c.visibility === 'public' || c.following) : g.channels }))
   .filter(g => g.channels.length))
-const defaultGroupName = computed(() => props.groups.find(g => g.isDefault)?.name || '')
+const defaultGroupId = computed(() => props.groups.find(g => g.isDefault)?.id ?? props.groups[0]?.id)
 const api = useApi()
 const { open, closePanel } = useMobilePanel()
 // Fase 11: «Ajustes de cuenta» abre el modal de ajustes (y cierra el panel).
@@ -88,9 +88,11 @@ const PANEL_ICONS: Record<string, string> = {
 const mainLinks = computed(() => {
   const items = (tenant.value?.navMenu || [])
     .filter(i => i.visible)
+  const orderedItems = [...items.filter(i => !['reglas', 'terminos', 'privacidad'].includes(i.id)), ...items.filter(i => ['reglas', 'terminos', 'privacidad'].includes(i.id))]
+  const mappedItems = orderedItems
     .map(i => ({ label: navLabel(i), to: i.url, icon: PANEL_ICONS[i.id] || 'i-lucide-link', external: /^https?:\/\//i.test(i.url) }))
   const links = items.length
-    ? items
+    ? mappedItems
     : [
         { label: t('nav.inicio'), to: '/feeds', icon: 'i-lucide-home', external: false },
         { label: t('nav.cursos'), to: '/courses', icon: 'i-lucide-graduation-cap', external: false },
@@ -246,17 +248,16 @@ const mainLinks = computed(() => {
 
         <!-- Canales (mismos grupos y candados que el lateral fijo) -->
         <div v-if="displayGroups.length">
-          <h3 class="mb-1.5 px-2 text-xs font-bold tracking-wider text-muted uppercase">{{ t('nav.channels') }}</h3>
-          <div v-for="group in displayGroups" :key="group.id" class="mb-2">
-            <div class="mb-0.5 flex items-center gap-1 px-2">
-              <p class="min-w-0 flex-1 truncate text-[11px] font-semibold tracking-wide text-muted">{{ group.name }}</p>
-              <UButton
-                v-if="user?.role === 'admin'" icon="i-lucide-plus" size="xs" color="neutral" variant="ghost"
-                :title="t('channelAdmin.groupNewChannel')" :aria-label="t('channelAdmin.groupNewChannel')"
-                @click="openChannelCreate(group.id)"
-              />
-              <ChannelGroupMenu :group="group" :fallback-name="defaultGroupName" />
-            </div>
+          <div class="mb-1.5 flex items-center gap-1 px-2">
+            <h3 class="flex-1 text-xs font-bold tracking-wider text-muted uppercase">{{ t('nav.channels') }}</h3>
+            <UButton
+              v-if="user?.role === 'admin'" icon="i-lucide-plus" size="xs" color="neutral" variant="ghost"
+              :title="t('channelAdmin.groupNewChannel')" :aria-label="t('channelAdmin.groupNewChannel')"
+              @click="openChannelCreate(defaultGroupId)"
+            />
+            <ChannelSectionMenu v-if="user?.role === 'admin'" />
+          </div>
+          <div v-for="group in displayGroups" :key="group.id" class="mb-0.5">
             <ul class="space-y-0.5">
               <li v-for="ch in group.channels" :key="ch.id">
                 <div class="flex items-center rounded-lg hover:bg-elevated">

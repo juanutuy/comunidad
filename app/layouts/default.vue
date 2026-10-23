@@ -28,9 +28,10 @@ const { data: channelData, refresh: refreshChannels } = await useAsyncData('layo
 // eliminar grupo), como en la referencia.
 const { openCreate: openChannelCreate } = useChannelEditor()
 const sidebarGroups = computed(() => (channelData.value?.groups || [])
-  .map(g => ({ ...g, channels: user.value && user.value.role !== 'admin' ? g.channels.filter(c => c.following) : g.channels }))
+  .map(g => ({ ...g, channels: user.value && user.value.role !== 'admin' ? g.channels.filter(c => c.visibility === 'public' || c.following) : g.channels }))
   .filter(g => g.channels.length))
-const defaultGroupName = computed(() => (channelData.value?.groups || []).find(g => g.isDefault)?.name || '')
+const defaultGroupId = computed(() => (channelData.value?.groups || []).find(g => g.isDefault)?.id ?? channelData.value?.groups?.[0]?.id)
+const legalNavIds = new Set(['reglas', 'terminos', 'privacidad'])
 
 // Fase 7: navegación principal en pastillas, centrada en la barra
 // superior. Fase 10: las pastillas solo viven en escritorio amplio
@@ -56,7 +57,10 @@ const FALLBACK_NAV: { id: string, label: string, url: string, visible: boolean, 
 ]
 const navItems = computed(() => tenant.value?.navMenu?.length ? tenant.value.navMenu : FALLBACK_NAV)
 const headerNav = computed(() => navItems.value.filter(i => i.zone === 'header' && i.visible))
-const sidebarNav = computed(() => navItems.value.filter(i => i.zone === 'sidebar' && i.visible))
+const sidebarNav = computed(() => {
+  const items = navItems.value.filter(i => i.zone === 'sidebar' && i.visible)
+  return [...items.filter(i => !legalNavIds.has(i.id)), ...items.filter(i => legalNavIds.has(i.id))]
+})
 const NAV_ICONS: Record<string, string> = {
   inicio: 'i-lucide-home', cursos: 'i-lucide-graduation-cap', eventos: 'i-lucide-calendar-days',
   miembros: 'i-lucide-users', ranking: 'i-lucide-trophy', videos: 'i-lucide-play-square',
@@ -233,22 +237,16 @@ const hideRightRail = computed(() => route.path.startsWith('/profile/') || route
           </ul>
         </div>
         <div>
-          <h3 class="mb-1.5 px-2 text-xs font-bold tracking-wider text-muted uppercase">
-            {{ t('nav.channels') }}
-          </h3>
-          <div v-for="group in sidebarGroups" :key="group.id" class="mb-3">
-            <div class="group/gh mb-1 flex items-center gap-1 px-2">
-              <p class="min-w-0 flex-1 truncate text-[11px] font-semibold tracking-wide text-muted">
-                {{ group.name }}
-              </p>
-              <UButton
-                v-if="user?.role === 'admin'" icon="i-lucide-plus" size="xs" color="neutral" variant="ghost"
-                :title="t('channelAdmin.groupNewChannel')" :aria-label="t('channelAdmin.groupNewChannel')"
-                class="shrink-0"
-                @click="openChannelCreate(group.id)"
-              />
-              <ChannelGroupMenu :group="group" :fallback-name="defaultGroupName" />
-            </div>
+          <div class="mb-1.5 flex items-center gap-1 px-2">
+            <h3 class="flex-1 text-xs font-bold tracking-wider text-muted uppercase">{{ t('nav.channels') }}</h3>
+            <UButton
+              v-if="user?.role === 'admin'" icon="i-lucide-plus" size="xs" color="neutral" variant="ghost"
+              :title="t('channelAdmin.groupNewChannel')" :aria-label="t('channelAdmin.groupNewChannel')"
+              @click="openChannelCreate(defaultGroupId)"
+            />
+            <ChannelSectionMenu v-if="user?.role === 'admin'" />
+          </div>
+          <div v-for="group in sidebarGroups" :key="group.id" class="mb-0.5">
             <ul class="space-y-0.5">
               <li v-for="ch in group.channels" :key="ch.id" class="group/ch">
                 <div class="flex items-center rounded-md hover:bg-elevated">
