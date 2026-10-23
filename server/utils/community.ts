@@ -203,7 +203,7 @@ export interface PollView {
 // equivale a tener acceso completo (el comportamiento de siempre).
 export async function serializePost(event: H3Event, row: Record<string, unknown>, userId: number | null, fullAccess: boolean, viewerRole: string | null = null, opts?: { canInteract?: boolean, metadata?: PostMetadata }) {
   const postId = row.id as number
-  const canInteract = opts?.canInteract ?? fullAccess
+  const canInteract = userId !== null && (opts?.canInteract ?? fullAccess)
   // Fase 16-G: conteos por emoji del catálogo (las filas legadas ya
   // viajaron a emoji en la migración), resumen con total y top, y MI
   // reacción (una sola por usuario desde esta fase; null = ninguna).
