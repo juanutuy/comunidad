@@ -28,7 +28,7 @@ const { data: channelData, refresh: refreshChannels } = await useAsyncData('layo
 // eliminar grupo), como en la referencia.
 const { openCreate: openChannelCreate } = useChannelEditor()
 const sidebarGroups = computed(() => (channelData.value?.groups || [])
-  .map(g => ({ ...g, channels: user.value ? g.channels.filter(c => c.following) : g.channels }))
+  .map(g => ({ ...g, channels: user.value && user.value.role !== 'admin' ? g.channels.filter(c => c.following) : g.channels }))
   .filter(g => g.channels.length))
 const defaultGroupName = computed(() => (channelData.value?.groups || []).find(g => g.isDefault)?.name || '')
 
