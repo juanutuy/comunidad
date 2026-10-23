@@ -46,8 +46,5 @@ async function submit() {
     <p class="mt-4 text-center text-sm text-muted">
       {{ t('auth.noAccount') }} <NuxtLink to="/register" class="font-medium text-primary hover:underline">{{ t('auth.createFree') }}</NuxtLink>
     </p>
-    <p class="mt-3 rounded-md bg-elevated p-3 text-center text-xs text-muted">
-      {{ t('auth.demoNote') }}
-    </p>
   </UCard>
 </template>

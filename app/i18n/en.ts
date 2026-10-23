@@ -911,7 +911,6 @@ export const en: typeof es = {
     loginButton: 'Log in',
     noAccount: "Don't have an account yet?",
     createFree: 'Create one for free',
-    demoNote: 'Demo: admin@demo.local · member@demo.local — password: demo1234',
     helloToast: 'Hello again!',
     loginFailed: 'Could not log in.',
     createAccountTitle: 'Create your account',

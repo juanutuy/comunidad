@@ -911,7 +911,6 @@ export const es = {
     loginButton: 'Iniciar sesión',
     noAccount: '¿Todavía no tenés cuenta?',
     createFree: 'Creá una gratis',
-    demoNote: 'Demo: admin@demo.local · member@demo.local — contraseña: demo1234',
     helloToast: '¡Hola de nuevo!',
     loginFailed: 'No se pudo iniciar sesión.',
     createAccountTitle: 'Creá tu cuenta',
