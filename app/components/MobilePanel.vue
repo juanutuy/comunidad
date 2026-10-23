@@ -85,11 +85,19 @@ const PANEL_ICONS: Record<string, string> = {
   biblioteca: 'i-lucide-book-open', precios: 'i-lucide-tag', reglas: 'i-lucide-scroll-text',
   terminos: 'i-lucide-file-text', privacidad: 'i-lucide-shield',
 }
+const legalLinks = computed(() => {
+  const configured = (tenant.value?.navMenu || []).filter(i => i.visible && i.zone === 'sidebar' && ['reglas', 'terminos', 'privacidad'].includes(i.id))
+  if (tenant.value?.navMenu?.length) return configured.map(i => ({ id: i.id, label: navLabel(i), to: i.url, icon: PANEL_ICONS[i.id] || 'i-lucide-link', external: /^https?:\/\//i.test(i.url) }))
+  return [
+    { id: 'reglas', label: t('nav.reglas'), to: '/guidelines', icon: PANEL_ICONS.reglas, external: false },
+    { id: 'terminos', label: t('nav.terminos'), to: '/terms', icon: PANEL_ICONS.terminos, external: false },
+    { id: 'privacidad', label: t('nav.privacidad'), to: '/privacy', icon: PANEL_ICONS.privacidad, external: false },
+  ]
+})
 const mainLinks = computed(() => {
   const items = (tenant.value?.navMenu || [])
-    .filter(i => i.visible)
-  const orderedItems = [...items.filter(i => !['reglas', 'terminos', 'privacidad'].includes(i.id)), ...items.filter(i => ['reglas', 'terminos', 'privacidad'].includes(i.id))]
-  const mappedItems = orderedItems
+    .filter(i => i.visible && !['reglas', 'terminos', 'privacidad'].includes(i.id))
+  const mappedItems = items
     .map(i => ({ label: navLabel(i), to: i.url, icon: PANEL_ICONS[i.id] || 'i-lucide-link', external: /^https?:\/\//i.test(i.url) }))
   const links = items.length
     ? mappedItems
@@ -247,8 +255,9 @@ const mainLinks = computed(() => {
         </nav>
 
         <!-- Canales (mismos grupos y candados que el lateral fijo) -->
-        <div v-if="displayGroups.length">
-          <div class="mb-1.5 flex items-center gap-1 px-2">
+        <div v-if="displayGroups.length || legalLinks.length">
+          <template v-if="displayGroups.length">
+            <div class="mb-1.5 flex items-center gap-1 px-2">
             <h3 class="flex-1 text-xs font-bold tracking-wider text-muted uppercase">{{ t('nav.channels') }}</h3>
             <UButton
               v-if="user?.role === 'admin'" icon="i-lucide-plus" size="xs" color="neutral" variant="ghost"
@@ -256,8 +265,8 @@ const mainLinks = computed(() => {
               @click="openChannelCreate(defaultGroupId)"
             />
             <ChannelSectionMenu v-if="user?.role === 'admin'" />
-          </div>
-          <div v-for="group in displayGroups" :key="group.id" class="mb-0.5">
+            </div>
+            <div v-for="group in displayGroups" :key="group.id" class="mb-0.5">
             <ul class="space-y-0.5">
               <li v-for="ch in group.channels" :key="ch.id">
                 <div class="flex items-center rounded-lg hover:bg-elevated">
@@ -276,6 +285,19 @@ const mainLinks = computed(() => {
                   </NuxtLink>
                   <ChannelContextMenu :channel="ch" size="sm" />
                 </div>
+              </li>
+            </ul>
+            </div>
+          </template>
+          <div v-if="legalLinks.length" class="mt-3 border-t border-default pt-3">
+            <ul class="space-y-0.5">
+              <li v-for="item in legalLinks" :key="item.id">
+                <a v-if="item.external" :href="item.to" target="_blank" rel="noopener" class="flex items-center gap-3 rounded-lg px-2 py-2 text-[15px] hover:bg-elevated" @click="closePanel">
+                  <UIcon :name="item.icon" class="shrink-0 text-muted" /> {{ item.label }}
+                </a>
+                <NuxtLink v-else :to="item.to" class="flex items-center gap-3 rounded-lg px-2 py-2 text-[15px] hover:bg-elevated" active-class="bg-elevated font-semibold" @click="closePanel">
+                  <UIcon :name="item.icon" class="shrink-0 text-muted" /> {{ item.label }}
+                </NuxtLink>
               </li>
             </ul>
           </div>

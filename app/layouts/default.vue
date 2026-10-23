@@ -57,10 +57,8 @@ const FALLBACK_NAV: { id: string, label: string, url: string, visible: boolean, 
 ]
 const navItems = computed(() => tenant.value?.navMenu?.length ? tenant.value.navMenu : FALLBACK_NAV)
 const headerNav = computed(() => navItems.value.filter(i => i.zone === 'header' && i.visible))
-const sidebarNav = computed(() => {
-  const items = navItems.value.filter(i => i.zone === 'sidebar' && i.visible)
-  return [...items.filter(i => !legalNavIds.has(i.id)), ...items.filter(i => legalNavIds.has(i.id))]
-})
+const sidebarNav = computed(() => navItems.value.filter(i => i.zone === 'sidebar' && i.visible && !legalNavIds.has(i.id)))
+const sidebarLegalNav = computed(() => navItems.value.filter(i => i.zone === 'sidebar' && i.visible && legalNavIds.has(i.id)))
 const NAV_ICONS: Record<string, string> = {
   inicio: 'i-lucide-home', cursos: 'i-lucide-graduation-cap', eventos: 'i-lucide-calendar-days',
   miembros: 'i-lucide-users', ranking: 'i-lucide-trophy', videos: 'i-lucide-play-square',
@@ -263,6 +261,21 @@ const hideRightRail = computed(() => route.path.startsWith('/profile/') || route
               </li>
             </ul>
           </div>
+        </div>
+        <div v-if="sidebarLegalNav.length" class="border-t border-default pt-3">
+          <ul class="space-y-0.5">
+            <li v-for="item in sidebarLegalNav" :key="item.id">
+              <a
+                v-if="isExternal(item.url)" :href="item.url" target="_blank" rel="noopener"
+                class="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-elevated"
+              >
+                <UIcon :name="navIcon(item.id)" class="shrink-0" /> {{ navLabel(item) }}
+              </a>
+              <NuxtLink v-else :to="item.url" class="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-elevated" active-class="bg-elevated font-semibold">
+                <UIcon :name="navIcon(item.id)" class="shrink-0" /> {{ navLabel(item) }}
+              </NuxtLink>
+            </li>
+          </ul>
         </div>
         <div v-if="user && ['admin', 'moderator', 'course_manager'].includes(user.role || '')" class="border-t border-default pt-4">
           <ul class="space-y-0.5 text-sm">
