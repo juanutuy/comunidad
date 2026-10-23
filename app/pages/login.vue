@@ -41,7 +41,7 @@ async function submit() {
       <UFormField :label="t('auth.password')">
         <UInput v-model="form.password" type="password" required :placeholder="t('auth.passwordPlaceholder')" class="w-full" />
       </UFormField>
-      <UButton type="submit" block :label="t('auth.loginButton')" :loading="loading" />
+      <UButton type="submit" block icon="i-lucide-log-in" :label="t('auth.loginButton')" :loading="loading" />
     </form>
     <p class="mt-4 text-center text-sm text-muted">
       {{ t('auth.noAccount') }} <NuxtLink to="/register" class="font-medium text-primary hover:underline">{{ t('auth.createFree') }}</NuxtLink>

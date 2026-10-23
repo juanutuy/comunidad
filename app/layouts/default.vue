@@ -201,8 +201,8 @@ const hideRightRail = computed(() => route.path.startsWith('/profile/') || route
           </span>
         </template>
         <template v-else>
-          <UButton to="/login" color="neutral" variant="ghost" :label="t('nav.login')" />
-          <UButton to="/register" :label="t('nav.join')" :style="{ backgroundColor: tenant?.brandColor }" />
+          <UButton to="/login" color="neutral" variant="ghost" icon="i-lucide-log-in" :label="t('nav.login')" />
+          <UButton to="/register" color="primary" icon="i-lucide-user-round-plus" :label="t('nav.join')" />
         </template>
       </div>
     </header>
