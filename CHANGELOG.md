@@ -1,5 +1,9 @@
 # Historial de cambios
 
+## 2026-10-23 — Redirección previa al renderizado del panel
+
+Middleware global protege `/admin` y sus secciones antes de montar páginas y layout. Visitantes reciben HTTP 302 a `/login`; miembros sin rol de staff vuelven al feed. Las consultas SSR conservan el dominio del tenant. Regresiones HTTP y Worker comprueban que la respuesta de redirección no contiene el panel.
+
 ## 2026-10-23 — Recuperación, aislamiento y anonimización
 
 Enlaces de recuperación entregados solo al titular; eliminación limitada a la comunidad con autoría anónima y contenido conservado; endpoint demo deshabilitado; perfiles aislados por membresía; digest filtrado por permisos. Migración de seguridad revoca sesiones y enlaces previos y retira concesiones demo. Nuevas regresiones HTTP, de migración y Worker/D1. Véase [remediación](docs/REMEDIACION-2026-10-23.md).

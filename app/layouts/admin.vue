@@ -10,14 +10,10 @@
 // iconos en md–lg; oculto en teléfono, donde se abre como panel
 // deslizable desde el botón de menú de la barra superior.
 //
-// La autorización se sigue decidiendo en el servidor: las APIs
-// /api/admin/** exigen la capacidad de cada sección (requireAdmin,
-// requireModerator o requireCourseManager) y cada página muestra su
-// aviso si la cuenta no la tiene. Fase 14: el riel se filtra por rol
-// — un moderador ve Miembros y Moderación; un encargado de cursos,
-// solo Cursos — y solo se pinta para el staff; sin rol de staff se
-// ve la barra y el aviso de la página, nunca datos.
-const { user, tenant, logout } = useAuth()
+// El middleware global comprueba sesión y rol antes de renderizar /admin/**.
+// Las APIs mantienen sus comprobaciones de capacidad por sección.
+// El layout exige además staff activo para ocultarse al perder la sesión.
+const { user, tenant, status, logout } = useAuth()
 const { t } = useI18n()
 const { initials } = useFormat()
 const router = useRouter()
@@ -42,7 +38,7 @@ const sections = computed(() => [
   { label: t('adminShell.sectionSettings'), icon: 'i-lucide-settings', to: '/admin/settings', roles: ['admin'] },
 ])
 const visibleSections = computed(() => sections.value.filter(s => !!user.value?.role && s.roles.includes(user.value.role)))
-const isStaff = computed(() => visibleSections.value.length > 0)
+const isStaff = computed(() => status.value === 'active' && visibleSections.value.length > 0)
 function isActive(item: { to: string, exact?: boolean }) {
   if (item.exact) return route.path === item.to
   return route.path === item.to || route.path.startsWith(`${item.to}/`)
@@ -78,7 +74,7 @@ const userMenuItems = computed(() => [
 </script>
 
 <template>
-  <div data-frame="admin" class="flex h-dvh flex-col overflow-hidden bg-neutral-50 dark:bg-neutral-950">
+  <div v-if="isStaff" data-frame="admin" class="flex h-dvh flex-col overflow-hidden bg-neutral-50 dark:bg-neutral-950">
     <header class="z-40 shrink-0 border-b border-default bg-white/90 backdrop-blur dark:bg-neutral-900/90">
       <div class="flex h-14 items-center gap-3 px-4">
         <UButton

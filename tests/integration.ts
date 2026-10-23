@@ -69,6 +69,29 @@ try {
   assert.equal((await admin('/api/auth/login', { email: 'admin@demo.local', password: 'demo1234' })).status, 200)
   assert.equal((await member('/api/auth/login', { email: 'member@demo.local', password: 'demo1234' })).status, 200)
 
+  await test('admin HTML redirects guests before rendering any console markup', async () => {
+    for (const path of ['/admin', '/admin/channels', '/admin/members', '/admin/settings']) {
+      const response = await anon(path)
+      assert.equal(response.status, 302, `${path}: ${response.text.slice(0, 200)}`)
+      assert.equal(response.headers.location, '/login')
+      assert.ok(!response.text.includes('data-frame="admin"'))
+      assert.ok(!response.text.includes('Iniciá sesión con una cuenta administradora'))
+    }
+    const response = await member('/admin')
+    assert.equal(response.status, 302)
+    assert.equal(response.headers.location, '/feeds')
+    const allowed = await admin('/admin')
+    assert.equal(allowed.status, 200, allowed.text.slice(0, 200))
+    assert.ok(allowed.text.includes('data-frame="admin"'))
+  })
+  await test('admin SSR checks the requested tenant rather than the default tenant', async () => {
+    const tid = Number(run("INSERT INTO tenants(slug,name,created_at) VALUES('audit-ssr','SSR Community',?)", now()).lastInsertRowid)
+    run("INSERT INTO memberships(tenant_id,user_id,role,status) VALUES(?,?,'member','active')", tid, adminId)
+    const response = await admin('/admin', undefined, { host: 'audit-ssr.localhost' })
+    assert.equal(response.status, 302, response.text.slice(0, 200))
+    assert.equal(response.headers.location, '/feeds')
+    assert.ok(!response.text.includes('data-frame="admin"'))
+  })
   await test('closed communities cannot be joined by login or an existing cookie', async () => {
     const tid = Number(run("INSERT INTO tenants(slug,name,created_at,anyone_can_register,join_approval) VALUES('audit-closed','Closed',?,0,1)", now()).lastInsertRowid)
     const host = 'audit-closed.localhost'

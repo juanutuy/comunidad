@@ -75,6 +75,17 @@ try {
     assert.equal(response.status, 200, await response.clone().text())
     assert.equal((await response.json() as any).posts.length, 7)
   })
+  await test('Worker redirects admin HTML before rendering for guests and non-staff', async () => {
+    for (const path of ['/admin', '/admin/channels', '/admin/settings']) {
+      const response = await fetch(base + path, { redirect: 'manual' })
+      assert.equal(response.status, 302, path)
+      assert.equal(response.headers.get('location'), '/login')
+      assert.ok(!(await response.text()).includes('data-frame="admin"'))
+    }
+    const member = await fetch(base + '/admin', { redirect: 'manual', headers: { cookie } })
+    assert.equal(member.status, 302)
+    assert.equal(member.headers.get('location'), '/feeds')
+  })
   await test('Worker media page handles existing uploads within D1 query limits', async () => {
     const login = await fetch(base + '/api/auth/login', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email: 'admin@demo.local', password: 'demo1234' }) })
     assert.equal(login.status, 200)
