@@ -1,4 +1,5 @@
 <script setup lang="ts">
+const guestAccess = useGuestAccess()
 export interface PollOptionView { id: number, label: string, votes: number, pct: number }
 export interface PollView { options: PollOptionView[], totalVotes: number, myOptionId: number | null }
 
@@ -92,7 +93,7 @@ const youtubeEmbed = computed(() => {
 // (semántica del servidor); la respuesta trae el resumen fresco y
 // se aplica tal cual, sin cálculo optimista que pueda desfasarse.
 async function toggleReaction(type: string) {
-  if (!user.value) { toast.add({ title: t('composer.loginToReact'), color: 'warning' }); return }
+  if (!user.value) { guestAccess.requestAccess(); return }
   try {
     const res = await api<{ reactions: Record<string, number>, reactionTop: string[], reactionTotal: number, myReaction: string | null }>(`/api/posts/${props.post.id}/reactions`, { method: 'POST', body: { type } })
     localReactions.value = res.reactions
@@ -113,7 +114,7 @@ const commentsOpen = ref(false)
 const displayCommentCount = computed(() => commentsState.loaded ? commentsState.total : props.post.commentCount)
 
 async function toggleBookmark() {
-  if (!user.value) { toast.add({ title: t('composer.loginToSave'), color: 'warning' }); return }
+  if (!user.value) { guestAccess.requestAccess(); return }
   localBookmarked.value = !localBookmarked.value
   try { await api(`/api/posts/${props.post.id}/bookmark`, { method: 'POST' }) }
   catch { emit('changed') }
@@ -200,7 +201,7 @@ const localPoll = ref<PollView | null>(props.post.poll ?? null)
 watch(() => props.post.poll, p => { localPoll.value = p ?? null })
 const voting = ref(false)
 async function vote(optionId: number) {
-  if (!user.value) { toast.add({ title: t('composer.loginToVote'), color: 'warning' }); return }
+  if (!user.value) { guestAccess.requestAccess(); return }
   if (voting.value || localPoll.value?.myOptionId === optionId) return
   voting.value = true
   try {

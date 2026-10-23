@@ -39,12 +39,7 @@ const { data, refresh } = await useAsyncData('feed',
     </UCard>
 
     <PostComposer v-if="user" @published="refresh" />
-    <UAlert v-else color="primary" variant="soft" icon="i-lucide-sparkles" :title="t('feed.visitorTitle')" :description="t('feed.visitorText')">
-      <template #actions>
-        <UButton to="/login" size="sm" color="neutral" :label="t('nav.login')" />
-        <UButton to="/register" size="sm" :label="t('nav.joinFree')" />
-      </template>
-    </UAlert>
+
 
     <PostCard v-for="post in data?.posts || []" :key="post.id" :post="post" @changed="refresh" />
     <ListPagination :offset="offset" :next-offset="data?.nextOffset ?? null" @update:offset="offset = $event" />

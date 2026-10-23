@@ -1,4 +1,5 @@
 <script setup lang="ts">
+const guestAccess = useGuestAccess()
 definePageMeta({ layout: 'auth' })
 const { login, tenant } = useAuth()
 const { t } = useI18n()
@@ -20,7 +21,7 @@ async function submit() {
       return
     }
     toast.add({ title: t('auth.helloToast'), color: 'success' })
-    router.push('/feeds')
+    router.push(guestAccess.returnTo.value)
   }
   catch (e) {
     error.value = (e as { data?: { message?: string } }).data?.message || t('auth.loginFailed')

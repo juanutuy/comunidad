@@ -1,4 +1,5 @@
 <script setup lang="ts">
+const guestAccess = useGuestAccess()
 // LA sección de comentarios (Fase 16-G): un solo componente para
 // la tarjeta (se expande dentro de la misma tarjeta, como en el
 // original) y para la página de detalle (nace expandida). Lee y
@@ -89,7 +90,7 @@ async function submitComment(payload: { body: string, media: { mediaType: string
             @submit="submitComment"
           />
         </div>
-        <UAlert v-else color="neutral" variant="soft" class="mb-4" :title="t('postDetail.loginToComment')" />
+        <UButton v-else class="mb-4" color="neutral" variant="soft" icon="i-lucide-message-circle" :label="t('postDetail.loginToComment')" @click="guestAccess.requestAccess()" />
 
         <div class="space-y-4">
           <PostCommentItem

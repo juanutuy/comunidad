@@ -314,11 +314,7 @@ const hideRightRail = computed(() => route.path.startsWith('/profile/') || route
             </a>
           </div>
         </div>
-        <UCard v-if="!user" class="text-sm">
-          <p class="font-semibold">{{ t('nav.joinCardTitle') }}</p>
-          <p class="mt-1 text-muted">{{ t('nav.joinCardText') }}</p>
-          <UButton to="/register" class="mt-3" block :label="t('nav.createAccount')" />
-        </UCard>
+
       </aside>
 
       <!-- Columna central: el desplazador principal. El pie vive al
@@ -350,6 +346,7 @@ const hideRightRail = computed(() => route.path.startsWith('/profile/') || route
 
     <MobilePanel :dm-unread="dmUnread" :groups="channelData?.groups || []" @logout="doLogout" />
     <MobileBottomBar v-if="user" :dm-unread="dmUnread" />
+    <GuestAccessDialog />
     <SearchDialog />
     <UserSettingsModal />
     <ReportDialog />

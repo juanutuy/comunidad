@@ -1,4 +1,5 @@
 <script setup lang="ts">
+const guestAccess = useGuestAccess()
 import type { PostView } from '~/components/PostCard.vue'
 
 // Página de canal (Fase 16-F): superficie INDEPENDIENTE del feed —
@@ -64,7 +65,7 @@ const albumGroups = computed(() => {
 })
 
 async function toggleFollow() {
-  if (!user.value) { toast.add({ title: t('channel.loginToFollow'), color: 'warning' }); return }
+  if (!user.value) { guestAccess.requestAccess(); return }
   await api(`/api/channels/${slug.value}/follow`, { method: 'POST' })
   await refresh()
   await refreshNuxtData('layout-channels')

@@ -3,7 +3,7 @@
 // líderes, miembros y usuarios en línea (datos de /api/sidebar).
 // Fase 7: acabado tipo referencia — títulos de bloque en mayúsculas
 // con «Ver todo», eventos con cuadrado de fecha y anfitrión.
-const { tenant } = useAuth()
+const { tenant, user } = useAuth()
 const { t, locale } = useI18n()
 const { initials } = useFormat()
 const api = useApi()
@@ -31,6 +31,8 @@ function blockOrder(key: string) {
 }
 function blockVisible(key: string) {
   const blocks = sidebar.value?.blocks
+  const content = { upcoming_events: sidebar.value?.events, recent_posts: sidebar.value?.recent, leaders: sidebar.value?.leaders, members: sidebar.value?.members, online_now: sidebar.value?.online }
+  if (!user.value && !content[key as keyof typeof content]?.length) return false
   return !blocks || blocks.some(b => b.key === key)
 }
 

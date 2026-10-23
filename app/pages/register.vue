@@ -1,4 +1,5 @@
 <script setup lang="ts">
+const guestAccess = useGuestAccess()
 // Registro. Fase 14: si el tenant pide aprobación previa, el
 // formulario suma las preguntas de ingreso configuradas por el
 // administrador y la cuenta queda «en revisión» al terminar. Si la
@@ -39,7 +40,7 @@ async function submit() {
       return
     }
     toast.add({ title: t('auth.welcomeToast'), color: 'success' })
-    router.push('/feeds')
+    router.push(guestAccess.returnTo.value)
   }
   catch (e) {
     error.value = (e as { data?: { message?: string } }).data?.message || t('auth.registerFailed')
