@@ -19,7 +19,7 @@ export default defineEventHandler(async (event) => {
   const channels = await db.prepare('SELECT id, name, slug, type FROM channels WHERE tenant_id = ? ORDER BY sort, name').all(tenant.id) as { id: number, name: string, slug: string, type: string }[]
   return {
     settings: {
-      name: tenant.name, tagline: tenant.tagline, brandColor: tenant.brand_color,
+      name: tenant.nameEs || tenant.name, nameEn: tenant.name_en || '', tagline: tenant.tagline, brandColor: tenant.brand_color,
       guidelines: JSON.parse(tenant.guidelines || '[]') as string[],
       terms: row?.terms || '', privacy: row?.privacy || '',
       // Fase 12: revisión previa opcional de publicaciones.

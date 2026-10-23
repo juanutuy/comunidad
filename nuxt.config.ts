@@ -62,7 +62,7 @@ export default defineNuxtConfig({
 
   app: {
     head: {
-      title: 'Comunidad',
+      title: 'ServGT',
       htmlAttrs: { lang: 'es' },
       meta: [
         { charset: 'utf-8' },
@@ -73,12 +73,12 @@ export default defineNuxtConfig({
         { name: 'mobile-web-app-capable', content: 'yes' },
         { name: 'apple-mobile-web-app-capable', content: 'yes' },
         { name: 'apple-mobile-web-app-status-bar-style', content: 'default' },
-        { name: 'apple-mobile-web-app-title', content: 'Comunidad' },
+        { name: 'apple-mobile-web-app-title', content: 'ServGT' },
       ],
       link: [
-        { rel: 'manifest', href: '/manifest.webmanifest' },
-        { rel: 'icon', type: 'image/png', sizes: '192x192', href: '/icons/icon-192.png' },
-        { rel: 'apple-touch-icon', href: '/icons/icon-192.png' },
+        { rel: 'manifest', href: '/api/manifest' },
+        { rel: 'icon', type: 'image/png', sizes: '192x192', href: '/branding/servgt/icon-192.png' },
+        { rel: 'apple-touch-icon', href: '/branding/servgt/icon-192.png' },
       ],
     },
   },

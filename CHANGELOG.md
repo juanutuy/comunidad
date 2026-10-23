@@ -1,5 +1,9 @@
 # Historial de cambios
 
+## 2026-10-23 — Marca ServGT y nombres por idioma
+
+Nombre español e inglés configurables por comunidad y reactivos al idioma activo. Símbolo ServGT, favicon e iconos de instalación; marca visible en acceso, administración y navegación móvil. Manifest generado por tenant e idioma. Identificadores técnicos y contenido histórico conservados.
+
 ## 2026-10-23 — Redirección previa al renderizado del panel
 
 Middleware global protege `/admin` y sus secciones antes de montar páginas y layout. Visitantes reciben HTTP 302 a `/login`; miembros sin rol de staff vuelven al feed. Las consultas SSR conservan el dominio del tenant. Regresiones HTTP y Worker comprueban que la respuesta de redirección no contiene el panel.

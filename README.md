@@ -1,4 +1,6 @@
-# Comunidad
+# ServGT Community
+
+Marca visible: **ServGT Comunidad** en español y **ServGT Community** en inglés, configurable por comunidad en Administración → Ajustes. Los identificadores técnicos del proyecto se mantienen.
 
 Plataforma de comunidades con canales, publicaciones, comentarios, chat, cursos, eventos, biblioteca, gamificación, moderación y cobros. Nuxt 4, Vue 3 y Nuxt UI; Cloudflare Workers, D1, R2 y Durable Objects en producción. SQLite y almacenamiento local para desarrollo.
 

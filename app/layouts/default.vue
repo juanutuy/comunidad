@@ -76,14 +76,8 @@ const colorMode = useColorMode()
 const logoSrc = computed(() => {
   const t = tenant.value
   if (!t) return ''
-  return (colorMode.value === 'dark' ? (t.logoDarkUrl || t.logoUrl) : (t.logoUrl || t.logoDarkUrl)) || t.iconUrl || ''
+  return (colorMode.value === 'dark' ? (t.logoDarkUrl || t.logoUrl) : (t.logoUrl || t.logoDarkUrl)) || ''
 })
-// Fase 15: favicon propio del tenant cuando el admin lo configuró.
-useHead(() => ({
-  title: tenant.value?.name || t('common.community'),
-  link: tenant.value?.faviconUrl ? [{ rel: 'icon', href: tenant.value.faviconUrl }] : [],
-}))
-
 // Fase 15: bloque de contacto al pie del lateral, solo si hay datos.
 const SOCIAL_ICONS: Record<string, string> = {
   Facebook: 'i-lucide-facebook', X: 'i-lucide-twitter', Instagram: 'i-lucide-instagram',
@@ -155,7 +149,8 @@ const hideRightRail = computed(() => route.path.startsWith('/profile/') || route
         <NuxtLink to="/feeds" class="flex shrink-0 items-center gap-2">
           <img v-if="logoSrc" :src="logoSrc" :alt="tenant?.name || t('common.community')" class="h-8 max-w-44 object-contain">
           <template v-else>
-            <span class="flex h-8 w-8 items-center justify-center rounded-lg font-bold text-white" :style="{ backgroundColor: tenant?.brandColor || '#2563eb' }">
+            <img v-if="tenant?.iconUrl" :src="tenant.iconUrl" alt="" class="h-8 w-8 shrink-0 object-contain">
+            <span v-else class="flex h-8 w-8 items-center justify-center rounded-lg font-bold text-white" :style="{ backgroundColor: tenant?.brandColor || '#2563eb' }">
               {{ (tenant?.name || 'C').charAt(0) }}
             </span>
             <span class="hidden font-bold sm:block">{{ tenant?.name || t('common.community') }}</span>

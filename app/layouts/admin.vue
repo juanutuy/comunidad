@@ -84,7 +84,8 @@ const userMenuItems = computed(() => [
         <UButton to="/feeds" color="neutral" variant="ghost" icon="i-lucide-arrow-left" :label="t('adminShell.backToCommunity')" class="-ml-2 shrink-0" />
         <span class="hidden h-6 w-px bg-neutral-200 sm:block dark:bg-neutral-800" />
         <span class="flex min-w-0 items-center gap-2">
-          <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg font-bold text-white" :style="{ backgroundColor: tenant?.brandColor || '#2563eb' }">
+          <img v-if="tenant?.iconUrl" :src="tenant.iconUrl" alt="" class="h-8 w-8 shrink-0 object-contain">
+          <span v-else class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg font-bold text-white" :style="{ backgroundColor: tenant?.brandColor || '#2563eb' }">
             {{ (tenant?.name || 'C').charAt(0) }}
           </span>
           <span class="hidden truncate font-bold sm:block">{{ tenant?.name || 'Comunidad' }}</span>

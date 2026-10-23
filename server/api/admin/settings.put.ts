@@ -8,7 +8,7 @@ import { resolveNavMenu, resolveSidebar, resolveSocialLinks } from '../../utils/
 import type { NavItem, SidebarBlock, SocialLink } from '../../utils/privacy'
 
 interface SettingsBody {
-  name?: string, tagline?: string, brandColor?: string, guidelines?: string[], terms?: string, privacy?: string
+  name?: string, nameEn?: string, tagline?: string, brandColor?: string, guidelines?: string[], terms?: string, privacy?: string
   moderationReview?: boolean
   // Fase 18: idioma por defecto de la comunidad ('es' | 'en').
   defaultLocale?: string
@@ -45,6 +45,10 @@ export default defineEventHandler(async (event) => {
   else {
     await db.prepare('UPDATE tenants SET name = ?, tagline = ?, brand_color = ?, guidelines = ? WHERE id = ?')
       .run(name, (body.tagline || '').trim(), brandColor, JSON.stringify(guidelines), tenant.id)
+  }
+  if (body.nameEn !== undefined) {
+    if (typeof body.nameEn !== 'string' || body.nameEn.length > 120) throw createError({ statusCode: 400, message: 'Nombre en inglés inválido.' })
+    await db.prepare('UPDATE tenants SET name_en = ? WHERE id = ?').run(body.nameEn.trim(), tenant.id)
   }
   // Fase 12: la revisión previa se guarda aparte para no tocar las
   // ramas de textos legales; si el cliente no la manda, no cambia.
@@ -136,7 +140,7 @@ export default defineEventHandler(async (event) => {
     const value = body[field]
     if (value === undefined) continue
     const url = String(value).trim()
-    if (url !== '' && !url.startsWith('/api/files/'))
+    if (url !== '' && !url.startsWith('/api/files/') && !['/branding/servgt/symbol.svg', '/branding/servgt/symbol-black.svg', '/branding/servgt/favicon.ico'].includes(url))
       throw createError({ statusCode: 400, message: 'Las imágenes de marca tienen que subirse desde esta misma pantalla.' })
     await db.prepare(`UPDATE tenants SET ${column} = ? WHERE id = ?`).run(url.slice(0, 300), tenant.id).catch(() => {})
   }

@@ -19,7 +19,7 @@ interface NavItemForm { id: string, label: string, url: string, visible: boolean
 interface SocialLinkForm { platform: string, url: string }
 interface SettingsData {
   settings: {
-    name: string, tagline: string, brandColor: string, guidelines: string[], terms: string, privacy: string
+    name: string, nameEn?: string, tagline: string, brandColor: string, guidelines: string[], terms: string, privacy: string
     moderationReview?: boolean
     joinApproval?: boolean, joinQuestions?: string[], joinCooldownDays?: number, autoJoinChannels?: number[]
     // Fase 15: privacidad y presentación.
@@ -42,7 +42,7 @@ const { data } = await useAsyncData('admin-settings', () =>
     : Promise.resolve(null))
 
 const form = reactive({
-  name: '', tagline: '', brandColor: '#2563eb', guidelinesText: '', terms: '', privacy: '', moderationReview: false,
+  name: '', nameEn: '', tagline: '', brandColor: '#2563eb', guidelinesText: '', terms: '', privacy: '', moderationReview: false,
   // Fase 14: ingreso de miembros.
   joinApproval: false, joinQuestions: [] as string[], joinCooldownDays: 0, autoJoin1: 0, autoJoin2: 0,
   // Fase 15: privacidad y presentación.
@@ -62,6 +62,7 @@ const form = reactive({
 watchEffect(() => {
   if (data.value?.settings) {
     form.name = data.value.settings.name
+    form.nameEn = data.value.settings.nameEn || ''
     form.tagline = data.value.settings.tagline
     form.brandColor = data.value.settings.brandColor
     form.guidelinesText = data.value.settings.guidelines.join('\n')
@@ -252,6 +253,7 @@ async function save() {
       method: 'PUT',
       body: {
         name: form.name,
+        nameEn: form.nameEn,
         tagline: form.tagline,
         brandColor: form.brandColor,
         guidelines: form.guidelinesText.split('\n').map(g => g.trim()).filter(Boolean),
@@ -315,8 +317,11 @@ async function save() {
 
       <UCard v-if="tab === 'general'">
         <div class="space-y-4">
-          <UFormField label="Nombre de la comunidad">
+          <UFormField label="Nombre de la comunidad (español)">
             <UInput v-model="form.name" class="w-full" />
+          </UFormField>
+          <UFormField label="Nombre de la comunidad (inglés)" hint="Si está vacío, se usa el nombre en español.">
+            <UInput v-model="form.nameEn" class="w-full" />
           </UFormField>
           <UFormField label="Lema / descripción corta">
             <UInput v-model="form.tagline" class="w-full" />

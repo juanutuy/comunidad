@@ -145,7 +145,8 @@ const mainLinks = computed(() => {
         </span>
       </NuxtLink>
       <div v-else class="flex w-full items-center gap-3 px-4 py-4 pr-12">
-        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg font-bold text-white" :style="{ backgroundColor: tenant?.brandColor || '#2563eb' }">
+        <img v-if="tenant?.iconUrl" :src="tenant.iconUrl" alt="" class="size-10 shrink-0 object-contain">
+        <span v-else class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg font-bold text-white" :style="{ backgroundColor: tenant?.brandColor || '#2563eb' }">
           {{ (tenant?.name || 'C').charAt(0) }}
         </span>
         <span class="min-w-0">
@@ -194,7 +195,8 @@ const mainLinks = computed(() => {
         <!-- Comunidad actual (+ las demás membresías, si hay) -->
         <div>
           <div class="flex items-center gap-3 rounded-xl border border-default p-3">
-            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg font-bold text-white" :style="{ backgroundColor: tenant?.brandColor || '#2563eb' }">
+            <img v-if="tenant?.iconUrl" :src="tenant.iconUrl" alt="" class="size-10 shrink-0 object-contain">
+        <span v-else class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg font-bold text-white" :style="{ backgroundColor: tenant?.brandColor || '#2563eb' }">
               {{ (tenant?.name || 'C').charAt(0) }}
             </span>
             <span class="min-w-0 flex-1">

@@ -1,3 +1,4 @@
+import { computed } from 'vue'
 // Estado de sesión compartido (usuario del tenant actual).
 export interface SessionUser {
   id: number
@@ -17,6 +18,8 @@ export interface NavItemInfo { id: string, label: string, url: string, visible: 
 export interface SocialLinkInfo { platform: string, url: string }
 
 export interface TenantInfo {
+  nameEs?: string
+  nameEn?: string
   id: number
   slug: string
   name: string
@@ -119,5 +122,6 @@ export function useAuth() {
     gates.value = null
   }
 
-  return { user, tenant, status, gates, fetchMe, login, register, logout }
+  const localizedTenant = computed(() => tenant.value ? { ...tenant.value, name: (i18n.locale.value === 'en' ? tenant.value.nameEn : tenant.value.nameEs) || tenant.value.name } : null)
+  return { user, tenant: localizedTenant, status, gates, fetchMe, login, register, logout }
 }

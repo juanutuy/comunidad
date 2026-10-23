@@ -9,14 +9,14 @@ import { readSession } from './auth'
 import { channelAccess, tenantForHost } from '../../shared/access'
 import { isOnline } from './chat'
 import { dbFor } from './db'
-import { msg } from './i18n'
+import { msg, eventLocale } from './i18n'
 import { getReviewEnabled } from './moderation'
 import { getPrivacySettings, paidTeaserText, truncateTitle } from './privacy'
 import { summarizeReactionRows } from './reactions'
 import { sanitizeHtml } from './sanitize'
 
 export interface TenantRow {
-  id: number, slug: string, name: string, tagline: string, brand_color: string, guidelines: string
+  id: number, slug: string, name: string, name_en?: string, nameEs?: string, tagline: string, brand_color: string, guidelines: string
   // Fase 15: columnas de privacidad y presentación (opcionales en el
   // tipo porque resolveTenant puede correr sobre bases anteriores; la
   // lectura canónica de estos ajustes es getPrivacySettings).
@@ -66,7 +66,8 @@ export async function resolveTenant(event: H3Event): Promise<TenantRow> {
   const db = await dbFor(event)
   const tenant = await tenantForHost((sql, ...params) => db.prepare(sql).get(...params), getRequestHost(event))
   if (!tenant) throw createError({ statusCode: 404, message: 'Comunidad no encontrada.' })
-  return tenant as TenantRow
+  const row = tenant as TenantRow
+  return { ...row, nameEs: row.name, name: await eventLocale(event, row.id) === 'en' ? row.name_en || row.name : row.name }
 }
 
 export function publicUser(u: UserRow) {

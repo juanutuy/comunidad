@@ -105,8 +105,9 @@ CREATE TABLE IF NOT EXISTS app_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL D
 // tablas nuevas (arriba) y columnas nuevas (abajo). Los ALTER corren en
 // try/catch: si la columna ya existe, SQLite/D1 lanzan "duplicate column"
 // y se ignora. Idempotente y seguro en ambos motores.
-export const SCHEMA_VERSION = 'security-audit-2026-10-23-v1'
+export const SCHEMA_VERSION = 'localized-brand-v1'
 export const MIGRATIONS = [
+  `ALTER TABLE tenants ADD COLUMN name_en TEXT NOT NULL DEFAULT ''`,
   `ALTER TABLE memberships ADD COLUMN status_reason TEXT NOT NULL DEFAULT ''`,
   `ALTER TABLE memberships ADD COLUMN status_changed_at TEXT NOT NULL DEFAULT ''`,
   `ALTER TABLE memberships ADD COLUMN status_changed_by INTEGER`,

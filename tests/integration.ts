@@ -69,6 +69,24 @@ try {
   assert.equal((await admin('/api/auth/login', { email: 'admin@demo.local', password: 'demo1234' })).status, 200)
   assert.equal((await member('/api/auth/login', { email: 'member@demo.local', password: 'demo1234' })).status, 200)
 
+  await test('localized tenant branding is shared by tenant API, SSR and install manifest', async () => {
+    const original = one('SELECT name,name_en,icon_url,favicon_url FROM tenants WHERE id=?', tenant)
+    run("UPDATE tenants SET name='ServGT Comunidad',name_en='ServGT Community',icon_url='/branding/servgt/symbol.svg',favicon_url='/branding/servgt/favicon.ico' WHERE id=?", tenant)
+    try {
+      const spanish = await anon('/api/tenant', undefined, { headers: { cookie: 'cm_locale=es' } })
+      const english = await anon('/api/tenant', undefined, { headers: { cookie: 'cm_locale=en' } })
+      assert.equal(spanish.body.tenant.name, 'ServGT Comunidad')
+      assert.equal(english.body.tenant.name, 'ServGT Community')
+      assert.equal(english.body.tenant.nameEs, 'ServGT Comunidad')
+      const page = await anon('/login', undefined, { headers: { cookie: 'cm_locale=en' } })
+      assert.ok(page.text.includes('ServGT Community'))
+      assert.ok(page.text.includes('/branding/servgt/symbol.svg'))
+      const manifest = await anon('/api/manifest?locale=en')
+      assert.equal(manifest.body.name, 'ServGT Community')
+      assert.ok(manifest.body.icons.some((i: any) => i.src === '/branding/servgt/icon-512.png'))
+    }
+    finally { run('UPDATE tenants SET name=?,name_en=?,icon_url=?,favicon_url=? WHERE id=?', original.name, original.name_en, original.icon_url, original.favicon_url, tenant) }
+  })
   await test('admin HTML redirects guests before rendering any console markup', async () => {
     for (const path of ['/admin', '/admin/channels', '/admin/members', '/admin/settings']) {
       const response = await anon(path)

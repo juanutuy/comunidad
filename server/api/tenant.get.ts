@@ -30,7 +30,7 @@ export default defineEventHandler(async (event) => {
   const pay = await getPaymentSettings(event, tenant.id)
   return {
     tenant: {
-      id: tenant.id, slug: tenant.slug, name: tenant.name, tagline: tenant.tagline,
+      id: tenant.id, slug: tenant.slug, name: tenant.name, nameEs: tenant.nameEs, nameEn: tenant.name_en || tenant.nameEs, tagline: tenant.tagline,
       brandColor: tenant.brand_color,
       currency: pay.currency,
       manualPaymentsEnabled: pay.manualPaymentsEnabled,

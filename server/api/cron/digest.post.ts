@@ -35,11 +35,12 @@ export default defineEventHandler(async (event) => {
     const tenantId = Number(tenant.id)
     await publishDuePosts(event, tenantId)
     const upcoming = await db.prepare('SELECT title, starts_at FROM events WHERE tenant_id = ? AND starts_at >= ? ORDER BY starts_at LIMIT 5').all(tenantId, now) as Record<string, unknown>[]
-    const members = await db.prepare("SELECT u.id, u.email, m.role FROM users u JOIN memberships m ON m.user_id = u.id WHERE m.tenant_id = ? AND m.status IN ('active', 'restricted')").all(tenantId) as { id: number, email: string, role: string }[]
+    const members = await db.prepare("SELECT u.id, u.email, u.locale, m.role FROM users u JOIN memberships m ON m.user_id = u.id WHERE m.tenant_id = ? AND m.status IN ('active', 'restricted')").all(tenantId) as { id: number, email: string, role: string, locale: string | null }[]
     for (const m of members) {
+      const communityName = (m.locale || tenant.default_locale) === 'en' ? tenant.name_en || tenant.name : tenant.name
       const { posts: newPosts, count: postCount } = await digestPosts(db, tenantId, m.id, m.role, weekAgo)
       const lines = [
-        `Hola, esto pasó esta semana en ${tenant.name}:`,
+        `Hola, esto pasó esta semana en ${communityName}:`,
         '',
         postCount
           ? `• ${postCount} publicación(es) nueva(s). Destacadas:`
@@ -54,7 +55,7 @@ export default defineEventHandler(async (event) => {
       recipients++
       const status = await sendEmail(event, {
         tenantId, userId: Number(m.id), to: String(m.email), kind: 'digest',
-        subject: `Tu resumen semanal de ${tenant.name}`,
+        subject: `Tu resumen semanal de ${communityName}`,
         text: lines.join('\n'),
       })
       if (status === 'sent') sent++
