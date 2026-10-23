@@ -142,9 +142,9 @@ const hideRightRail = computed(() => route.path.startsWith('/profile/') || route
 </script>
 
 <template>
-  <div data-frame="member" class="flex h-dvh flex-col overflow-hidden bg-neutral-50 dark:bg-neutral-950">
-    <header class="z-40 shrink-0 border-b border-default bg-white/90 backdrop-blur dark:bg-neutral-900/90">
-      <div class="relative mx-auto flex h-14 max-w-[1400px] items-center gap-3 px-4">
+  <div data-frame="member" class="flex h-dvh flex-col overflow-hidden community-shell">
+    <header class="z-40 shrink-0 border-b border-default community-header">
+      <div class="relative mx-auto flex h-18 max-w-[1560px] items-center gap-3 px-4">
         <UButton class="md:hidden" color="neutral" variant="ghost" icon="i-lucide-menu" :aria-label="t('nav.openMenu')" @click="openPanel" />
         <NuxtLink to="/feeds" class="flex shrink-0 items-center gap-2">
           <img v-if="logoSrc" :src="logoSrc" :alt="tenant?.name || t('common.community')" class="h-8 max-w-44 object-contain">
@@ -209,11 +209,11 @@ const hideRightRail = computed(() => route.path.startsWith('/profile/') || route
          interno (overflow-y-auto en su contenedor: desplazar dentro
          de un lado no mueve el centro, y viceversa) y la columna
          central como desplazador principal del contenido. -->
-    <div class="mx-auto flex min-h-0 w-full max-w-[1400px] flex-1 gap-6 px-4">
+    <div class="mx-auto flex min-h-0 w-full max-w-[1560px] flex-1 gap-5 px-4 lg:gap-7">
       <!-- Lateral fijo desde tableta (md) con scroll interno propio;
            en teléfono la navegación vive en el panel deslizable
            (Fase 10). -->
-      <aside data-scroll-region="channels-sidebar" class="hidden min-h-0 w-60 shrink-0 space-y-5 overflow-y-auto py-6 pr-1 md:block">
+      <aside data-scroll-region="channels-sidebar" class="hidden min-h-0 community-sidebar w-60 shrink-0 space-y-7 overflow-y-auto py-7 pr-3 lg:w-64 md:block">
         <div>
           <ul class="space-y-0.5">
             <li v-for="item in sidebarNav" :key="item.id">
@@ -316,7 +316,7 @@ const hideRightRail = computed(() => route.path.startsWith('/profile/') || route
            final de ESTE scroll (ya no bajo el marco, donde quedaría
            fuera de la ventana) y el respiro de la barra inferior
            móvil también, para que no tape el final del contenido. -->
-      <main ref="centerScroller" data-scroll-region="center" class="min-h-0 min-w-0 flex-1 overflow-y-auto py-6">
+      <main ref="centerScroller" data-scroll-region="center" class="min-h-0 min-w-0 flex-1 overflow-y-auto py-7">
         <slot />
         <footer class="mt-10 border-t border-default">
           <div class="flex flex-wrap items-center gap-x-4 gap-y-1 py-4 text-xs text-muted">
@@ -334,7 +334,7 @@ const hideRightRail = computed(() => route.path.startsWith('/profile/') || route
       <!-- Riel derecho: fijo con scroll interno propio (su contenedor
            lleva el overflow, con la altura de la zona bajo el
            header); solo desde xl y nunca en el perfil (Fase 9). -->
-      <aside v-if="!hideRightRail" data-scroll-region="right-rail" class="hidden min-h-0 w-[290px] shrink-0 overflow-y-auto py-6 pl-1 xl:block">
+      <aside v-if="!hideRightRail" data-scroll-region="right-rail" class="hidden min-h-0 w-[300px] shrink-0 overflow-y-auto py-6 pl-1 xl:block">
         <RightRail />
       </aside>
     </div>

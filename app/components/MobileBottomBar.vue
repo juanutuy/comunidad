@@ -26,7 +26,7 @@ const itemClass = 'flex h-full flex-col items-center justify-center gap-0.5 text
 <template>
   <nav
     v-if="user"
-    class="fixed inset-x-0 bottom-0 z-40 border-t border-default bg-white/95 pb-[env(safe-area-inset-bottom)] backdrop-blur dark:bg-neutral-900/95 md:hidden"
+    class="fixed inset-x-0 bottom-0 z-40 border-t border-default community-header pb-[env(safe-area-inset-bottom)] md:hidden"
     :aria-label="t('bottomBar.mobileNavigation')"
   >
     <div class="grid h-16 grid-cols-5">

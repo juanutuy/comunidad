@@ -5,6 +5,46 @@
   --font-sans: 'Public Sans', ui-sans-serif, system-ui, sans-serif;
 }
 
+/* Shared semantic surfaces, consumed by Nuxt UI and the member shell. */
+:root {
+  --ui-bg: #ffffff;
+  --ui-bg-muted: #f4f6fa;
+  --ui-bg-elevated: #edf1f7;
+  --ui-border: #e1e7ef;
+  --ui-border-accented: #c5d0df;
+  --community-canvas: #f4f6fa;
+  --community-sidebar: #ffffff;
+}
+.dark {
+  --ui-bg: #19212d;
+  --ui-bg-muted: #141c27;
+  --ui-bg-elevated: #242f3e;
+  --ui-border: #2c3848;
+  --ui-border-accented: #43536a;
+  --community-canvas: #101720;
+  --community-sidebar: #151e29;
+}
+body { -webkit-font-smoothing: antialiased; }
+.community-shell { background: var(--community-canvas); }
+.community-header { background: var(--community-sidebar); }
+.community-sidebar { background: var(--community-sidebar); border-right: 1px solid var(--ui-border); }
+.community-sidebar a { min-height: 44px; border-radius: 12px; gap: 12px; padding: 10px 12px; font-size: 0.9375rem; }
+.community-sidebar a[aria-current="page"] { background: color-mix(in srgb, var(--ui-primary) 12%, transparent); color: var(--ui-primary); }
+.community-hero {
+  position: relative; isolation: isolate; overflow: hidden;
+  background: linear-gradient(115deg, color-mix(in srgb, var(--community-brand, #2563eb) 28%, #101d32), color-mix(in srgb, var(--community-brand, #2563eb) 60%, #14243c));
+  color: #fff;
+}
+.community-hero::after {
+  content: ''; position: absolute; z-index: -1; width: 320px; height: 320px;
+  right: -80px; top: -180px; border-radius: 50%;
+  border: 48px solid rgb(255 255 255 / .06);
+  box-shadow: 0 0 0 48px rgb(255 255 255 / .04), 0 0 0 96px rgb(255 255 255 / .025);
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; transition-duration: 0.01ms !important; }
+}
+
 /* Fase 8 — contenido rico: el mismo CSS da formato al área editable
    de TipTap (.rich-area, la clase ProseMirror del editor) y al HTML
    ya sanitizado que se muestra en posts, cursos y eventos

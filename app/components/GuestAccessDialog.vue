@@ -18,7 +18,7 @@ async function authenticated(status: string) {
 </script>
 
 <template>
-  <UModal v-model:open="open" :title="t('auth.welcomeBack')" :description="t('auth.loginSubtitle', { name: tenant?.name || t('pricing.theCommunity') })">
+  <UModal v-model:open="open" :ui="{ content: 'max-w-xl', header: 'border-none pb-0 sm:pb-0' }" :title="t('auth.welcomeBack')" :description="t('auth.loginSubtitle', { name: tenant?.name || t('pricing.theCommunity') })">
     <template #body>
       <LoginForm v-if="open" @authenticated="authenticated" @register="open = false" />
     </template>

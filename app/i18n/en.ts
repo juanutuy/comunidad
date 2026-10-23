@@ -782,6 +782,8 @@ export const en: typeof es = {
     previewSuffix: ' · preview',
   },
   rail: {
+    guestEvents: 'Sign in to explore upcoming community events.',
+    guestPosts: 'Sign in to discover recent community activity.',
     upcomingEvents: 'Upcoming events',
     noUpcoming: 'No upcoming events.',
     hostLabel: 'Host: {name}',
@@ -903,6 +905,8 @@ export const en: typeof es = {
     languageFailed: 'The language could not be saved',
   },
   auth: {
+    showPassword: 'Show password',
+    hidePassword: 'Hide password',
     welcomeBack: 'Welcome back',
     loginSubtitle: 'Log in to continue in {name}.',
     email: 'Email',

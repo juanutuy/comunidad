@@ -32,7 +32,8 @@ function blockOrder(key: string) {
 function blockVisible(key: string) {
   const blocks = sidebar.value?.blocks
   const content = { upcoming_events: sidebar.value?.events, recent_posts: sidebar.value?.recent, leaders: sidebar.value?.leaders, members: sidebar.value?.members, online_now: sidebar.value?.online }
-  if (!user.value && !content[key as keyof typeof content]?.length) return false
+  // Keep useful empty states for events and posts in the public feed.
+  if (!user.value && !['upcoming_events', 'recent_posts'].includes(key) && !content[key as keyof typeof content]?.length) return false
   return !blocks || blocks.some(b => b.key === key)
 }
 
@@ -53,7 +54,7 @@ function dateParts(iso: string) {
 <template>
   <div class="flex flex-col gap-5">
     <UCard v-if="blockVisible('upcoming_events')" :style="{ order: blockOrder('upcoming_events') }">
-      <div class="mb-3 flex items-baseline justify-between gap-2">
+      <div class="mb-5 flex items-baseline justify-between gap-2">
         <h3 class="text-xs font-bold tracking-wider text-muted uppercase">{{ t('rail.upcomingEvents') }}</h3>
         <NuxtLink to="/events" class="text-xs font-medium text-primary hover:underline">{{ t('common.viewAll') }}</NuxtLink>
       </div>
@@ -73,11 +74,11 @@ function dateParts(iso: string) {
           </NuxtLink>
         </li>
       </ul>
-      <p v-else class="text-sm text-muted">{{ t('rail.noUpcoming') }}</p>
+      <p v-else class="rounded-xl bg-muted px-4 py-6 text-center text-sm leading-relaxed text-muted">{{ t(user ? 'rail.noUpcoming' : 'rail.guestEvents') }}</p>
     </UCard>
 
     <UCard v-if="blockVisible('recent_posts')" :style="{ order: blockOrder('recent_posts') }">
-      <div class="mb-3 flex items-baseline justify-between gap-2">
+      <div class="mb-5 flex items-baseline justify-between gap-2">
         <h3 class="text-xs font-bold tracking-wider text-muted uppercase">{{ t('rail.recentPosts') }}</h3>
         <NuxtLink to="/feeds" class="text-xs font-medium text-primary hover:underline">{{ t('common.viewAll') }}</NuxtLink>
       </div>
@@ -86,11 +87,11 @@ function dateParts(iso: string) {
           <NuxtLink :to="`/p/${p.channel_slug}/${p.slug}`" class="text-sm leading-snug hover:underline">{{ p.title }}</NuxtLink>
         </li>
       </ul>
-      <p v-else class="text-sm text-muted">{{ t('rail.noPosts') }}</p>
+      <p v-else class="rounded-xl bg-muted px-4 py-6 text-center text-sm leading-relaxed text-muted">{{ t(user ? 'rail.noPosts' : 'rail.guestPosts') }}</p>
     </UCard>
 
     <UCard v-if="blockVisible('leaders')" :style="{ order: blockOrder('leaders') }">
-      <div class="mb-3 flex items-baseline justify-between gap-2">
+      <div class="mb-5 flex items-baseline justify-between gap-2">
         <h3 class="text-xs font-bold tracking-wider text-muted uppercase">{{ t('rail.topLeaders') }}</h3>
         <NuxtLink to="/leaderboard" class="text-xs font-medium text-primary hover:underline">{{ t('common.viewAll') }}</NuxtLink>
       </div>
@@ -109,7 +110,7 @@ function dateParts(iso: string) {
     </UCard>
 
     <UCard v-if="blockVisible('members')" :style="{ order: blockOrder('members') }">
-      <div class="mb-3 flex items-baseline justify-between gap-2">
+      <div class="mb-5 flex items-baseline justify-between gap-2">
         <h3 class="text-xs font-bold tracking-wider text-muted uppercase">{{ t('rail.members') }}</h3>
         <NuxtLink to="/members" class="text-xs font-medium text-primary hover:underline">{{ t('common.viewAll') }}</NuxtLink>
       </div>
@@ -126,7 +127,7 @@ function dateParts(iso: string) {
     </UCard>
 
     <UCard v-if="blockVisible('online_now')" :style="{ order: blockOrder('online_now') }">
-      <div class="mb-3 flex items-baseline justify-between gap-2">
+      <div class="mb-5 flex items-baseline justify-between gap-2">
         <h3 class="text-xs font-bold tracking-wider text-muted uppercase">{{ t('rail.onlineNow', { count: sidebar?.online?.length || 0 }) }}</h3>
         <NuxtLink to="/members" class="text-xs font-medium text-primary hover:underline">{{ t('common.viewAll') }}</NuxtLink>
       </div>

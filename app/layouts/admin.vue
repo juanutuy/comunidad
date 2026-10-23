@@ -74,9 +74,9 @@ const userMenuItems = computed(() => [
 </script>
 
 <template>
-  <div v-if="isStaff" data-frame="admin" class="flex h-dvh flex-col overflow-hidden bg-neutral-50 dark:bg-neutral-950">
-    <header class="z-40 shrink-0 border-b border-default bg-white/90 backdrop-blur dark:bg-neutral-900/90">
-      <div class="flex h-14 items-center gap-3 px-4">
+  <div v-if="isStaff" data-frame="admin" class="flex h-dvh flex-col overflow-hidden community-shell">
+    <header class="z-40 shrink-0 border-b border-default community-header">
+      <div class="flex h-18 items-center gap-3 px-4">
         <UButton
           v-if="isStaff" class="md:hidden" color="neutral" variant="ghost"
           icon="i-lucide-menu" :aria-label="t('adminShell.consoleMenu')" @click="railOpen = true"

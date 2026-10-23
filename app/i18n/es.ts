@@ -782,6 +782,8 @@ export const es = {
     previewSuffix: ' · vista previa',
   },
   rail: {
+    guestEvents: 'Iniciá sesión para consultar los próximos encuentros.',
+    guestPosts: 'Iniciá sesión para descubrir la actividad reciente.',
     upcomingEvents: 'Próximos eventos',
     noUpcoming: 'No hay eventos próximos.',
     hostLabel: 'Anfitrión: {name}',
@@ -903,6 +905,8 @@ export const es = {
     languageFailed: 'No se pudo guardar el idioma',
   },
   auth: {
+    showPassword: 'Mostrar contraseña',
+    hidePassword: 'Ocultar contraseña',
     welcomeBack: 'Bienvenido de nuevo',
     loginSubtitle: 'Iniciá sesión para seguir en {name}.',
     email: 'Correo electrónico',

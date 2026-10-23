@@ -20,18 +20,17 @@ const { data, refresh } = await useAsyncData('feed',
 </script>
 
 <template>
-  <div class="space-y-5">
+  <div class="space-y-6">
     <!-- Cabecera de la comunidad (Fase 7): banner de marca + nombre. -->
     <UCard :ui="{ body: 'p-0 sm:p-0' }" class="overflow-hidden">
-      <div
-        class="h-28 sm:h-36"
-        :style="{ background: `linear-gradient(120deg, ${tenant?.brandColor || '#2563eb'} 0%, ${tenant?.brandColor || '#2563eb'}b3 55%, ${tenant?.brandColor || '#2563eb'}59 100%)` }"
-      />
-      <div class="px-5 py-4">
-        <h1 class="text-2xl font-bold">{{ tenant?.name }}</h1>
-        <p class="mt-0.5 text-muted">{{ tenant?.tagline }}</p>
+      <div class="community-hero px-6 py-8 sm:px-8 sm:py-10" :style="{ '--community-brand': tenant?.brandColor || '#2563eb' }">
+        <span class="mb-6 inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-xs font-semibold tracking-wide">
+          <UIcon name="i-lucide-orbit" class="size-4" /> {{ t('common.community') }}
+        </span>
+        <h1 class="max-w-lg text-3xl font-bold tracking-tight sm:text-4xl">{{ tenant?.name }}</h1>
+        <p class="mt-3 max-w-lg text-base leading-relaxed text-blue-100">{{ tenant?.tagline }}</p>
       </div>
-      <div class="flex items-center gap-3 border-t border-default px-5 py-3">
+      <div class="flex items-center gap-3 border-t border-default px-6 py-4">
         <h2 class="text-lg font-bold">{{ t('feed.title') }}</h2>
         <span class="flex-1" />
         <USelect v-model="sort" :items="sortOptions" size="sm" class="w-40" />
