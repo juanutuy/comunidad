@@ -14,6 +14,7 @@ const { openSettings: openUserSettings } = useUserSettings()
 // Corrección: la búsqueda de la barra es SOLO el icono de lupa que
 // abre el diálogo (Cmd+K), como en la referencia — sin caja pegada.
 const { openSearch } = useSearchDialog()
+const guestAccess = useGuestAccess()
 
 const { data: channelData, refresh: refreshChannels } = await useAsyncData('layout-channels', () =>
   api<{ groups: { id: number, name: string, sort?: number, isDefault?: boolean, channels: { id: number, slug: string, name: string, icon: string, description?: string, type: string, priceCents: number, contentType?: 'post' | 'image', coverUrl?: string, visibility?: 'public' | 'private' | 'secret', groupId?: number | null, postPermission?: string, archived?: boolean, following: boolean, hasAccess?: boolean }[] }[] }>('/api/channels'))
@@ -201,8 +202,7 @@ const hideRightRail = computed(() => route.path.startsWith('/profile/') || route
           </span>
         </template>
         <template v-else>
-          <UButton to="/login" color="neutral" variant="ghost" icon="i-lucide-log-in" :label="t('nav.login')" />
-          <UButton to="/register" color="primary" icon="i-lucide-user-round-plus" :label="t('nav.join')" />
+          <UButton color="primary" icon="i-lucide-log-in" :label="t('nav.login')" @click="guestAccess.requestAccess()" />
         </template>
       </div>
     </header>

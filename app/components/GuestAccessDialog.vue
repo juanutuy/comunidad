@@ -1,15 +1,21 @@
 <script setup lang="ts">
 const { open } = useGuestAccess()
+const { tenant } = useAuth()
 const { t } = useI18n()
+async function authenticated(status: string) {
+  open.value = false
+  if (['pending', 'declined'].includes(status)) {
+    await navigateTo('/pending')
+    return
+  }
+  await refreshNuxtData()
+}
 </script>
 
 <template>
-  <UModal v-model:open="open" :title="t('feed.visitorTitle')" :description="t('feed.visitorText')">
+  <UModal v-model:open="open" :title="t('auth.welcomeBack')" :description="t('auth.loginSubtitle', { name: tenant?.name || t('pricing.theCommunity') })">
     <template #body>
-      <div class="flex flex-wrap gap-3">
-        <UButton to="/register" icon="i-lucide-user-round-plus" :label="t('nav.join')" @click="open = false" />
-        <UButton to="/login" color="neutral" variant="soft" icon="i-lucide-log-in" :label="t('nav.login')" @click="open = false" />
-      </div>
+      <LoginForm v-if="open" @authenticated="authenticated" @register="open = false" />
     </template>
   </UModal>
 </template>
