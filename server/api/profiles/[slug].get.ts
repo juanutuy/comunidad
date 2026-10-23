@@ -17,7 +17,7 @@ export default defineEventHandler(async (event) => {
   const tenant = await resolveTenant(event)
   const slug = getRouterParam(event, 'slug')!
   const db = await dbFor(event)
-  const user = await db.prepare('SELECT * FROM users WHERE slug = ?').get(slug) as Record<string, unknown> | undefined
+  const user = await db.prepare('SELECT u.* FROM users u JOIN memberships m ON m.user_id = u.id WHERE u.slug = ? AND m.tenant_id = ? AND m.status IN (\'active\', \'restricted\')').get(slug, tenant.id) as Record<string, unknown> | undefined
   if (!user) throw createError({ statusCode: 404, message: 'Miembro no encontrado.' })
   const { user: me, role } = await currentAuth(event, tenant.id)
   // Endurecimiento Fase 15: comunidad privada = el perfil (datos,

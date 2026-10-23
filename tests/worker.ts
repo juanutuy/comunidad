@@ -118,6 +118,22 @@ try {
     assert.equal(retried.status, 200, await retried.text())
     assert.equal(sql("SELECT status FROM payments WHERE stripe_session_id='cs_worker'")[0].status, 'paid')
   })
+  await test('D1 executes scoped anonymization without erasing retained content or global profile', async () => {
+    const login = await fetch(base + '/api/auth/login', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email: 'admin@demo.local', password: 'demo1234' }) })
+    const adminCookie = login.headers.get('set-cookie')!.split(';')[0]!
+    sql("INSERT INTO users(id,name,slug,email,password_hash,created_at,website) VALUES(200,'Scoped','scoped','scoped@example.invalid','fixture','','https://owner.invalid')")
+    sql("INSERT INTO memberships(tenant_id,user_id,role,status) VALUES(1,200,'member','active')")
+    sql("INSERT INTO posts(tenant_id,channel_id,author_id,slug,title,body,body_html,created_at) VALUES(1,1,200,'scoped-retain','Scoped','Kept','<p>Kept</p>','')")
+    const response = await fetch(base + '/api/admin/members/200/delete-account', { method: 'POST', headers: { cookie: adminCookie, 'content-type': 'application/json' }, body: JSON.stringify({ content: 'anonymize', confirmation: 'ELIMINAR' }) })
+    assert.equal(response.status, 200, await response.text())
+    const row = sql("SELECT body,author_id FROM posts WHERE slug='scoped-retain'")[0]
+    assert.equal(row.body, 'Kept')
+    assert.notEqual(row.author_id, 200)
+    assert.equal(sql('SELECT website FROM users WHERE id=' + row.author_id)[0].website, '')
+    assert.equal(sql('SELECT website FROM users WHERE id=200')[0].website, 'https://owner.invalid')
+    assert.equal(sql('SELECT id FROM memberships WHERE tenant_id=1 AND user_id=200').length, 0)
+  })
+
 }
 finally {
   if (child?.pid) { try { process.kill(-child.pid, 'SIGTERM') } catch { /* exited */ } }

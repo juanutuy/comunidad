@@ -12,6 +12,7 @@
 import { dbFor } from '../../utils/db'
 import { publishDuePosts } from '../../utils/community'
 import { sendEmail } from '../../utils/email'
+import { digestPosts } from '../../utils/digest'
 
 export default defineEventHandler(async (event) => {
   const cfg = useRuntimeConfig()
@@ -33,24 +34,23 @@ export default defineEventHandler(async (event) => {
   for (const tenant of tenants) {
     const tenantId = Number(tenant.id)
     await publishDuePosts(event, tenantId)
-    const newPosts = await db.prepare("SELECT p.title, c.name AS channel_name FROM posts p JOIN channels c ON c.id = p.channel_id WHERE p.tenant_id = ? AND p.status = 'published' AND p.created_at >= ? ORDER BY p.created_at DESC LIMIT 8").all(tenantId, weekAgo) as Record<string, unknown>[]
     const upcoming = await db.prepare('SELECT title, starts_at FROM events WHERE tenant_id = ? AND starts_at >= ? ORDER BY starts_at LIMIT 5').all(tenantId, now) as Record<string, unknown>[]
-    const postCount = (await db.prepare("SELECT COUNT(*) AS n FROM posts WHERE tenant_id = ? AND status = 'published' AND created_at >= ?").get(tenantId, weekAgo) as { n: number }).n
-    const lines = [
-      `Hola, esto pasó esta semana en ${tenant.name}:`,
-      '',
-      postCount
-        ? `• ${postCount} publicación(es) nueva(s). Destacadas:`
-        : '• Sin publicaciones nuevas esta semana: ¡es un buen momento para compartir algo!',
-      ...newPosts.map(p => `  - ${p.title} (en ${p.channel_name})`),
-      '',
-      upcoming.length ? 'Próximos eventos:' : 'Sin eventos próximos por ahora.',
-      ...upcoming.map(e => `  - ${e.title} · ${String(e.starts_at).slice(0, 10)}`),
-      '',
-      'Entrá a la comunidad para participar.',
-    ]
-    const members = await db.prepare('SELECT u.id, u.email, u.name FROM users u JOIN memberships m ON m.user_id = u.id AND m.tenant_id = ?').all(tenantId) as Record<string, unknown>[]
+    const members = await db.prepare("SELECT u.id, u.email, m.role FROM users u JOIN memberships m ON m.user_id = u.id WHERE m.tenant_id = ? AND m.status IN ('active', 'restricted')").all(tenantId) as { id: number, email: string, role: string }[]
     for (const m of members) {
+      const { posts: newPosts, count: postCount } = await digestPosts(db, tenantId, m.id, m.role, weekAgo)
+      const lines = [
+        `Hola, esto pasó esta semana en ${tenant.name}:`,
+        '',
+        postCount
+          ? `• ${postCount} publicación(es) nueva(s). Destacadas:`
+          : '• Sin publicaciones nuevas esta semana: ¡es un buen momento para compartir algo!',
+        ...newPosts.map(p => `  - ${p.title} (en ${p.channel_name})`),
+        '',
+        upcoming.length ? 'Próximos eventos:' : 'Sin eventos próximos por ahora.',
+        ...upcoming.map(e => `  - ${e.title} · ${String(e.starts_at).slice(0, 10)}`),
+        '',
+        'Entrá a la comunidad para participar.',
+      ]
       recipients++
       const status = await sendEmail(event, {
         tenantId, userId: Number(m.id), to: String(m.email), kind: 'digest',

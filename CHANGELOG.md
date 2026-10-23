@@ -1,5 +1,9 @@
 # Historial de cambios
 
+## 2026-10-23 — Recuperación, aislamiento y anonimización
+
+Enlaces de recuperación entregados solo al titular; eliminación limitada a la comunidad con autoría anónima y contenido conservado; endpoint demo deshabilitado; perfiles aislados por membresía; digest filtrado por permisos. Migración de seguridad revoca sesiones y enlaces previos y retira concesiones demo. Nuevas regresiones HTTP, de migración y Worker/D1. Véase [remediación](docs/REMEDIACION-2026-10-23.md).
+
 ## 2026-10-20 — Compatibilidad de medios con D1 remoto
 
 Consultas de referencias de medios divididas en tres grupos, con nombres de columnas explícitos. Evita el límite remoto de términos UNION; mantiene coste acotado para toda la página. Regresión Worker con referencias de canal y biblioteca.

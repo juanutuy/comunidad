@@ -61,3 +61,22 @@ test('plan grants preserve source, expiration and cancellation ordering', async 
   }
   finally { close() }
 })
+
+test('security upgrade revokes legacy sessions, links and demo grants exactly once', async () => {
+  const { db, close } = await memoryDatabase()
+  try {
+    await db.prepare("INSERT INTO users(id,name,slug,email,password_hash,created_at,token_version) VALUES(99,'Owner','owner','owner@example.invalid','fixture','',5)").run()
+    await db.prepare("INSERT INTO access_links(tenant_id,user_id,token,expires_at,created_at) VALUES(1,99,'legacy','2999-01-01','')").run()
+    await db.prepare("INSERT INTO channel_access(tenant_id,user_id,channel_id,source,created_at) VALUES(1,99,1,'demo',''),(1,99,2,'stripe','')").run()
+    await db.prepare("DELETE FROM app_meta WHERE key = 'security_revoke_20261023'").run()
+    await db.prepare("UPDATE app_meta SET value = 'member-moderation-v1' WHERE key = 'schema_version'").run()
+    await migrateDb(db)
+    assert.equal((await db.prepare('SELECT token_version FROM users WHERE id=99').get()).token_version, 6)
+    assert.equal((await db.prepare('SELECT COUNT(*) n FROM access_links').get()).n, 0)
+    assert.equal((await db.prepare("SELECT COUNT(*) n FROM channel_access WHERE source='demo'").get()).n, 0)
+    assert.equal((await db.prepare("SELECT COUNT(*) n FROM channel_access WHERE source='stripe'").get()).n, 1)
+    await migrateDb(db)
+    assert.equal((await db.prepare('SELECT token_version FROM users WHERE id=99').get()).token_version, 6)
+  }
+  finally { close() }
+})

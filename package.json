@@ -2,7 +2,7 @@
   "dependencies": {
     "better-sqlite3": "^12.4.1"
   },
-  "description": "Plataforma de comunidades (MVP) — Nuxt 4 + Nuxt UI v4, 100% Cloudflare (Workers + D1 + R2).",
+  "description": "Plataforma de comunidades (MVP) \u2014 Nuxt 4 + Nuxt UI v4, 100% Cloudflare (Workers + D1 + R2).",
   "devDependencies": {
     "@iconify-json/lucide": "^1.2.139",
     "@nuxt/ui": "^4.11.3",
@@ -42,7 +42,8 @@
     "test": "tsx --test tests/*.test.ts",
     "test:integration": "tsx tests/integration.ts",
     "db:bootstrap": "tsx scripts/bootstrap.ts",
-    "test:worker": "tsx tests/worker.ts"
+    "test:worker": "tsx tests/worker.ts",
+    "test:audit": "tsx scripts/audit-2026-10-23.ts"
   },
   "type": "module",
   "version": "0.1.0",

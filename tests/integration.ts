@@ -197,8 +197,8 @@ try {
     assert.equal((await admin(`/api/admin/earnings/${pid}/approve`, {})).status, 200)
   })
   await test('access links are consumed once under concurrent requests', async () => {
-    run('INSERT INTO access_links(tenant_id,user_id,token,expires_at,created_at) VALUES(?,?,?,?,?)', tenant, memberId, 'audit-one-use', new Date(Date.now() + 60000).toISOString(), now())
-    const responses = await Promise.all(Array.from({ length: 6 }, () => client()('/api/auth/access', { token: 'audit-one-use' })))
+    run('INSERT INTO access_links(tenant_id,user_id,token,expires_at,created_at) VALUES(?,?,?,?,?)', tenant, memberId, 'owner-aabbccddeeff', new Date(Date.now() + 60000).toISOString(), now())
+    const responses = await Promise.all(Array.from({ length: 6 }, () => client()('/api/auth/access', { token: 'owner-aabbccddeeff' })))
     assert.equal(responses.filter(r => r.status === 200).length, 1)
   })
   await test('login attempts are limited', async () => {

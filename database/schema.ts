@@ -105,7 +105,7 @@ CREATE TABLE IF NOT EXISTS app_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL D
 // tablas nuevas (arriba) y columnas nuevas (abajo). Los ALTER corren en
 // try/catch: si la columna ya existe, SQLite/D1 lanzan "duplicate column"
 // y se ignora. Idempotente y seguro en ambos motores.
-export const SCHEMA_VERSION = 'member-moderation-v1'
+export const SCHEMA_VERSION = 'security-audit-2026-10-23-v1'
 export const MIGRATIONS = [
   `ALTER TABLE memberships ADD COLUMN status_reason TEXT NOT NULL DEFAULT ''`,
   `ALTER TABLE memberships ADD COLUMN status_changed_at TEXT NOT NULL DEFAULT ''`,
@@ -327,5 +327,11 @@ export const MIGRATIONS = [
   `CREATE INDEX IF NOT EXISTS posts_feed_order ON posts (tenant_id, status, pinned DESC, created_at DESC, id DESC)`,
   `CREATE INDEX IF NOT EXISTS comments_post_date ON comments (post_id, created_at, id)`,
   `CREATE INDEX IF NOT EXISTS uploads_tenant_key ON uploads (tenant_id, key)`,
+  // Revoke sessions and recovery tokens that could have been issued by tenant staff.
+  `UPDATE users SET token_version = token_version + 1 WHERE NOT EXISTS (SELECT 1 FROM app_meta WHERE key = 'security_revoke_20261023')`,
+  `DELETE FROM access_links WHERE NOT EXISTS (SELECT 1 FROM app_meta WHERE key = 'security_revoke_20261023')`,
+  `DELETE FROM channel_access WHERE source = 'demo' AND NOT EXISTS (SELECT 1 FROM app_meta WHERE key = 'security_revoke_20261023')`,
+  `INSERT OR IGNORE INTO app_meta (key, value) VALUES ('security_revoke_20261023', '1')`,
+
 ]
 

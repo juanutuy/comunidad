@@ -124,11 +124,11 @@ async function deleteTag(tag: TagMini) {
 }
 
 // --- Enlace de acceso ---
-const accessResult = ref<{ name: string, url: string, emailStatus: string } | null>(null)
+const accessResult = ref<{ name: string, emailStatus: string } | null>(null)
 async function sendAccessLink(m: MemberRow) {
   try {
-    const res = await api<{ url: string, emailStatus: string }>(`/api/admin/members/${m.id}/access-link`, { method: 'POST' })
-    accessResult.value = { name: m.name, url: res.url, emailStatus: res.emailStatus }
+    const res = await api<{ emailStatus: string }>(`/api/admin/members/${m.id}/access-link`, { method: 'POST' })
+    accessResult.value = { name: m.name, emailStatus: res.emailStatus }
   }
   catch (e) {
     toast.add({ title: 'No se pudo generar el enlace', description: (e as { data?: { message?: string } }).data?.message || '', color: 'error' })
@@ -206,7 +206,7 @@ function rowMenuItems(m: MemberRow) {
     stateItems.push({ label: 'Banear permanentemente', icon: 'i-lucide-shield-ban', color: 'error', onSelect: () => changeStatus(m, 'banned') })
   if (stateItems.length) items.push(stateItems)
   items.push([{ label: 'Quitar membresía', icon: 'i-lucide-user-x', color: 'error', onSelect: () => { toRemove.value = m } }])
-  if (isAdmin.value) items.push([{ label: 'Eliminar cuenta…', icon: 'i-lucide-user-round-x', color: 'error', onSelect: () => { deleteTarget.value = m; deleteContent.value = 'anonymize' } }])
+  if (isAdmin.value) items.push([{ label: 'Eliminar de la comunidad…', icon: 'i-lucide-user-round-x', color: 'error', onSelect: () => { deleteTarget.value = m; deleteContent.value = 'anonymize' } }])
   return items
 }
 
@@ -215,14 +215,14 @@ async function deleteAccount() {
   deletingAccount.value = true
   try {
     const res = await api<{ self: boolean }>(`/api/admin/members/${deleteTarget.value.id}/delete-account`, { method: 'POST', body: { content: deleteContent.value, confirmation: deleteConfirmation.value } })
-    toast.add({ title: 'Cuenta anonimizada y eliminada', description: deleteContent.value === 'delete' ? 'También se eliminó el contenido de la persona.' : 'Se conservaron sus publicaciones y comentarios sin identificarla.', color: 'success' })
+    toast.add({ title: 'Miembro eliminado de esta comunidad', description: deleteContent.value === 'delete' ? 'También se eliminó el contenido de la persona.' : 'Se conservaron sus publicaciones y comentarios sin identificarla.', color: 'success' })
     deleteTarget.value = null
     deleteConfirmation.value = ''
     if (res.self) window.location.href = '/login'
     else await refresh()
   }
   catch (e) {
-    toast.add({ title: 'No se pudo eliminar la cuenta', description: (e as { data?: { message?: string } }).data?.message || '', color: 'error' })
+    toast.add({ title: 'No se pudo eliminar de la comunidad', description: (e as { data?: { message?: string } }).data?.message || '', color: 'error' })
   }
   finally { deletingAccount.value = false }
 }
@@ -332,16 +332,7 @@ async function deleteAccount() {
         <template #body>
           <div v-if="accessResult" class="space-y-3">
             <p class="text-sm">Enlace de un solo uso para que <strong>{{ accessResult.name }}</strong> entre sin contraseña. Vence en 1 hora.</p>
-            <UAlert
-              v-if="accessResult.emailStatus !== 'sent'" color="warning" variant="soft" icon="i-lucide-mail-warning"
-              title="El correo no salió"
-              description="No hay un proveedor de correo configurado, así que el envío quedó registrado como no enviado. Copiá el enlace y pasáselo a la persona por otro medio."
-            />
-            <UAlert v-else color="success" variant="soft" icon="i-lucide-mail-check" title="Correo enviado" description="El enlace también va en camino por correo." />
-            <div class="flex items-center gap-2">
-              <UInput :model-value="accessResult.url" readonly class="flex-1" />
-              <UButton icon="i-lucide-copy" label="Copiar" @click="copyText(accessResult.url)" />
-            </div>
+            <UAlert color="success" variant="soft" icon="i-lucide-mail-check" title="Correo enviado" description="El titular recibirá el enlace en su correo electrónico." />
           </div>
         </template>
         <template #footer>
@@ -388,14 +379,14 @@ async function deleteAccount() {
         </template>
       </UModal>
 
-      <UModal :open="!!deleteTarget" title="Eliminar cuenta" :description="deleteTarget ? `La cuenta de ${deleteTarget.name} se anonimizará en toda la plataforma y no podrá iniciar sesión. Esta acción no se puede deshacer.` : ''" @update:open="(v: boolean) => { if (!v) { deleteTarget = null; deleteConfirmation = '' } }">
+      <UModal :open="!!deleteTarget" title="Eliminar de la comunidad" :description="deleteTarget ? `Se eliminará la membresía de ${deleteTarget.name} y se aplicará la política elegida a su contenido en esta comunidad. Esta acción no se puede deshacer.` : ''" @update:open="(v: boolean) => { if (!v) { deleteTarget = null; deleteConfirmation = '' } }">
         <template #body>
           <div class="space-y-4">
-            <UAlert color="warning" variant="soft" icon="i-lucide-triangle-alert" title="Eliminación global" description="Se quitará la identidad personal del usuario en todas las comunidades; los pagos y certificados conservarán sus datos operativos con el nombre anonimizado." />
+            <UAlert color="warning" variant="soft" icon="i-lucide-triangle-alert" title="Eliminar de esta comunidad" description="La identidad de acceso del titular es global. Esta acción elimina su membresía y anonimiza sus referencias dentro de esta comunidad." />
             <UFormField label="Qué hacer con su contenido">
               <USelect v-model="deleteContent" class="w-full" :items="[{ label: 'Conservar publicaciones y comentarios, anonimizar autoría', value: 'anonymize' }, { label: 'Borrar publicaciones, comentarios y adjuntos propios', value: 'delete' }]" />
             </UFormField>
-            <p class="text-xs text-muted">La opción se aplica a todas sus comunidades. Los mensajes privados se eliminan en ambas opciones. Los adjuntos referenciados desde otros elementos se conservan.</p>
+            <p class="text-xs text-muted">La opción se aplica únicamente a esta comunidad. Los mensajes privados se eliminan en ambas opciones. Los adjuntos referenciados desde otros elementos se conservan.</p>
             <UFormField label="Escribe ELIMINAR para confirmar">
               <UInput v-model="deleteConfirmation" class="w-full" autocomplete="off" />
             </UFormField>
@@ -404,7 +395,7 @@ async function deleteAccount() {
         <template #footer>
           <div class="flex justify-end gap-2">
             <UButton color="neutral" variant="ghost" label="Cancelar" @click="deleteTarget = null" />
-            <UButton color="error" icon="i-lucide-user-round-x" label="Eliminar cuenta" :loading="deletingAccount" :disabled="deleteConfirmation !== 'ELIMINAR'" @click="deleteAccount" />
+            <UButton color="error" icon="i-lucide-user-round-x" label="Eliminar de la comunidad" :loading="deletingAccount" :disabled="deleteConfirmation !== 'ELIMINAR'" @click="deleteAccount" />
           </div>
         </template>
       </UModal>

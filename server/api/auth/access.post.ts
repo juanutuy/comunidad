@@ -10,7 +10,7 @@ import { dbFor, nowIso } from '../../utils/db'
 export default defineEventHandler(async (event) => {
   const body = await readBody<{ token?: string }>(event)
   const token = String(body.token || '')
-  if (!token) throw createError({ statusCode: 400, message: 'Falta el enlace de acceso.' })
+  if (!/^owner-[a-f0-9]+$/.test(token)) throw createError({ statusCode: 400, message: 'Falta el enlace de acceso.' })
   const db = await dbFor(event)
   const tenant = await resolveTenant(event)
   const link = await db.prepare('SELECT * FROM access_links WHERE tenant_id = ? AND token = ?').get(tenant.id, token) as

@@ -18,6 +18,7 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run test:integration
+      - run: npm run test:audit
       - run: npm run build
       - run: npm run test:worker
       - run: npm audit --omit=dev
