@@ -23,6 +23,9 @@ export default defineEventHandler(async (event) => {
   const expiresAt = Number.isFinite(days) && days > 0 ? new Date(Date.now() + days * 24 * 3600 * 1000).toISOString() : ''
   const db = await dbFor(event)
   if (kind === 'email') {
+    const banned = await db.prepare(`SELECT u.id FROM users u JOIN memberships m ON m.user_id = u.id AND m.tenant_id = ?
+      WHERE lower(u.email) = ? AND m.status = 'banned'`).get(tenant.id, email)
+    if (banned) throw createError({ statusCode: 403, message: 'Esta persona está baneada de la comunidad.' })
     const dupe = await db.prepare("SELECT id FROM invitations WHERE tenant_id = ? AND kind = 'email' AND email = ? AND status = 'pending'").get(tenant.id, email) as { id: number } | undefined
     if (dupe) throw createError({ statusCode: 409, message: 'Ya hay una invitación pendiente para ese correo. Revocala si querés crear otra.' })
     const member = await db.prepare(`SELECT u.id FROM users u JOIN memberships m ON m.user_id = u.id AND m.tenant_id = ?

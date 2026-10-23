@@ -34,6 +34,7 @@ const statusMeta: Record<string, { label: string, color: 'success' | 'warning' |
   pending: { label: 'En revisión', color: 'warning' },
   restricted: { label: 'Restringido', color: 'warning' },
   suspended: { label: 'Suspendido', color: 'error' },
+  banned: { label: 'Baneado', color: 'error' },
   declined: { label: 'Rechazado', color: 'neutral' },
 }
 
@@ -51,9 +52,11 @@ async function changeRole(m: MemberRow, role: string) {
 }
 
 async function changeStatus(m: MemberRow, status: string) {
+  const reason = status === 'active' ? '' : window.prompt(`Motivo para ${status === 'banned' ? 'banear' : status === 'suspended' ? 'suspender' : 'restringir'} a ${m.name}`)?.trim()
+  if (status !== 'active' && !reason) return
   try {
-    await api(`/api/admin/members/${m.id}/status`, { method: 'POST', body: { status } })
-    toast.add({ title: status === 'active' ? `${m.name} volvió a estar activo` : status === 'suspended' ? `${m.name} fue suspendido` : `${m.name} fue restringido`, color: 'success' })
+    await api(`/api/admin/members/${m.id}/status`, { method: 'POST', body: { status, reason } })
+    toast.add({ title: status === 'active' ? `${m.name} volvió a estar activo` : status === 'banned' ? `${m.name} fue baneado` : status === 'suspended' ? `${m.name} fue suspendido` : `${m.name} fue restringido`, color: 'success' })
     await refresh()
   }
   catch (e) {
@@ -162,14 +165,21 @@ async function createMember() {
 
 // --- Quitar membresía (existente) ---
 const toRemove = ref<MemberRow | null>(null)
+const removeReason = ref('')
+const deleteTarget = ref<MemberRow | null>(null)
+const deleteContent = ref<'anonymize' | 'delete'>('anonymize')
+const deleteConfirmation = ref('')
+const deletingAccount = ref(false)
 const removing = ref(false)
 async function removeMember() {
   if (!toRemove.value) return
+  if (removeReason.value.trim().length > 500) return
   removing.value = true
   try {
-    const res = await api<{ self: boolean }>(`/api/admin/members/${toRemove.value.id}/remove`, { method: 'POST' })
+    const res = await api<{ self: boolean }>(`/api/admin/members/${toRemove.value.id}/remove`, { method: 'POST', body: { reason: removeReason.value.trim() } })
     toast.add({ title: 'Membresía quitada', color: 'success' })
     toRemove.value = null
+    removeReason.value = ''
     if (res.self) window.location.href = '/feeds'
     else await refresh()
   }
@@ -186,15 +196,35 @@ function rowMenuItems(m: MemberRow) {
     { label: 'Enviar enlace de acceso', icon: 'i-lucide-key-round', onSelect: () => sendAccessLink(m), disabled: m.status !== 'active' },
   ]]
   const stateItems: Record<string, unknown>[] = []
-  if (m.status === 'suspended' || m.status === 'restricted')
+  if (m.status === 'suspended' || m.status === 'restricted' || m.status === 'banned')
     stateItems.push({ label: 'Reactivar', icon: 'i-lucide-user-check', onSelect: () => changeStatus(m, 'active') })
-  if (m.status !== 'restricted' && m.status !== 'pending')
+  if (m.status !== 'restricted' && m.status !== 'pending' && m.status !== 'banned')
     stateItems.push({ label: 'Restringir (solo lectura)', icon: 'i-lucide-eye-off', onSelect: () => changeStatus(m, 'restricted') })
-  if (m.status !== 'suspended')
+  if (m.status !== 'suspended' && m.status !== 'banned')
     stateItems.push({ label: 'Suspender', icon: 'i-lucide-ban', onSelect: () => changeStatus(m, 'suspended') })
+  if (m.status !== 'banned' && m.status !== 'pending')
+    stateItems.push({ label: 'Banear permanentemente', icon: 'i-lucide-shield-ban', color: 'error', onSelect: () => changeStatus(m, 'banned') })
   if (stateItems.length) items.push(stateItems)
   items.push([{ label: 'Quitar membresía', icon: 'i-lucide-user-x', color: 'error', onSelect: () => { toRemove.value = m } }])
+  if (isAdmin.value) items.push([{ label: 'Eliminar cuenta…', icon: 'i-lucide-user-round-x', color: 'error', onSelect: () => { deleteTarget.value = m; deleteContent.value = 'anonymize' } }])
   return items
+}
+
+async function deleteAccount() {
+  if (!deleteTarget.value) return
+  deletingAccount.value = true
+  try {
+    const res = await api<{ self: boolean }>(`/api/admin/members/${deleteTarget.value.id}/delete-account`, { method: 'POST', body: { content: deleteContent.value, confirmation: deleteConfirmation.value } })
+    toast.add({ title: 'Cuenta anonimizada y eliminada', description: deleteContent.value === 'delete' ? 'También se eliminó el contenido de la persona.' : 'Se conservaron sus publicaciones y comentarios sin identificarla.', color: 'success' })
+    deleteTarget.value = null
+    deleteConfirmation.value = ''
+    if (res.self) window.location.href = '/login'
+    else await refresh()
+  }
+  catch (e) {
+    toast.add({ title: 'No se pudo eliminar la cuenta', description: (e as { data?: { message?: string } }).data?.message || '', color: 'error' })
+  }
+  finally { deletingAccount.value = false }
 }
 </script>
 
@@ -358,9 +388,31 @@ function rowMenuItems(m: MemberRow) {
         </template>
       </UModal>
 
-      <UModal :open="!!toRemove" title="Quitar membresía" :description="toRemove ? `${toRemove.name} dejará de ser miembro de esta comunidad. Su cuenta y su contenido no se borran.` : ''" @update:open="(v: boolean) => { if (!v) toRemove = null }">
+      <UModal :open="!!deleteTarget" title="Eliminar cuenta" :description="deleteTarget ? `La cuenta de ${deleteTarget.name} se anonimizará en toda la plataforma y no podrá iniciar sesión. Esta acción no se puede deshacer.` : ''" @update:open="(v: boolean) => { if (!v) { deleteTarget = null; deleteConfirmation = '' } }">
+        <template #body>
+          <div class="space-y-4">
+            <UAlert color="warning" variant="soft" icon="i-lucide-triangle-alert" title="Eliminación global" description="Se quitará la identidad personal del usuario en todas las comunidades; los pagos y certificados conservarán sus datos operativos con el nombre anonimizado." />
+            <UFormField label="Qué hacer con su contenido">
+              <USelect v-model="deleteContent" class="w-full" :items="[{ label: 'Conservar publicaciones y comentarios, anonimizar autoría', value: 'anonymize' }, { label: 'Borrar publicaciones, comentarios y adjuntos propios', value: 'delete' }]" />
+            </UFormField>
+            <p class="text-xs text-muted">La opción se aplica a todas sus comunidades. Los mensajes privados se eliminan en ambas opciones. Los adjuntos referenciados desde otros elementos se conservan.</p>
+            <UFormField label="Escribe ELIMINAR para confirmar">
+              <UInput v-model="deleteConfirmation" class="w-full" autocomplete="off" />
+            </UFormField>
+          </div>
+        </template>
         <template #footer>
           <div class="flex justify-end gap-2">
+            <UButton color="neutral" variant="ghost" label="Cancelar" @click="deleteTarget = null" />
+            <UButton color="error" icon="i-lucide-user-round-x" label="Eliminar cuenta" :loading="deletingAccount" :disabled="deleteConfirmation !== 'ELIMINAR'" @click="deleteAccount" />
+          </div>
+        </template>
+      </UModal>
+
+      <UModal :open="!!toRemove" title="Quitar membresía" :description="toRemove ? `${toRemove.name} dejará de ser miembro de esta comunidad. Su cuenta y su contenido no se borran. Esta acción no impide que vuelva a solicitar acceso.` : ''" @update:open="(v: boolean) => { if (!v) { toRemove = null; removeReason = '' } }">
+        <template #footer>
+          <div class="flex justify-end gap-2">
+            <UInput v-model="removeReason" class="mr-auto w-72" maxlength="500" placeholder="Motivo (opcional)" />
             <UButton color="neutral" variant="ghost" label="Cancelar" @click="toRemove = null" />
             <UButton color="error" label="Sí, quitar membresía" icon="i-lucide-user-x" :loading="removing" @click="removeMember" />
           </div>

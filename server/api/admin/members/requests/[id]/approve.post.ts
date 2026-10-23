@@ -16,9 +16,15 @@ export default defineEventHandler(async (event) => {
   const req = await db.prepare("SELECT * FROM join_requests WHERE tenant_id = ? AND id = ? AND status = 'pending'").get(tenant.id, requestId) as
     { id: number, user_id: number } | undefined
   if (!req) throw createError({ statusCode: 404, message: 'Esa solicitud ya no está pendiente.' })
+  const member = await db.prepare('SELECT status FROM memberships WHERE tenant_id = ? AND user_id = ?').get(tenant.id, req.user_id) as { status: string } | undefined
+  if (member?.status === 'banned') throw createError({ statusCode: 403, message: 'Esta persona está baneada de la comunidad.' })
   await db.prepare("UPDATE join_requests SET status = 'approved', decided_by = ?, decided_at = ? WHERE id = ?")
     .run(me.id, nowIso(), req.id)
-  await db.prepare("UPDATE memberships SET status = 'active' WHERE tenant_id = ? AND user_id = ?").run(tenant.id, req.user_id)
+  const now = nowIso()
+  await db.batch([
+    { sql: "UPDATE memberships SET status = 'active', status_reason = '', status_changed_at = ?, status_changed_by = ? WHERE tenant_id = ? AND user_id = ?", params: [now, me.id, tenant.id, req.user_id] },
+    { sql: 'INSERT INTO membership_events (tenant_id, user_id, actor_id, action, reason, created_at) VALUES (?, ?, ?, ?, ?, ?)', params: [tenant.id, req.user_id, me.id, 'active', 'Solicitud aprobada', now] },
+  ])
   await applyAutoJoin(event, tenant.id, req.user_id)
   const user = await db.prepare('SELECT name, email FROM users WHERE id = ?').get(req.user_id) as { name: string, email: string }
   await notify(event, {

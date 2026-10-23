@@ -70,6 +70,8 @@ export default defineEventHandler(async (event) => {
     if (!verifyPassword(password, existing.password_hash))
       throw createError({ statusCode: 409, message: await msg(event, tenant.id, 'auth.emailTaken') })
     const m = await db.prepare('SELECT status FROM memberships WHERE tenant_id = ? AND user_id = ?').get(tenant.id, existing.id) as { status: string } | undefined
+    if (m?.status === 'banned')
+      throw createError({ statusCode: 403, message: 'Tu cuenta fue baneada de esta comunidad. Si creés que es un error, contactá a un administrador.' })
     // Único reingreso posible con el mismo correo: la solicitud fue
     // rechazada en ESTE tenant y ya pasó el cooldown.
     if (m && (m.status || 'active') !== 'declined')
@@ -97,7 +99,7 @@ export default defineEventHandler(async (event) => {
   const needsApproval = join.approval && !invited
   const status = needsApproval ? 'pending' : 'active'
   if (reapplying) {
-    await db.prepare('UPDATE memberships SET status = ?, role = \'member\' WHERE tenant_id = ? AND user_id = ?').run(status, tenant.id, userId)
+    await db.prepare('UPDATE memberships SET status = ?, role = \'member\', status_reason = \'\', status_changed_at = ?, status_changed_by = NULL WHERE tenant_id = ? AND user_id = ?').run(status, nowIso(), tenant.id, userId)
   }
   else {
     await db.prepare('INSERT INTO memberships (tenant_id, user_id, role, status) VALUES (?, ?, \'member\', ?)')

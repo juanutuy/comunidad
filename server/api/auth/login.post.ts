@@ -29,6 +29,10 @@ export default defineEventHandler(async (event) => {
   const status = m.status || 'active'
   if (status === 'suspended')
     throw createError({ statusCode: 403, message: await msg(event, tenant.id, 'auth.suspended') })
+  if (status === 'banned')
+    throw createError({ statusCode: 403, message: 'Tu cuenta fue baneada de esta comunidad. Si creés que es un error, contactá a un administrador.' })
+  if (status === 'banned')
+    throw createError({ statusCode: 403, message: 'Tu cuenta fue baneada de esta comunidad. Si creés que es un error, contactá a un administrador.' })
   setSession(event, row.id, (row as { token_version?: number }).token_version ?? 0)
   // Fase 18: la cookie de idioma queda en el idioma de la cuenta (su
   // elección personal o el defecto de la comunidad), para que las

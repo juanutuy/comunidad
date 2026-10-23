@@ -10,16 +10,19 @@ import { requireAdmin, resolveTenant } from '../../../../utils/community'
 import { dbFor } from '../../../../utils/db'
 import { applyAutoJoin } from '../../../../utils/members'
 
-const STATUSES = ['active', 'suspended', 'restricted']
+const STATUSES = ['active', 'suspended', 'restricted', 'banned']
 
 export default defineEventHandler(async (event) => {
   const tenant = await resolveTenant(event)
   const me = await requireAdmin(event, tenant.id)
   const targetId = Number(getRouterParam(event, 'id'))
-  const body = await readBody<{ status?: string }>(event)
+  const body = await readBody<{ status?: string, reason?: string }>(event)
   const status = String(body.status || '')
+  const reason = typeof body.reason === 'string' ? body.reason.trim().slice(0, 500) : ''
   if (!STATUSES.includes(status))
-    throw createError({ statusCode: 400, message: 'Estado inválido: activo, suspendido o restringido.' })
+    throw createError({ statusCode: 400, message: 'Estado inválido: activo, suspendido, restringido o baneado.' })
+  if (status !== 'active' && !reason)
+    throw createError({ statusCode: 400, message: 'Indica el motivo de la medida.' })
   if (targetId === me.id && status !== 'active')
     throw createError({ statusCode: 400, message: 'No podés suspenderte ni restringirte a vos mismo.' })
   const db = await dbFor(event)
@@ -30,7 +33,11 @@ export default defineEventHandler(async (event) => {
     if (admins <= 1) throw createError({ statusCode: 400, message: 'No se puede suspender ni restringir al único administrador de la comunidad.' })
   }
   const wasPending = (target.status || 'active') === 'pending'
-  await db.prepare('UPDATE memberships SET status = ? WHERE tenant_id = ? AND user_id = ?').run(status, tenant.id, targetId)
+  const now = new Date().toISOString()
+  await db.batch([
+    { sql: 'UPDATE memberships SET status = ?, status_reason = ?, status_changed_at = ?, status_changed_by = ? WHERE tenant_id = ? AND user_id = ?', params: [status, reason, now, me.id, tenant.id, targetId] },
+    { sql: 'INSERT INTO membership_events (tenant_id, user_id, actor_id, action, reason, created_at) VALUES (?, ?, ?, ?, ?, ?)', params: [tenant.id, targetId, me.id, status, reason, now] },
+  ])
   // Si se está activando a alguien que esperaba aprobación, la
   // solicitud pendiente se cierra como aprobada y entra el
   // auto-ingreso, igual que desde la cola de solicitudes.

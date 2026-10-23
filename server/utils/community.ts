@@ -119,6 +119,8 @@ export async function requireUser(event: H3Event, tenantId: number): Promise<Use
     throw createError({ statusCode: 403, message: await msg(event, tenantId, 'auth.joinDeclined') })
   if (status === 'suspended')
     throw createError({ statusCode: 403, message: await msg(event, tenantId, 'auth.suspended') })
+  if (status === 'banned')
+    throw createError({ statusCode: 403, message: 'Tu cuenta fue baneada de esta comunidad. Si creés que es un error, contactá a un administrador.' })
   return user
 }
 

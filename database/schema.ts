@@ -105,8 +105,13 @@ CREATE TABLE IF NOT EXISTS app_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL D
 // tablas nuevas (arriba) y columnas nuevas (abajo). Los ALTER corren en
 // try/catch: si la columna ya existe, SQLite/D1 lanzan "duplicate column"
 // y se ignora. Idempotente y seguro en ambos motores.
-export const SCHEMA_VERSION = 'audit-2026-10-20-v1'
+export const SCHEMA_VERSION = 'member-moderation-v1'
 export const MIGRATIONS = [
+  `ALTER TABLE memberships ADD COLUMN status_reason TEXT NOT NULL DEFAULT ''`,
+  `ALTER TABLE memberships ADD COLUMN status_changed_at TEXT NOT NULL DEFAULT ''`,
+  `ALTER TABLE memberships ADD COLUMN status_changed_by INTEGER`,
+  `CREATE TABLE IF NOT EXISTS membership_events (id INTEGER PRIMARY KEY AUTOINCREMENT, tenant_id INTEGER NOT NULL, user_id INTEGER NOT NULL, actor_id INTEGER, action TEXT NOT NULL, reason TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL)`,
+  `CREATE INDEX IF NOT EXISTS membership_events_history ON membership_events (tenant_id, user_id, id DESC)`,
   `ALTER TABLE member_subscriptions ADD COLUMN stripe_event_created INTEGER NOT NULL DEFAULT 0`,
   `CREATE TABLE IF NOT EXISTS auth_attempts (key TEXT PRIMARY KEY, attempts INTEGER NOT NULL DEFAULT 0, resets_at INTEGER NOT NULL)`,
   `CREATE INDEX IF NOT EXISTS auth_attempts_expiry ON auth_attempts (resets_at)`,

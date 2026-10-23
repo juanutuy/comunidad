@@ -17,6 +17,7 @@ const MESSAGES: Record<string, string> = {
   pending: 'Tu solicitud de ingreso está en revisión. Te avisaremos cuando un administrador la resuelva.',
   declined: 'Tu solicitud de ingreso no fue aprobada. Podés volver a solicitar el ingreso desde el registro cuando pase el tiempo de espera.',
   suspended: 'Tu cuenta está suspendida en esta comunidad. Si creés que es un error, escribile a un administrador.',
+  banned: 'Tu cuenta fue baneada de esta comunidad. Si creés que es un error, contactá a un administrador.',
 }
 
 export default defineEventHandler(async (event) => {
