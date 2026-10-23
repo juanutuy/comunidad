@@ -5,7 +5,7 @@ import { postMetadata } from '../../utils/postMetadata'
 // publicaciones se devuelven bloqueadas (solo teaser).
 import { POST_SELECT, canAccessChannel, channelBySlug, channelContentType, channelVisibility, currentAuth, isChannelArchived, publishDuePosts, resolveTenant, serializePost } from '../../utils/community'
 import { dbFor } from '../../utils/db'
-import { getPrivacySettings, requireSessionUnlessPublic } from '../../utils/privacy'
+import { getPrivacySettings, requirePublicChannelOrSession } from '../../utils/privacy'
 import { hiddenFilterSql } from '../../utils/blocks'
 
 export default defineEventHandler(async (event) => {
@@ -19,9 +19,7 @@ export default defineEventHandler(async (event) => {
   // gestionarlo desde la consola.
   if (isChannelArchived(channel) && role !== 'admin')
     throw createError({ statusCode: 404, message: 'Canal no encontrado.' })
-  // Endurecimiento Fase 15: comunidad privada = el detalle del canal
-  // no se lee sin sesión.
-  await requireSessionUnlessPublic(event, tenant.id, user)
+  await requirePublicChannelOrSession(event, tenant.id, user, channel.visibility)
   const access = await canAccessChannel(event, user?.id ?? null, role, channel)
   // Fase 15: un canal privado, para quien no tiene acceso, no existe
   // (404 también acá: ni el nombre ni sus publicaciones se filtran).

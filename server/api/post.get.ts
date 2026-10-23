@@ -4,7 +4,7 @@
 // existe: ni su nombre ni sus publicaciones salen por esta ruta.
 import { POST_SELECT, canAccessChannel, channelBySlug, channelVisibility, currentAuth, isChannelArchived, resolveTenant, serializePost } from '../utils/community'
 import { dbFor } from '../utils/db'
-import { getPrivacySettings, requireSessionUnlessPublic } from '../utils/privacy'
+import { getPrivacySettings, requirePublicChannelOrSession } from '../utils/privacy'
 import { fetchCommentTree } from '../utils/comments'
 
 export default defineEventHandler(async (event) => {
@@ -20,8 +20,7 @@ export default defineEventHandler(async (event) => {
   // por enlace directo para los miembros (el canal está cerrado).
   if (isChannelArchived(channel) && role !== 'admin')
     throw createError({ statusCode: 404, message: 'Publicación no encontrada.' })
-  // Endurecimiento Fase 15: comunidad privada = el detalle no se lee sin sesión.
-  await requireSessionUnlessPublic(event, tenant.id, user)
+  await requirePublicChannelOrSession(event, tenant.id, user, channel.visibility)
   // Fase 5: borradores y programados SOLO los abre su autor.
   // Fase 12: un post en revisión también lo pueden abrir los admins
   // (para evaluarlo desde su contexto, además de la cola).
@@ -48,7 +47,7 @@ export default defineEventHandler(async (event) => {
   // En el modo público, el visitante lee la publicación pero NO los
   // comentarios (decisión propia de esta fase): los comentarios son
   // conversación de miembros.
-  const visitorPublic = !user && priv.visibility === 'public'
+  const visitorPublic = !user && (priv.visibility === 'public' || channelVisibility(channel) === 'public')
   // Fase 16-G: los comentarios viajan como ÁRBOL (raíces con sus
   // respuestas, reacciones por comentario y adjuntos) desde el
   // serializador compartido — el detalle y la tarjeta expansible

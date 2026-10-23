@@ -2,17 +2,12 @@
 import { canAccessChannel, channelContentType, channelVisibility, currentAuth, isChannelArchived, resolveTenant } from '../../utils/community'
 import type { ChannelRow } from '../../utils/community'
 import { dbFor } from '../../utils/db'
-import { getPrivacySettings, requireSessionUnlessPublic } from '../../utils/privacy'
+import { getPrivacySettings, requirePublicChannelsOrSession } from '../../utils/privacy'
 
 export default defineEventHandler(async (event) => {
   const tenant = await resolveTenant(event)
   const { user, role } = await currentAuth(event, tenant.id)
-  // Endurecimiento Fase 15: comunidad privada = el listado de canales
-  // (nombres incluidos) no se lee sin sesión.
-  await requireSessionUnlessPublic(event, tenant.id, user)
-  // Fase 15: en el modo público, el visitante no ve los canales
-  // privados en el listado (ni el nombre): para él no existen. Con
-  // sesión, o en el modo privado de siempre, el listado no cambia.
+  await requirePublicChannelsOrSession(event, tenant.id, user)
   const priv = await getPrivacySettings(event, tenant.id)
   const hidePrivate = !user && priv.visibility === 'public'
   const db = await dbFor(event)
@@ -40,6 +35,7 @@ export default defineEventHandler(async (event) => {
     withAccess.push({ ch, access })
   }
   let visible = withAccess.filter(({ ch, access }) => {
+    if (!user && channelVisibility(ch) !== 'public') return false
     if (hidePrivate && ch.type === 'private') return false
     if (channelVisibility(ch) === 'secret' && !access) return false
     return true

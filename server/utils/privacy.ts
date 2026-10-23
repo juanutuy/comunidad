@@ -273,6 +273,25 @@ export async function requireSessionUnlessPublic(event: H3Event, tenantId: numbe
     throw createError({ statusCode: 401, message: 'Iniciá sesión para continuar.' })
 }
 
+// Public channels are an explicit exception to a private tenant: guests
+// may browse their directory and feed without opening courses, member
+// profiles, private channels, or other tenant surfaces.
+export async function requirePublicChannelsOrSession(event: H3Event, tenantId: number, user: { id?: number } | null | undefined): Promise<void> {
+  if (user) return
+  const settings = await getPrivacySettings(event, tenantId)
+  if (settings.visibility === 'public') return
+  const db = await dbFor(event)
+  const channel = await db.prepare("SELECT id FROM channels WHERE tenant_id = ? AND visibility = 'public' AND archived_at = '' LIMIT 1").get(tenantId)
+  if (!channel) throw createError({ statusCode: 401, message: 'Iniciá sesión para continuar.' })
+}
+
+export async function requirePublicChannelOrSession(event: H3Event, tenantId: number, user: { id?: number } | null | undefined, visibility?: string | null): Promise<void> {
+  if (user) return
+  const settings = await getPrivacySettings(event, tenantId)
+  if (settings.visibility === 'public' || !visibility || visibility === 'public') return
+  throw createError({ statusCode: 401, message: 'Iniciá sesión para continuar.' })
+}
+
 export async function hasPaidEntitlement(event: H3Event, tenantId: number, userId: number, role: string | null): Promise<boolean> {
   if (role === 'admin') return true
   const db = await dbFor(event)

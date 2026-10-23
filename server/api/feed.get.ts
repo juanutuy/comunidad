@@ -1,6 +1,6 @@
 import { POST_SELECT, channelVisibility, currentAuth, publishDuePosts, resolveTenant, serializePost } from '../utils/community'
 import { dbFor } from '../utils/db'
-import { getPrivacySettings, requireSessionUnlessPublic } from '../utils/privacy'
+import { getPrivacySettings, requirePublicChannelsOrSession } from '../utils/privacy'
 import { hiddenFilterSql } from '../utils/blocks'
 import { activeSubscription, channelAccessDecision } from '../../shared/access'
 import { postMetadata } from '../utils/postMetadata'
@@ -10,7 +10,7 @@ import type { ChannelRow } from '../utils/community'
 export default defineEventHandler(async (event) => {
   const tenant = await resolveTenant(event)
   const { user, role } = await currentAuth(event, tenant.id)
-  await requireSessionUnlessPublic(event, tenant.id, user)
+  await requirePublicChannelsOrSession(event, tenant.id, user)
   const db = await dbFor(event)
   await publishDuePosts(event, tenant.id)
   const priv = await getPrivacySettings(event, tenant.id)
@@ -21,9 +21,10 @@ export default defineEventHandler(async (event) => {
   const subscribed = user ? await activeSubscription((sql, ...params) => db.prepare(sql).get(...params), tenant.id, user.id) : false
   const access = new Map(channels.map(c => [c.id, channelAccessDecision(c, user?.id ?? null, role, direct.has(c.id), subscribed)]))
   const visible = channels.filter(c => {
+    if (!user && channelVisibility(c) !== 'public') return false
     if (c.archived_at && role !== 'admin') return false
     if (access.get(c.id)) return true
-    return channelVisibility(c) === 'public' && c.type === 'paid' && priv.paidLockedWhere === 'feed' && (!!user || priv.visibility === 'public')
+    return channelVisibility(c) === 'public' && c.type === 'paid' && priv.paidLockedWhere === 'feed'
   }).map(c => c.id)
   const hf = hiddenFilterSql(user?.id ?? null)
   const order = sort === 'asc' ? 'p.created_at ASC, p.id ASC' : 'p.pinned DESC, p.created_at DESC, p.id DESC'
