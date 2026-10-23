@@ -68,7 +68,9 @@ export async function seedIfEmpty(db: AsyncDb) {
   ]
 
   const tenantId = await insert('INSERT INTO tenants (slug, name, tagline, brand_color, guidelines, created_at) VALUES (?, ?, ?, ?, ?, ?)',
-    'demo', 'Comunidad Demo', 'Un espacio para aprender, compartir y crecer en comunidad.', '#2563eb', JSON.stringify(guidelines), iso(now))
+    'demo', 'ServGT Comunidad', 'Un espacio para aprender, compartir y crecer en comunidad.', '#2563eb', JSON.stringify(guidelines), iso(now))
+
+  await run("UPDATE tenants SET name_en = 'ServGT Community', icon_url = '/branding/servgt/symbol.svg', favicon_url = '/branding/servgt/favicon.ico' WHERE id = ?", tenantId)
 
   const mkUser = async (name: string, slug: string, email: string, bio: string, location: string) =>
     insert('INSERT INTO users (name, slug, email, password_hash, bio, location, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
