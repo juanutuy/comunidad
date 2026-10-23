@@ -21,6 +21,7 @@ onMounted(() => {
 
 <template>
   <UApp>
+    <NuxtLoadingIndicator :height="3" :throttle="150" :hide-delay="200" color="var(--ui-primary)" error-color="var(--ui-error)" aria-hidden="true" />
     <NuxtLayout>
       <NuxtPage />
     </NuxtLayout>
