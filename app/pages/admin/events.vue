@@ -4,6 +4,7 @@
 // RSVP existente; aquí se ve cuántos confirmaron asistencia.
 definePageMeta({ layout: 'admin' })
 const { user, tenant } = useAuth()
+const { t } = useI18n()
 const { fmtDateTime } = useFormat()
 const api = useApi()
 const toast = useToast()
@@ -16,7 +17,7 @@ const { data, refresh } = await useAsyncData('admin-events', () =>
 // (barra fija) y viaja como HTML; el servidor sanitiza y deriva el
 // texto plano. Sin HTML previo, el editor arranca con la descripción
 // plana anterior convertida en párrafos.
-const form = reactive({ title: '', descriptionHtml: '', startsAt: '', endsAt: '', location: 'En línea', category: 'General', agenda: '' })
+const form = reactive({ title: '', descriptionHtml: '', startsAt: '', endsAt: '', location: 'En línea', category: 'General', agenda: '', recurrence: 'none', occurrences: 4, timezone: 'UTC' })
 const editing = ref<EventRow | null>(null)
 const saving = ref(false)
 
@@ -31,7 +32,14 @@ async function uploadImageFile(file: File): Promise<string> {
   const up = await api<{ url: string }>('/api/uploads', { method: 'POST', body: fd })
   return up.url
 }
-function localInput(iso: string) { return iso ? iso.slice(0, 16) : '' }
+onMounted(() => { form.timezone = Intl.DateTimeFormat().resolvedOptions().timeZone })
+const recurrenceOptions = computed(() => [{ value: 'none', label: t('completion.once') }, { value: 'daily', label: t('completion.daily') }, { value: 'weekly', label: t('completion.weekly') }, { value: 'monthly', label: t('completion.monthly') }])
+function localInput(iso: string) {
+  if (!iso) return ''
+  const date = new Date(iso)
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
+}
 function startEdit(e: EventRow) {
   editing.value = e
   form.title = e.title
@@ -44,12 +52,14 @@ function startEdit(e: EventRow) {
 }
 function resetForm() {
   editing.value = null
+  form.recurrence = 'none'; form.occurrences = 4
   form.title = ''; form.descriptionHtml = ''; form.startsAt = ''; form.endsAt = ''; form.location = 'En línea'; form.category = 'General'; form.agenda = ''
 }
 async function save() {
   saving.value = true
   try {
     const body = {
+      recurrence: editing.value ? 'none' : form.recurrence, occurrences: form.occurrences, timezone: form.timezone,
       title: form.title, descriptionHtml: form.descriptionHtml, location: form.location, category: form.category, agenda: form.agenda,
       startsAt: form.startsAt ? new Date(form.startsAt).toISOString() : '',
       endsAt: form.endsAt ? new Date(form.endsAt).toISOString() : '',
@@ -123,6 +133,11 @@ async function confirmDelete() {
               <UInput v-model="form.category" class="w-full" placeholder="General, Taller, En vivo…" />
             </UFormField>
           </div>
+          <div v-if="!editing" class="grid gap-4 sm:grid-cols-2">
+            <UFormField :label="t('completion.recurrence')"><USelect v-model="form.recurrence" :items="recurrenceOptions" class="w-full" /></UFormField>
+            <UFormField v-if="form.recurrence !== 'none'" :label="t('completion.occurrences')"><UInput v-model.number="form.occurrences" type="number" min="2" max="52" /></UFormField>
+          </div>
+          <p class="text-sm text-muted">{{ t('completion.seriesHint', { timezone: form.timezone }) }}</p>
           <div class="flex justify-end gap-2">
             <UButton v-if="editing" color="neutral" variant="ghost" label="Cancelar edición" @click="resetForm" />
             <UButton :label="editing ? 'Guardar cambios' : 'Crear evento'" icon="i-lucide-save" :loading="saving" :disabled="!form.title.trim() || !form.startsAt" @click="save" />

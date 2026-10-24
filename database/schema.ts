@@ -102,6 +102,9 @@ CREATE TABLE IF NOT EXISTS community_owners (tenant_id INTEGER PRIMARY KEY, user
 CREATE TABLE IF NOT EXISTS library_folders (id INTEGER PRIMARY KEY AUTOINCREMENT, tenant_id INTEGER NOT NULL, name TEXT NOT NULL, created_at TEXT NOT NULL);
 CREATE UNIQUE INDEX IF NOT EXISTS library_folder_names ON library_folders (tenant_id, name COLLATE NOCASE);
 CREATE TABLE IF NOT EXISTS saved_messages (tenant_id INTEGER NOT NULL, user_id INTEGER NOT NULL, kind TEXT NOT NULL, message_id INTEGER NOT NULL, created_at TEXT NOT NULL, PRIMARY KEY (tenant_id, user_id, kind, message_id));
+CREATE TABLE IF NOT EXISTS oauth_identities (tenant_id INTEGER NOT NULL, provider TEXT NOT NULL, subject TEXT NOT NULL, user_id INTEGER NOT NULL, created_at TEXT NOT NULL, PRIMARY KEY (tenant_id, provider, subject), UNIQUE (tenant_id, provider, user_id));
+CREATE TABLE IF NOT EXISTS oauth_flows (state_hash TEXT PRIMARY KEY, tenant_id INTEGER NOT NULL, user_id INTEGER NOT NULL, token_version INTEGER NOT NULL, verifier TEXT NOT NULL, expires_at INTEGER NOT NULL);
+CREATE TABLE IF NOT EXISTS event_reminders (tenant_id INTEGER NOT NULL, event_id INTEGER NOT NULL, user_id INTEGER NOT NULL, reminder_key TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'pending', lease_until INTEGER NOT NULL DEFAULT 0, attempts INTEGER NOT NULL DEFAULT 0, updated_at TEXT NOT NULL, PRIMARY KEY (tenant_id, event_id, user_id, reminder_key));
 `
 
 // Migraciones aditivas (Fase 2) para bases creadas en la Fase 1 — ya hay
@@ -109,8 +112,11 @@ CREATE TABLE IF NOT EXISTS saved_messages (tenant_id INTEGER NOT NULL, user_id I
 // tablas nuevas (arriba) y columnas nuevas (abajo). Los ALTER corren en
 // try/catch: si la columna ya existe, SQLite/D1 lanzan "duplicate column"
 // y se ignora. Idempotente y seguro en ambos motores.
-export const SCHEMA_VERSION = 'member-library-v1'
+export const SCHEMA_VERSION = 'event-oauth-billing-v1'
 export const MIGRATIONS = [
+  `ALTER TABLE member_subscriptions ADD COLUMN cancel_at_period_end INTEGER NOT NULL DEFAULT 0`,
+  `ALTER TABLE events ADD COLUMN series_id TEXT NOT NULL DEFAULT ''`,
+  `ALTER TABLE events ADD COLUMN timezone TEXT NOT NULL DEFAULT 'UTC'`,
   `ALTER TABLE dm_messages ADD COLUMN reply_to INTEGER`,
   `ALTER TABLE chat_room_messages ADD COLUMN reply_to INTEGER`,
   `ALTER TABLE library_items ADD COLUMN folder_id INTEGER`,

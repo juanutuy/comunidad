@@ -85,6 +85,8 @@ onMounted(() => refreshPurchases())
 
     <UAlert v-if="purchases?.subscriptions?.some(s => s.status === 'active')" color="success" variant="soft" icon="i-lucide-badge-check" :title="t('pricing.membershipActiveTitle')" :description="t('pricing.currentPlan', { plan: purchases.subscriptions.find(s => s.status === 'active')?.planName || '' })" />
 
+    <UButton v-if="user" to="/billing" color="neutral" variant="soft" icon="i-lucide-credit-card" :label="t('completion.billing')" />
+
     <div v-if="data?.plans.length" class="grid gap-4 md:grid-cols-2">
       <UCard
         v-for="plan in data.plans" :key="plan.id" class="flex flex-col"

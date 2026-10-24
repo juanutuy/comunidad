@@ -26,6 +26,7 @@ export function emailEnabled(): boolean {
 }
 
 export interface SendEmailInput {
+  idempotencyKey?: string
   tenantId: number
   userId?: number | null
   to: string
@@ -45,9 +46,11 @@ export async function sendEmail(event: H3Event, input: SendEmailInput): Promise<
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          ...(input.idempotencyKey ? { 'Idempotency-Key': input.idempotencyKey } : {}),
           ...(cfg.providerToken ? { 'Authorization': `Bearer ${cfg.providerToken}` } : {}),
         },
         body: JSON.stringify({ from: cfg.from, to: input.to, subject: input.subject, text: input.text }),
+        signal: AbortSignal.timeout(15000),
       })
       status = res.ok ? 'sent' : 'failed'
       detail = `Proveedor respondió HTTP ${res.status}.`

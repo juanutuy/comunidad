@@ -19,6 +19,18 @@ export { RealtimeRoom } from './realtime/room.mjs'
 
 export default {
   ...nitroHandler,
+  async scheduled(_controller, env, ctx) {
+    // Opt-in: no task is scheduled by this handler until a Cron Trigger is configured.
+    const origin = env.NUXT_REMINDER_ORIGIN
+    if (!origin || !env.NUXT_CRON_SECRET) return
+    const url = new URL('/api/cron/event-reminders', origin)
+    if (url.protocol !== 'https:') return
+    ctx.waitUntil(nitroHandler.fetch(new Request(url, {
+      method: 'POST', headers: { 'content-type': 'application/json', 'x-cron-secret': env.NUXT_CRON_SECRET }, body: '{}',
+    }), env, ctx).then(response => {
+      if (!response.ok) throw new Error(`Event reminder job returned HTTP ${response.status}`)
+    }))
+  },
   async fetch(request, env, ctx) {
     const url = new URL(request.url)
     const isUpgrade = (request.headers.get('upgrade') || '').toLowerCase() === 'websocket'

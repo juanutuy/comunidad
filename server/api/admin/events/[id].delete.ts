@@ -12,6 +12,7 @@ export default defineEventHandler(async (event) => {
   if (!row) throw createError({ statusCode: 404, message: 'Evento no encontrado.' })
   await db.prepare("DELETE FROM point_events WHERE tenant_id = ? AND kind = 'event_rsvp' AND ref_id = ?").run(tenant.id, eventId)
   await db.prepare('DELETE FROM rsvps WHERE tenant_id = ? AND event_id = ?').run(tenant.id, eventId)
-  await db.prepare('DELETE FROM events WHERE id = ?').run(eventId)
+  await db.prepare('DELETE FROM event_reminders WHERE tenant_id = ? AND event_id = ?').run(tenant.id, eventId)
+  await db.prepare('DELETE FROM events WHERE tenant_id = ? AND id = ?').run(tenant.id, eventId)
   return { ok: true }
 })

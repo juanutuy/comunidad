@@ -40,6 +40,7 @@ async function submit() {
       </UFormField>
       <UButton size="lg" type="submit" block icon="i-lucide-log-in" :label="t('auth.loginButton')" :loading="loading" />
     </form>
+    <GoogleSignIn class="mt-5" />
     <p class="mt-7 text-center text-sm text-muted">
       {{ t('auth.noAccount') }} <NuxtLink to="/register" @click="emit('register')" class="font-medium text-primary hover:underline">{{ t('auth.createFree') }}</NuxtLink>
     </p>

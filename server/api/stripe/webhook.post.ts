@@ -59,8 +59,8 @@ export default defineEventHandler(async (event) => {
     const end = obj.current_period_end ?? obj.items?.data?.[0]?.current_period_end
     const status = evt.type === 'customer.subscription.deleted' ? 'canceled' : ['active', 'trialing'].includes(obj.status) ? 'active' : 'inactive'
     if (status === 'active' && !Number.isFinite(end)) throw createError({ statusCode: 503, message: 'Suscripción sin período confirmado.' })
-    commands.push({ sql: `UPDATE member_subscriptions SET status = ?, current_period_end = ?, stripe_event_created = ?, updated_at = ?
-      WHERE stripe_subscription_id = ? AND stripe_event_created <= ? AND (status <> 'canceled' OR ? = 'canceled')`, params: [status, Number.isFinite(end) ? new Date(end * 1000).toISOString() : now, evt.created, now, id, evt.created, status] })
+    commands.push({ sql: `UPDATE member_subscriptions SET status = ?, current_period_end = ?, cancel_at_period_end = ?, stripe_event_created = ?, updated_at = ?
+      WHERE stripe_subscription_id = ? AND stripe_event_created <= ? AND (status <> 'canceled' OR ? = 'canceled')`, params: [status, Number.isFinite(end) ? new Date(end * 1000).toISOString() : now, obj.cancel_at_period_end ? 1 : 0, evt.created, now, id, evt.created, status] })
   }
   commands.push({ sql: 'INSERT OR IGNORE INTO stripe_events (id, type, processed_at) VALUES (?, ?, ?)', params: [evt.id, evt.type, now] })
   await db.batch(commands)

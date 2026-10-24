@@ -12,7 +12,7 @@
 import { currentAuth, resolveTenant } from '../utils/community'
 
 const OPEN_PREFIXES = ['/api/auth/', '/api/invite/']
-const OPEN_PATHS = new Set(['/api/tenant', '/api/stripe/webhook', '/api/cron/digest'])
+const OPEN_PATHS = new Set(['/api/tenant', '/api/stripe/webhook', '/api/cron/digest', '/api/cron/event-reminders'])
 const MESSAGES: Record<string, string> = {
   pending: 'Tu solicitud de ingreso está en revisión. Te avisaremos cuando un administrador la resuelva.',
   declined: 'Tu solicitud de ingreso no fue aprobada. Podés volver a solicitar el ingreso desde el registro cuando pase el tiempo de espera.',

@@ -45,7 +45,7 @@ const loading = ref(false)
 const profile = reactive({ name: '', bio: '', location: '', website: '' })
 const prefs = reactive<Record<string, boolean>>({
   notify_reaction: true, notify_comment: true, notify_mention: true, notify_new_post: true, notify_dm: true, notify_follow: true,
-  directory_visible: true, show_in_search: true, feed_following: false,
+  directory_visible: true, show_in_search: true, feed_following: false, notify_event: true, email_event: true,
 })
 
 async function load() {
@@ -292,6 +292,8 @@ const notifyItems = computed(() => [
 
             <!-- Notificaciones -->
             <div v-else-if="section === 'notificaciones'" class="space-y-3">
+              <div class="flex items-center gap-3"><span class="flex-1 text-sm">{{ t('completion.notifyEvent') }}</span><USwitch v-model="prefs.notify_event" :aria-label="t('completion.notifyEvent')" /></div>
+              <div class="flex items-center gap-3"><span class="flex-1 text-sm">{{ t('completion.emailEvent') }}</span><USwitch v-model="prefs.email_event" :aria-label="t('completion.emailEvent')" /></div>
               <div v-for="item in notifyItems" :key="item.key" class="flex items-center gap-3">
                 <UIcon :name="item.icon" class="text-muted" />
                 <span class="flex-1 text-sm">{{ item.label }}</span>
@@ -366,6 +368,8 @@ const notifyItems = computed(() => [
 
             <!-- Seguridad -->
             <div v-else-if="section === 'seguridad'" class="space-y-4">
+              <GoogleSignIn mode="link" class="border-b border-default pb-5" />
+              <UButton to="/billing" color="neutral" variant="soft" icon="i-lucide-credit-card" :label="t('completion.billing')" @click="closeSettings" />
               <UFormField :label="t('settings.currentPassword')">
                 <UInput v-model="pw.current" type="password" class="w-full" autocomplete="current-password" />
               </UFormField>

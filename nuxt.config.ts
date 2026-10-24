@@ -7,6 +7,10 @@ export default defineNuxtConfig({
   ssr: true,
 
   runtimeConfig: {
+    googleClientId: process.env.NUXT_GOOGLE_CLIENT_ID || '',
+    googleClientSecret: process.env.NUXT_GOOGLE_CLIENT_SECRET || '',
+    googleOAuthOrigin: process.env.NUXT_GOOGLE_OAUTH_ORIGIN || '',
+    billingPortalConfiguration: process.env.NUXT_BILLING_PORTAL_CONFIGURATION || '',
     communityBaseDomain: process.env.NUXT_COMMUNITY_BASE_DOMAIN || 'servgt.com',
     communityCreationEnabled: process.env.NUXT_COMMUNITY_CREATION_ENABLED === 'true',
     // Solo servidor. Valor por defecto SOLO para desarrollo local.

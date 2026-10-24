@@ -6,7 +6,7 @@
 import { requireUser, resolveTenant } from '../../utils/community'
 import { dbFor } from '../../utils/db'
 
-const ALLOWED = ['feed_following', 'notify_reaction', 'notify_comment', 'notify_mention', 'notify_new_post', 'notify_dm', 'notify_follow', 'directory_visible', 'show_in_search']
+const ALLOWED = ['notify_event', 'email_event', 'feed_following', 'notify_reaction', 'notify_comment', 'notify_mention', 'notify_new_post', 'notify_dm', 'notify_follow', 'directory_visible', 'show_in_search']
 
 export default defineEventHandler(async (event) => {
   const tenant = await resolveTenant(event)
