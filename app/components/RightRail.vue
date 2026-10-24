@@ -17,7 +17,8 @@ interface SidebarData {
   members: { id: number, name: string, slug: string, avatarUrl: string, online: boolean }[]
 }
 const { data: sidebar } = await useAsyncData('right-rail', () =>
-  api<SidebarData>('/api/sidebar').catch(() => ({ events: [], recent: [], leaders: [], online: [], members: [] }) as SidebarData))
+  api<SidebarData>('/api/sidebar').catch(() => ({ events: [], recent: [], leaders: [], online: [], members: [] }) as SidebarData),
+  { watch: [() => user.value?.id, () => tenant.value?.id] })
 
 // Fase 15: orden y visibilidad salen de la config del tenant que
 // devuelve el servidor en `blocks` (ya filtrada por audiencia para el

@@ -98,6 +98,7 @@ CREATE TABLE IF NOT EXISTS certificates (id INTEGER PRIMARY KEY AUTOINCREMENT, t
 CREATE UNIQUE INDEX IF NOT EXISTS certificates_code ON certificates (code);
 CREATE UNIQUE INDEX IF NOT EXISTS certificates_unique ON certificates (tenant_id, user_id, course_id);
 CREATE TABLE IF NOT EXISTS app_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL DEFAULT '');
+CREATE TABLE IF NOT EXISTS community_owners (tenant_id INTEGER PRIMARY KEY, user_id INTEGER NOT NULL UNIQUE, request_key TEXT NOT NULL, created_at TEXT NOT NULL);
 `
 
 // Migraciones aditivas (Fase 2) para bases creadas en la Fase 1 — ya hay
@@ -105,7 +106,7 @@ CREATE TABLE IF NOT EXISTS app_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL D
 // tablas nuevas (arriba) y columnas nuevas (abajo). Los ALTER corren en
 // try/catch: si la columna ya existe, SQLite/D1 lanzan "duplicate column"
 // y se ignora. Idempotente y seguro en ambos motores.
-export const SCHEMA_VERSION = 'localized-brand-v1'
+export const SCHEMA_VERSION = 'community-provisioning-v1'
 export const MIGRATIONS = [
   `ALTER TABLE tenants ADD COLUMN name_en TEXT NOT NULL DEFAULT ''`,
   `ALTER TABLE memberships ADD COLUMN status_reason TEXT NOT NULL DEFAULT ''`,

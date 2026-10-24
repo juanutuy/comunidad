@@ -85,7 +85,7 @@ export default defineEventHandler(async (event) => {
       .run(days, tenant.id).catch(() => {})
   }
   if (Array.isArray(body.autoJoinChannels)) {
-    const ids = [...new Set(body.autoJoinChannels.map(Number).filter(n => Number.isInteger(n) && n > 0))].slice(0, 2)
+    const ids = [...new Set(body.autoJoinChannels.map(Number).filter(n => Number.isInteger(n) && n > 0))].slice(0, 100)
     for (const id of ids) {
       const ch = await db.prepare('SELECT id FROM channels WHERE tenant_id = ? AND id = ?').get(tenant.id, id)
       if (!ch) throw createError({ statusCode: 400, message: 'Uno de los canales de auto-ingreso no existe en esta comunidad.' })

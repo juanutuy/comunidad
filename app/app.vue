@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { brandStyles } from '#shared/branding'
 const { fetchMe, tenant } = useAuth()
 await fetchMe()
 
@@ -9,6 +10,7 @@ const { locale } = useI18n()
 useHead(() => ({
   htmlAttrs: { lang: locale.value },
   title: tenant.value?.name || 'ServGT',
+  style: [{ key: 'community-brand', textContent: brandStyles(tenant.value?.brandColor) }],
   link: [
     ...(tenant.value?.faviconUrl ? [{ rel: 'icon' as const, href: tenant.value.faviconUrl }] : []),
     { rel: 'manifest' as const, href: `/api/manifest?locale=${locale.value}` },

@@ -64,7 +64,7 @@ export function channelPostPermission(channel: { post_permission?: string | null
 
 export async function resolveTenant(event: H3Event): Promise<TenantRow> {
   const db = await dbFor(event)
-  const tenant = await tenantForHost((sql, ...params) => db.prepare(sql).get(...params), getRequestHost(event))
+  const tenant = await tenantForHost((sql, ...params) => db.prepare(sql).get(...params), getRequestHost(event), String(useRuntimeConfig().communityBaseDomain || 'servgt.com'))
   if (!tenant) throw createError({ statusCode: 404, message: 'Comunidad no encontrada.' })
   const row = tenant as TenantRow
   return { ...row, nameEs: row.name, name: await eventLocale(event, row.id) === 'en' ? row.name_en || row.name : row.name }

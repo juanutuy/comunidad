@@ -33,7 +33,7 @@ export async function getJoinSettings(event: H3Event, tenantId: number): Promise
       approval: !!row.join_approval,
       questions: parseArr(row.join_questions).map(q => String(q)).slice(0, 6),
       cooldownDays: Math.max(0, Number(row.join_cooldown_days) || 0),
-      autoJoinChannels: parseArr(row.auto_join_channels).map(n => Number(n)).filter(n => Number.isInteger(n) && n > 0).slice(0, 2),
+      autoJoinChannels: parseArr(row.auto_join_channels).map(n => Number(n)).filter(n => Number.isInteger(n) && n > 0).slice(0, 100),
     }
   }
   catch { return fallback } // bases anteriores sin las columnas: ingreso libre, como siempre

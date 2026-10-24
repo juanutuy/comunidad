@@ -8,7 +8,7 @@ definePageMeta({ layout: 'admin' })
 const { user, tenant } = useAuth()
 const api = useApi()
 const toast = useToast()
-const { fmtMoney, fmtDate, fmtDateTime } = useFormat()
+const { fmtAmount, fmtDate, fmtDateTime } = useFormat()
 
 interface Order {
   id: number, buyerName: string, buyerEmail: string, productName: string, kind: string
@@ -47,7 +47,7 @@ const subLabel = (o: Order) => o.kind !== 'plan'
 const deciding = ref(0)
 async function decide(p: PendingPayment, action: 'approve' | 'reject') {
   const verb = action === 'approve' ? 'aprobar' : 'rechazar'
-  if (!confirm(`¿Seguro que querés ${verb} el pago de ${p.buyerName} por ${p.productName} (${fmtMoney(p.amountCents, p.paymentCurrency)})?${action === 'approve' ? ' Al aprobar se concede el acceso en el acto.' : ' Al rechazar no se concede ningún acceso.'}`)) return
+  if (!confirm(`¿Seguro que querés ${verb} el pago de ${p.buyerName} por ${p.productName} (${fmtAmount(p.amountCents, p.paymentCurrency)})?${action === 'approve' ? ' Al aprobar se concede el acceso en el acto.' : ' Al rechazar no se concede ningún acceso.'}`)) return
   deciding.value = p.id
   try {
     await api(`/api/admin/earnings/${p.id}/${action}`, { method: 'POST' })
@@ -71,12 +71,12 @@ async function decide(p: PendingPayment, action: 'approve' | 'reject') {
       <div class="grid gap-4 sm:grid-cols-3">
         <UCard>
           <p class="flex items-center gap-2 text-sm text-muted"><UIcon name="i-lucide-banknote" /> Ingresos totales</p>
-          <p class="mt-1 text-3xl font-bold">{{ fmtMoney(data.kpis.totalRevenueCents, data.currency) }}</p>
+          <p class="mt-1 text-3xl font-bold">{{ fmtAmount(data.kpis.totalRevenueCents, data.currency) }}</p>
           <p class="text-xs text-muted">Suma histórica de pagos confirmados.</p>
         </UCard>
         <UCard>
           <p class="flex items-center gap-2 text-sm text-muted"><UIcon name="i-lucide-calendar-check" /> Ingresos de este mes</p>
-          <p class="mt-1 text-3xl font-bold">{{ fmtMoney(data.kpis.monthRevenueCents, data.currency) }}</p>
+          <p class="mt-1 text-3xl font-bold">{{ fmtAmount(data.kpis.monthRevenueCents, data.currency) }}</p>
           <p class="text-xs text-muted">Pagos confirmados creados este mes.</p>
         </UCard>
         <UCard>
@@ -94,7 +94,7 @@ async function decide(p: PendingPayment, action: 'approve' | 'reject') {
         <ul class="divide-y divide-default px-4 sm:px-5">
           <li v-for="p in pendingData?.pending || []" :key="p.id" class="flex flex-wrap items-center gap-3 py-3">
             <div class="min-w-0 flex-1">
-              <p class="font-medium">{{ p.productName }} <span class="text-muted">· {{ fmtMoney(p.amountCents, p.paymentCurrency) }}</span></p>
+              <p class="font-medium">{{ p.productName }} <span class="text-muted">· {{ fmtAmount(p.amountCents, p.paymentCurrency) }}</span></p>
               <p class="text-sm text-muted">
                 {{ p.buyerName }} ({{ p.buyerEmail }}) · {{ kindLabel(p.kind) }} · {{ p.methodTitle || 'Método manual' }} · {{ fmtDateTime(p.createdAt) }}
                 <span v-if="p.reference" class="block">Referencia del comprador: «{{ p.reference }}»</span>
@@ -135,7 +135,7 @@ async function decide(p: PendingPayment, action: 'approve' | 'reject') {
                 <td class="px-4 py-2.5">{{ kindLabel(o.kind) }}</td>
                 <td class="px-4 py-2.5">{{ o.priceType === 'subscription' ? 'Suscripción' : 'Único' }}</td>
                 <td class="px-4 py-2.5">{{ o.gateway === 'manual' ? 'Manual' : 'Stripe' }}</td>
-                <td class="px-4 py-2.5 font-medium">{{ fmtMoney(o.amountCents, o.paymentCurrency) }}</td>
+                <td class="px-4 py-2.5 font-medium">{{ fmtAmount(o.amountCents, o.paymentCurrency) }}</td>
                 <td class="px-4 py-2.5">{{ o.nextRenewal ? fmtDate(o.nextRenewal) : '—' }}</td>
                 <td class="px-4 py-2.5"><UBadge :color="statusBadge(o.paymentStatus).color" variant="subtle">{{ statusBadge(o.paymentStatus).label }}</UBadge></td>
                 <td class="px-4 py-2.5">{{ subLabel(o) }}</td>

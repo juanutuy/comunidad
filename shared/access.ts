@@ -31,14 +31,14 @@ export async function channelAccess(get: QueryOne, userId: number | null, role: 
   return channelAccessDecision(channel, userId, role, direct, subscribed)
 }
 
-export async function tenantForHost(get: QueryOne, rawHost: string) {
+export async function tenantForHost(get: QueryOne, rawHost: string, baseDomain = 'servgt.com') {
   const host = rawHost.toLowerCase().replace(/:\d+$/, '').replace(/\.$/, '')
   if (host) {
     const domain = await get('SELECT t.* FROM tenant_domains d JOIN tenants t ON t.id = d.tenant_id WHERE d.domain = ?', host)
     if (domain) return domain
   }
   const sub = host.split('.')[0] || ''
-  if (sub && !['localhost', 'www', '127'].includes(sub)) {
+  if (host.endsWith(`.${baseDomain}`) && host.split('.').length === baseDomain.split('.').length + 1 && sub && !['hub', 'www'].includes(sub)) {
     const tenant = await get('SELECT * FROM tenants WHERE slug = ?', sub)
     if (tenant) return tenant
   }

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { BRAND_PRESETS } from '#shared/branding'
 // Ajustes de la comunidad (Fase 11): antes vivían al pie del Panel
 // (/admin); ahora son su propia sección de la consola, como en la
 // referencia, con sub-navegación real: «General» (nombre, lema, color
@@ -44,7 +45,7 @@ const { data } = await useAsyncData('admin-settings', () =>
 const form = reactive({
   name: '', nameEn: '', tagline: '', brandColor: '#2563eb', guidelinesText: '', terms: '', privacy: '', moderationReview: false,
   // Fase 14: ingreso de miembros.
-  joinApproval: false, joinQuestions: [] as string[], joinCooldownDays: 0, autoJoin1: 0, autoJoin2: 0,
+  joinApproval: false, joinQuestions: [] as string[], joinCooldownDays: 0, autoJoinChannels: [] as number[],
   // Fase 15: privacidad y presentación.
   visibility: 'private', directoryAudience: 'members', libraryAudience: 'members',
   paidPreviewMode: 'preview', paidPreviewPct: 25, paidPreviewChars: 350,
@@ -72,8 +73,7 @@ watchEffect(() => {
     form.joinApproval = !!data.value.settings.joinApproval
     form.joinQuestions = [...(data.value.settings.joinQuestions || [])]
     form.joinCooldownDays = data.value.settings.joinCooldownDays || 0
-    form.autoJoin1 = data.value.settings.autoJoinChannels?.[0] || 0
-    form.autoJoin2 = data.value.settings.autoJoinChannels?.[1] || 0
+    form.autoJoinChannels = [...(data.value.settings.autoJoinChannels || [])]
     form.visibility = data.value.settings.visibility || 'private'
     form.directoryAudience = data.value.settings.directoryAudience || 'members'
     form.libraryAudience = data.value.settings.libraryAudience || 'members'
@@ -234,10 +234,6 @@ async function onBrandFile(e: Event, field: 'logoUrl' | 'logoDarkUrl' | 'iconUrl
   finally { uploadingBrand.value = '' }
 }
 
-const channelOptions = computed(() => [
-  { label: 'Ninguno', value: 0 },
-  ...(data.value?.channels || []).map(c => ({ label: `# ${c.name}${c.type === 'private' ? ' (privado)' : c.type === 'paid' ? ' (pago)' : ''}`, value: c.id })),
-])
 function addQuestion() {
   if (form.joinQuestions.length < 6) form.joinQuestions.push('')
 }
@@ -263,7 +259,7 @@ async function save() {
         joinApproval: form.joinApproval,
         joinQuestions: form.joinQuestions,
         joinCooldownDays: Number(form.joinCooldownDays) || 0,
-        autoJoinChannels: [form.autoJoin1, form.autoJoin2].filter(id => id > 0),
+        autoJoinChannels: form.autoJoinChannels,
         // Fase 15: privacidad y presentación.
         visibility: form.visibility,
         directoryAudience: form.directoryAudience,
@@ -327,6 +323,13 @@ async function save() {
             <UInput v-model="form.tagline" class="w-full" />
           </UFormField>
           <UFormField label="Color de marca">
+            <div class="mb-3 flex flex-wrap gap-2">
+              <button v-for="color in BRAND_PRESETS" :key="color" type="button" :aria-label="color"
+                :aria-pressed="form.brandColor.toLowerCase() === color" class="h-10 w-10 rounded-full border-2 border-default focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                :style="{ backgroundColor: color }" @click="form.brandColor = color">
+                <UIcon v-if="form.brandColor.toLowerCase() === color" name="i-lucide-check" class="size-5 text-white" />
+              </button>
+            </div>
             <div class="flex items-center gap-3">
               <input v-model="form.brandColor" type="color" class="h-10 w-16 cursor-pointer rounded-md border border-default bg-transparent">
               <UInput v-model="form.brandColor" class="w-32" />
@@ -634,17 +637,14 @@ async function save() {
           <div>
             <p class="font-semibold">Canales de auto-ingreso</p>
             <p class="mt-1 text-sm text-muted">
-              Hasta 2 canales a los que entra automáticamente todo miembro nuevo, llegue como llegue
+              Los canales a los que entra automáticamente todo miembro nuevo, llegue como llegue
               (registro aprobado, invitación o alta manual). Si un canal es privado, el auto-ingreso igual
               suma a la persona: es tu decisión al elegirlo acá.
             </p>
-            <div class="mt-3 grid gap-3 sm:grid-cols-2">
-              <UFormField label="Canal 1">
-                <USelect v-model="form.autoJoin1" :items="channelOptions" class="w-full" />
-              </UFormField>
-              <UFormField label="Canal 2">
-                <USelect v-model="form.autoJoin2" :items="channelOptions" class="w-full" />
-              </UFormField>
+            <div class="mt-3 space-y-2">
+              <UCheckbox v-for="channel in data?.channels || []" :key="channel.id" :label="channel.name"
+                :model-value="form.autoJoinChannels.includes(channel.id)"
+                @update:model-value="checked => form.autoJoinChannels = checked ? [...form.autoJoinChannels, channel.id] : form.autoJoinChannels.filter(id => id !== channel.id)" />
             </div>
           </div>
         </div>

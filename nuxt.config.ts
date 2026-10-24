@@ -7,6 +7,8 @@ export default defineNuxtConfig({
   ssr: true,
 
   runtimeConfig: {
+    communityBaseDomain: process.env.NUXT_COMMUNITY_BASE_DOMAIN || 'servgt.com',
+    communityCreationEnabled: process.env.NUXT_COMMUNITY_CREATION_ENABLED === 'true',
     // Solo servidor. Valor por defecto SOLO para desarrollo local.
     sessionSecret: process.env.NUXT_SESSION_SECRET || '',
     demoSeed: process.env.NUXT_DEMO_SEED !== 'false',

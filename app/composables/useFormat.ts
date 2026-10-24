@@ -26,8 +26,8 @@ export function useFormat() {
   // en la moneda en que se registró el pago). Cambiar la moneda del
   // tenant cambia el formato y la interpretación de los montos
   // guardados: NO convierte entre monedas.
-  function fmtMoney(cents: number, currency?: string) {
-    if (cents === 0) return t('common.free')
+  function fmtMoney(cents: number, currency?: string, zeroAsFree = true) {
+    if (cents === 0 && zeroAsFree) return t('common.free')
     let code = currency || 'USD'
     if (!currency) {
       try { code = useAuth().tenant.value?.currency || 'USD' }
@@ -46,5 +46,6 @@ export function useFormat() {
   function initials(name: string) {
     return name.split(' ').map(p => p[0]).slice(0, 2).join('').toUpperCase()
   }
-  return { fmtDate, fmtDateTime, timeAgo, fmtMoney, initials }
+  const fmtAmount = (cents: number, currency?: string) => fmtMoney(cents, currency, false)
+  return { fmtDate, fmtDateTime, timeAgo, fmtMoney, fmtAmount, initials }
 }

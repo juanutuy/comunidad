@@ -7,7 +7,7 @@
 // totales de «De un vistazo» y la cola de atención no dependen de él.
 definePageMeta({ layout: 'admin' })
 const { user, tenant } = useAuth()
-const { fmtDateTime, fmtMoney, initials, timeAgo } = useFormat()
+const { fmtDateTime, fmtAmount, initials, timeAgo } = useFormat()
 const api = useApi()
 const route = useRoute()
 const router = useRouter()
@@ -63,7 +63,7 @@ const statCards = computed(() => {
     { label: 'Cursos publicados', value: t.courses, icon: 'i-lucide-graduation-cap', to: '/admin/courses' },
     { label: 'Eventos', value: t.events, icon: 'i-lucide-calendar-days', to: '/admin/events' },
     { label: 'Membresías activas', value: t.activeSubscriptions, icon: 'i-lucide-credit-card', to: '/admin/plans' },
-    { label: 'Ingresos confirmados', value: fmtMoney(t.revenueCents), icon: 'i-lucide-banknote', to: '/admin/earnings' },
+    { label: 'Ingresos confirmados', value: fmtAmount(t.revenueCents), icon: 'i-lucide-banknote', to: '/admin/earnings' },
   ]
 })
 
@@ -74,7 +74,7 @@ const periodCards = computed(() => {
     { label: 'Miembros nuevos', value: p.newMembers, icon: 'i-lucide-user-plus' },
     { label: 'Publicaciones', value: p.posts, icon: 'i-lucide-pen-square' },
     { label: 'Comentarios', value: p.comments, icon: 'i-lucide-message-circle' },
-    { label: 'Ingresos', value: fmtMoney(p.earningsCents), icon: 'i-lucide-banknote' },
+    { label: 'Ingresos', value: fmtAmount(p.earningsCents), icon: 'i-lucide-banknote' },
   ]
 })
 

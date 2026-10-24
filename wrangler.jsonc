@@ -4,6 +4,7 @@
   // exportar la clase Durable Object RealtimeRoom (Fase 3) e interceptar
   // los upgrades WebSocket de /api/rt/*. Los assets salen de .output/public.
   "name": "comunidad-mvp",
+  "workers_dev": true,
   "main": "worker-entry.mjs",
   "compatibility_date": "2025-07-15",
   "compatibility_flags": ["nodejs_compat"],
@@ -33,7 +34,9 @@
     { "tag": "v1-realtime", "new_sqlite_classes": ["RealtimeRoom"] }
   ],
   "vars": {
-    "NUXT_PUBLIC_APP_NAME": "Comunidad"
+    "NUXT_PUBLIC_APP_NAME": "ServGT",
+    "NUXT_COMMUNITY_BASE_DOMAIN": "servgt.me",
+    "NUXT_COMMUNITY_CREATION_ENABLED": "false"
   }
   // El secreto de sesión NO va aquí: `wrangler secret put NUXT_SESSION_SECRET`
 }

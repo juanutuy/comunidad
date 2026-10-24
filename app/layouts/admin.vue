@@ -14,7 +14,7 @@
 // Las APIs mantienen sus comprobaciones de capacidad por sección.
 // El layout exige además staff activo para ocultarse al perder la sesión.
 const { user, tenant, status, logout } = useAuth()
-const { t } = useI18n()
+const { t, locale } = useI18n()
 const { initials } = useFormat()
 const router = useRouter()
 const route = useRoute()
@@ -36,6 +36,7 @@ const sections = computed(() => [
   { label: t('adminShell.sectionDomains'), icon: 'i-lucide-globe', to: '/admin/domains', roles: ['admin'] },
   { label: t('adminShell.sectionEmails'), icon: 'i-lucide-mail', to: '/admin/emails', roles: ['admin'] },
   { label: t('adminShell.sectionSettings'), icon: 'i-lucide-settings', to: '/admin/settings', roles: ['admin'] },
+  { label: locale.value === 'en' ? 'Services' : 'Servicios', icon: 'i-lucide-plug', to: '/admin/readiness', roles: ['admin'] },
 ])
 const visibleSections = computed(() => sections.value.filter(s => !!user.value?.role && s.roles.includes(user.value.role)))
 const isStaff = computed(() => status.value === 'active' && visibleSections.value.length > 0)

@@ -12,6 +12,7 @@ const { user, tenant } = useAuth()
 const api = useApi()
 const toast = useToast()
 const route = useRoute()
+const badgeIcons = ['sprout', 'leaf', 'star', 'flame', 'gem', 'medal', 'award', 'trophy', 'crown', 'rocket', 'graduation-cap', 'shield-check'].map(icon => `i-lucide-${icon}`)
 
 const subItems = [
   { value: 'niveles', label: 'Niveles e insignias', icon: 'i-lucide-trophy' },
@@ -118,6 +119,9 @@ async function save() {
             </UFormField>
             <UFormField label="Icono" class="min-w-44 flex-1">
               <UInput v-model="l.icon" class="w-full" placeholder="i-lucide-star" />
+              <div class="mt-2 flex max-w-64 flex-wrap gap-1">
+                <UButton v-for="icon in badgeIcons" :key="icon" :icon="icon" size="sm" :variant="l.icon === icon ? 'solid' : 'ghost'" :aria-label="icon.replace('i-lucide-', '')" :aria-pressed="l.icon === icon" @click="l.icon = icon" />
+              </div>
             </UFormField>
             <UButton
               color="error" variant="ghost" icon="i-lucide-trash-2" aria-label="Eliminar nivel"
