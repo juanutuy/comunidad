@@ -19,7 +19,18 @@ const { data, refresh } = await useAsyncData(
   () => api<PostDetailData>('/api/post', { query: { channel: channelSlug.value, post: postSlug.value } }),
   { watch: [channelSlug, postSlug] },
 )
-const photoOpen = computed(() => String(route.query.photo || '') === postSlug.value && !!route.query.photo && data.value?.post.mediaType === 'image' && !!data.value.post.mediaUrl)
+function bodyImageSources(html: string) {
+  return [...html.matchAll(/<img\b[^>]*\bsrc\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/gi)]
+    .map(match => match[1] || match[2] || match[3] || '')
+    .filter(Boolean)
+}
+const inlineImages = computed(() => bodyImageSources(data.value?.post.bodyHtml || ''))
+const inlineImageIndex = computed(() => Number(route.query.image || 0) - 1)
+const selectedPhotoUrl = computed(() => {
+  if (route.query.image) return inlineImages.value[inlineImageIndex.value] || ''
+  return data.value?.post.mediaType === 'image' ? data.value.post.mediaUrl : ''
+})
+const photoOpen = computed(() => String(route.query.photo || '') === postSlug.value && !!selectedPhotoUrl.value)
 const photoModalOpen = computed({
   get: () => photoOpen.value,
   set: (open: boolean) => { if (!open) closePhotoViewer() },
@@ -40,10 +51,16 @@ const photoPosts = computed(() => {
 })
 const photoIndex = computed(() => Math.max(0, photoPosts.value.findIndex(post => post.slug === postSlug.value)))
 
-function openPhotoViewer() {
+function openPhotoViewer(source?: string) {
+  const imageIndex = source ? inlineImages.value.findIndex(candidate => candidate === source) : -1
   void router.push({
     path: `/p/${channelSlug.value}/${postSlug.value}`,
-    query: { photo: postSlug.value, pi: String(photoIndex.value + 1), from: 'post' },
+    query: {
+      photo: postSlug.value,
+      pi: String(photoIndex.value + 1),
+      from: 'post',
+      ...(imageIndex >= 0 ? { image: String(imageIndex + 1) } : {}),
+    },
   })
 }
 function closePhotoViewer() {
@@ -60,9 +77,16 @@ function closePhotoViewer() {
   delete query.photo
   delete query.pi
   delete query.from
+  delete query.image
   void router.replace({ path: route.path, query, hash: route.hash })
 }
 function movePhoto(direction: -1 | 1) {
+  if (route.query.image && inlineImages.value.length) {
+    const nextImage = inlineImageIndex.value + direction
+    if (nextImage < 0 || nextImage >= inlineImages.value.length) return
+    void router.push({ path: route.path, query: { ...route.query, image: String(nextImage + 1) } })
+    return
+  }
   const next = photoIndex.value + direction
   const target = photoPosts.value[next]
   if (!target) return
@@ -114,10 +138,10 @@ watch([() => route.fullPath, data], focusComments, { flush: 'post' })
       <template #content>
         <div v-if="data" class="grid h-[100dvh] min-h-0 grid-rows-[minmax(38vh,1fr)_minmax(0,1fr)] bg-black sm:grid-cols-[minmax(0,1fr)_400px] sm:grid-rows-1">
           <section class="relative flex min-h-0 min-w-0 items-center justify-center overflow-hidden bg-black" :aria-label="t('post.photoViewerTitle')">
-            <img :src="data.post.mediaUrl" :alt="t('post.postImageAlt')" class="h-full w-full object-contain">
-            <UButton v-if="photoPosts.length > 1" color="neutral" variant="solid" icon="i-lucide-chevron-left" class="absolute left-4 top-1/2 -translate-y-1/2 rounded-full bg-black/50 text-white hover:bg-black/75" :aria-label="t('post.previousPhoto')" :disabled="photoIndex === 0" @click="movePhoto(-1)" />
-            <UButton v-if="photoPosts.length > 1" color="neutral" variant="solid" icon="i-lucide-chevron-right" class="absolute right-4 top-1/2 -translate-y-1/2 rounded-full bg-black/50 text-white hover:bg-black/75" :aria-label="t('post.nextPhoto')" :disabled="photoIndex === photoPosts.length - 1" @click="movePhoto(1)" />
-            <span v-if="photoPosts.length > 1" class="absolute bottom-4 left-1/2 -translate-x-1/2 rounded-full bg-black/55 px-3 py-1 text-xs text-white">{{ photoIndex + 1 }} / {{ photoPosts.length }}</span>
+            <img :src="selectedPhotoUrl" :alt="t('post.postImageAlt')" class="h-full w-full object-contain">
+            <UButton v-if="(route.query.image ? inlineImages.length : photoPosts.length) > 1" color="neutral" variant="solid" icon="i-lucide-chevron-left" class="absolute left-4 top-1/2 -translate-y-1/2 rounded-full bg-black/50 text-white hover:bg-black/75" :aria-label="t('post.previousPhoto')" :disabled="route.query.image ? inlineImageIndex === 0 : photoIndex === 0" @click="movePhoto(-1)" />
+            <UButton v-if="(route.query.image ? inlineImages.length : photoPosts.length) > 1" color="neutral" variant="solid" icon="i-lucide-chevron-right" class="absolute right-4 top-1/2 -translate-y-1/2 rounded-full bg-black/50 text-white hover:bg-black/75" :aria-label="t('post.nextPhoto')" :disabled="route.query.image ? inlineImageIndex === inlineImages.length - 1 : photoIndex === photoPosts.length - 1" @click="movePhoto(1)" />
+            <span v-if="(route.query.image ? inlineImages.length : photoPosts.length) > 1" class="absolute bottom-4 left-1/2 -translate-x-1/2 rounded-full bg-black/55 px-3 py-1 text-xs text-white">{{ (route.query.image ? inlineImageIndex : photoIndex) + 1 }} / {{ route.query.image ? inlineImages.length : photoPosts.length }}</span>
           </section>
           <aside class="flex min-h-0 flex-col border-l border-default bg-default text-default">
             <div class="flex justify-end border-b border-default p-2">

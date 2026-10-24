@@ -44,6 +44,29 @@ export interface PostView {
 // expandir una segunda copia dentro de la tarjeta.
 const props = withDefaults(defineProps<{ post: PostView, linkable?: boolean, inlineComments?: boolean, showMedia?: boolean, photoSource?: string }>(), { linkable: true, inlineComments: false, showMedia: true, photoSource: 'feed' })
 const postUrl = computed(() => `/p/${props.post.channel.slug}/${props.post.slug}`)
+const router = useRouter()
+function richImageSources(html: string) {
+  return [...html.matchAll(/<img\b[^>]*\bsrc\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/gi)]
+    .map(match => match[1] || match[2] || match[3] || '')
+    .filter(Boolean)
+}
+function openRichImage(event: MouseEvent) {
+  const image = (event.target as HTMLElement).closest('img')
+  if (!image) return
+  const source = image.getAttribute('src') || image.getAttribute('data-src') || image.getAttribute('srcset')?.split(',')[0]?.trim().split(/\s+/)[0]
+  if (!source) return
+  event.preventDefault()
+  event.stopPropagation()
+  if (!props.linkable) {
+    emit('openPhoto', source)
+    return
+  }
+  const imageIndex = richImageSources(props.post.bodyHtml || '').findIndex(candidate => candidate === source)
+  void router.push({
+    path: postUrl.value,
+    query: { photo: props.post.slug, image: String(Math.max(0, imageIndex) + 1), from: props.photoSource },
+  })
+}
 function openCard(event: MouseEvent) {
   if (!props.linkable || event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
   const target = event.target as HTMLElement
@@ -51,7 +74,7 @@ function openCard(event: MouseEvent) {
   if (window.getSelection()?.toString()) return
   navigateTo(postUrl.value)
 }
-const emit = defineEmits<{ changed: [], deleted: [], openPhoto: [] }>()
+const emit = defineEmits<{ changed: [], deleted: [], openPhoto: [source?: string] }>()
 const { user } = useAuth()
 const { t } = useI18n()
 const { openReport } = useReportDialog()
@@ -368,7 +391,7 @@ async function deletePost() {
           <!-- Fase 8: con cuerpo rico se muestra el HTML (sanitizado
                en el servidor al guardar y al servir); sin él, el
                texto plano de siempre. -->
-          <div v-if="displayBodyHtml" class="rich-content mt-2 text-[15px] leading-relaxed" v-html="displayBodyHtml" />
+          <div v-if="displayBodyHtml" class="rich-content post-rich-content mt-2 text-[15px] leading-relaxed" v-html="displayBodyHtml" @click="openRichImage" />
           <p v-else class="mt-2 whitespace-pre-line text-[15px] leading-relaxed">
             {{ displayBody }}
           </p>
@@ -389,7 +412,7 @@ async function deletePost() {
               type="button"
               class="group/image block w-full cursor-zoom-in overflow-hidden rounded-lg focus-visible:outline-2 focus-visible:outline-primary"
               :aria-label="t('post.openImage')"
-              @click.stop="emit('openPhoto')"
+              @click.stop="emit('openPhoto', post.mediaUrl)"
             >
               <img :src="post.mediaUrl" :alt="t('post.postImageAlt')" class="max-h-96 w-full rounded-lg object-cover transition group-hover/image:brightness-95">
             </button>
