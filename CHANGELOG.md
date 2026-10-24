@@ -1,5 +1,31 @@
 # Historial de cambios
 
+## 2026-10-24 — Canales con estado activo y hover unificado
+
+El enlace del canal ocupa ahora toda la fila del menú lateral y queda debajo
+del botón de acciones; el fondo activo y hover cubre también el espacio de los
+tres puntos. Se quitó el fondo propio que hacía que el enlace activo pareciera
+una pastilla separada. El foco de teclado se dibuja alrededor de la fila.
+Commits `0bf485e`, `ef2cdd3`, `23877f8` (y ajustes de CSS intermedios).
+Desplegado en Cloudflare Worker `3cf2c037-856c-420c-9d9e-5d3428251d99` el
+24 de octubre. No se ejecutaron pruebas automatizadas ni revisión visual.
+
+## 2026-10-24 — Eventos recurrentes, recordatorios, Google y facturación
+
+Implementación descrita en
+[`docs/ACTIVAR-EVENTOS-GOOGLE-FACTURACION.md`](docs/ACTIVAR-EVENTOS-GOOGLE-FACTURACION.md).
+Commit `0cb8f60`; desplegada junto con la migración D1 remota en el Worker
+`3cf2c037-856c-420c-9d9e-5d3428251d99`. Faltan las variables/secretos y
+configuraciones externas que se indican en ese documento. No se ejecutaron
+pruebas automatizadas ni recorrido manual.
+
+## 2026-10-23 — Navegación a publicaciones y comentarios
+
+Se corrigió el enlace a la vista individual de una publicación y el acceso
+directo a comentarios. Commit `c000f16`. Este cambio forma parte del Worker
+desplegado `3cf2c037-856c-420c-9d9e-5d3428251d99`; no se repitió una prueba
+manual en producción durante este despliegue.
+
 ## 2026-10-23 — Acceso contextual a perfiles y comentarios
 
 Visitantes abren el modal de acceso antes de navegar a perfiles; se conserva el destino para continuar tras iniciar sesión. Las URLs directas presentan una pantalla de acceso y abren el modal al montar. Comentarios, respuestas y reacciones de comentarios comparten el mismo aviso de acceso. Errores de perfil ya no dejan el contenido vacío. Regresiones de SSR y destino de navegación.
@@ -178,3 +204,7 @@ qué quedó fuera) vive en el `README.md`. Cómo se creó el proyecto:
   programadas, directorio de miembros, gestión completa de cursos y
   eventos, salas grupales, textos legales editables y bloqueos entre
   miembros.
+
+El estado consolidado de funciones desplegadas, ajustes externos pendientes,
+hallazgos de producto y límites de verificación está en
+[`docs/ESTADO-PROYECTO-2026-10-24.md`](docs/ESTADO-PROYECTO-2026-10-24.md).

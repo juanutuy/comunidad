@@ -1,10 +1,10 @@
 # Activación de eventos, Google y facturación
 
-Cambios de código preparados sin ejecutar compilación, migración, pruebas ni navegación, por instrucción del usuario. No están desplegados ni se ha comprobado su funcionamiento en ejecución.
+Implementación desplegada en Cloudflare el 24 de octubre de 2026, versión Worker `3cf2c037-856c-420c-9d9e-5d3428251d99`. La compilación de producción terminó y la migración D1 remota se aplicó. No se ejecutaron pruebas automatizadas ni navegación manual. La infraestructura externa descrita abajo sigue requiriendo configuración.
 
 ## Base de datos y despliegue
 
-La versión de esquema pasa a `event-oauth-billing-v1`. Aplicar la migración del proyecto antes de publicar el código que la exige. La migración agrega identidades/flujos OAuth, registro de recordatorios, identificador/zona de series y estado de renovación. No necesita usuarios ni contenido seed.
+La versión de esquema pasa a `event-oauth-billing-v1`. La migración remota ya fue aplicada antes del despliegue. Agrega identidades/flujos OAuth, registro de recordatorios, identificador/zona de series y estado de renovación. No necesita usuarios ni contenido seed.
 
 No desplegar solamente los archivos de interfaz: estos cambios requieren servidor y esquema compatibles.
 
