@@ -28,7 +28,14 @@ const editorSavedTick = useState('channel-editor-saved', () => 0)
 
 const { data, refresh } = await useAsyncData('admin-channels', () =>
   isAdmin.value ? api<{ groups: Group[] }>('/api/channels?includeArchived=1') : Promise.resolve({ groups: [] as Group[] }))
-const all = computed(() => (data.value?.groups || []).flatMap(g => g.channels.map(c => ({ ...c, groupName: g.name }))))
+const orderedChannels = ref<(Channel & { groupName: string })[]>([])
+watch(data, (value) => {
+  orderedChannels.value = (value?.groups || []).flatMap(g => g.channels.map(c => ({ ...c, groupName: g.name })))
+}, { immediate: true })
+const all = computed(() => orderedChannels.value)
+const draggedChannelId = ref<number | null>(null)
+const dropTargetChannelId = ref<number | null>(null)
+const reorderingGroupId = ref<number | null>(null)
 
 // El modal guarda fuera de esta página: al cerrarse con éxito (el
 // contador de guardados) o al eliminarse un canal desde el
@@ -43,6 +50,61 @@ function editChannel(ch: Channel & { groupName: string }) {
     postPermission: ch.postPermission === 'staff' ? 'staff' : 'members',
     groupId: ch.groupId, archived: !!ch.archived,
   })
+}
+
+function startChannelDrag(event: DragEvent, channel: Channel) {
+  if (!isAdmin.value || channel.groupId == null || reorderingGroupId.value != null) {
+    event.preventDefault()
+    return
+  }
+  draggedChannelId.value = channel.id
+  if (event.dataTransfer) {
+    event.dataTransfer.effectAllowed = 'move'
+    event.dataTransfer.setData('text/plain', String(channel.id))
+  }
+}
+
+function allowChannelDrop(event: DragEvent, target: Channel) {
+  const source = all.value.find(channel => channel.id === draggedChannelId.value)
+  if (!source || source.groupId == null || source.groupId !== target.groupId || source.id === target.id || reorderingGroupId.value != null) return
+  event.preventDefault()
+  if (event.dataTransfer) event.dataTransfer.dropEffect = 'move'
+  dropTargetChannelId.value = target.id
+}
+
+async function dropChannel(event: DragEvent, target: Channel) {
+  event.preventDefault()
+  const sourceId = draggedChannelId.value
+  draggedChannelId.value = null
+  dropTargetChannelId.value = null
+  const groupId = target.groupId
+  if (sourceId == null || groupId == null || sourceId === target.id) return
+
+  const groupChannels = all.value.filter(channel => channel.groupId === groupId)
+  const from = groupChannels.findIndex(channel => channel.id === sourceId)
+  const to = groupChannels.findIndex(channel => channel.id === target.id)
+  if (from < 0 || to < 0) return
+  const [moved] = groupChannels.splice(from, 1)
+  if (!moved) return
+  groupChannels.splice(to, 0, moved)
+  const groupOrder = [...new Set(all.value.map(channel => channel.groupId))]
+  orderedChannels.value = groupOrder.flatMap(id => id === groupId ? groupChannels : all.value.filter(channel => channel.groupId === id))
+
+  reorderingGroupId.value = groupId
+  try {
+    await api(`/api/admin/channel-groups/${groupId}/channels`, {
+      method: 'PUT',
+      body: { channelIds: groupChannels.map(channel => channel.id) },
+    })
+    toast.add({ title: 'Orden de canales guardado', color: 'success' })
+  }
+  catch (e) {
+    toast.add({ title: 'No se pudo guardar el orden', description: (e as { data?: { message?: string } }).data?.message || '', color: 'error' })
+    await refresh()
+  }
+  finally {
+    reorderingGroupId.value = null
+  }
 }
 
 async function toggleArchived(ch: Channel & { groupName: string }) {
@@ -81,7 +143,26 @@ const visLabel = (c: Channel) => c.visibility === 'secret' ? 'Secreta' : c.visib
     <UCard>
       <p v-if="!all.length" class="text-sm text-muted">Todavía no hay canales en esta comunidad.</p>
       <ul v-else class="divide-y divide-default">
-        <li v-for="ch in all" :key="ch.id" class="flex flex-wrap items-center gap-x-3 gap-y-2 py-3">
+        <li
+          v-for="ch in all" :key="ch.id"
+          class="flex flex-wrap items-center gap-x-3 gap-y-2 border-s-2 border-transparent py-3 transition-colors"
+          :class="[
+            draggedChannelId === ch.id ? 'opacity-40' : '',
+            dropTargetChannelId === ch.id ? 'border-s-primary bg-elevated/50' : '',
+          ]"
+          @dragover="allowChannelDrop($event, ch)"
+          @drop="dropChannel($event, ch)"
+        >
+          <UButton
+            v-if="isAdmin" size="xs" color="neutral" variant="ghost" icon="i-lucide-grip-vertical"
+            :draggable="reorderingGroupId !== ch.groupId"
+            :disabled="reorderingGroupId === ch.groupId"
+            :aria-label="`Arrastrar ${ch.name} para reordenar`"
+            title="Arrastrar para reordenar"
+            class="cursor-grab touch-none active:cursor-grabbing"
+            @dragstart.stop="startChannelDrag($event, ch)"
+            @dragend="draggedChannelId = null; dropTargetChannelId = null"
+          />
           <UIcon :name="ch.icon" class="shrink-0 text-lg" />
           <div class="min-w-0 flex-1">
             <p class="flex flex-wrap items-center gap-2 font-medium">
