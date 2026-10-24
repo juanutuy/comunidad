@@ -36,6 +36,9 @@ body { -webkit-font-smoothing: antialiased; }
 .community-channel-row:focus-within,
 .community-channel-row:has([data-state="open"]) { background: var(--ui-bg-elevated); }
 .community-channel-row[data-active="true"] { background: color-mix(in srgb, var(--ui-primary) 12%, transparent); }
+.community-channel-row[data-active="true"]:hover,
+.community-channel-row[data-active="true"]:focus-within,
+.community-channel-row[data-active="true"]:has([data-state="open"]) { background: color-mix(in srgb, var(--ui-primary) 20%, transparent); }
 .community-channel-row > a,
 .community-channel-row > a:hover,
 .community-channel-row > a:active,
