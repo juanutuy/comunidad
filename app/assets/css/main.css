@@ -31,19 +31,21 @@ body { -webkit-font-smoothing: antialiased; }
 .community-sidebar a { min-height: 44px; border-radius: 12px; gap: 12px; padding: 10px 12px; font-size: 0.9375rem; }
 .community-sidebar a[aria-current="page"] { background: color-mix(in srgb, var(--ui-primary) 12%, transparent); color: var(--ui-primary); }
 /* One shared surface for the channel link and its context-menu trigger. */
-.community-channel-row { transition: background-color 150ms ease; }
+.community-channel-row { background: transparent; transition: background-color 150ms ease; }
 .community-channel-row:hover,
 .community-channel-row:focus-within,
 .community-channel-row:has([data-state="open"]) { background: var(--ui-bg-elevated); }
-.community-channel-row:has(a[aria-current="page"]) { background: color-mix(in srgb, var(--ui-primary) 12%, transparent); }
+.community-channel-row[data-active="true"] { background: color-mix(in srgb, var(--ui-primary) 12%, transparent); }
 .community-channel-row > a,
+.community-channel-row > a:hover,
+.community-channel-row > a:active,
 .community-sidebar .community-channel-row > a[aria-current="page"],
 .community-channel-row button,
 .community-channel-row button:hover,
 .community-channel-row button:active,
 .community-channel-row button[data-state="open"] { background: transparent !important; }
-.community-channel-row:has(a[aria-current="page"]) > a,
-.community-channel-row:has(a[aria-current="page"]) button { color: var(--ui-primary); }
+.community-channel-row[data-active="true"] > a,
+.community-channel-row[data-active="true"] button { color: var(--ui-primary); }
 .community-hero {
   position: relative; isolation: isolate; overflow: hidden;
   background: linear-gradient(115deg, color-mix(in srgb, var(--community-brand, #2563eb) 28%, #101d32), color-mix(in srgb, var(--community-brand, #2563eb) 60%, #14243c));

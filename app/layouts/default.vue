@@ -243,7 +243,7 @@ const hideRightRail = computed(() => route.path.startsWith('/profile/') || route
           <div v-for="group in sidebarGroups" :key="group.id" class="mb-0.5">
             <ul class="space-y-0.5">
               <li v-for="ch in group.channels" :key="ch.id" class="group/ch">
-                <div class="community-channel-row flex items-center rounded-xl">
+                <div class="community-channel-row flex items-center rounded-xl" :data-active="route.path === `/channels/${ch.slug}`">
                   <NuxtLink :to="`/channels/${ch.slug}`" class="flex min-w-0 flex-1 items-center gap-2 px-2 py-1.5 text-sm" active-class="font-semibold">
                     <UIcon :name="ch.icon" class="shrink-0" />
                     <span class="min-w-0 flex-1 truncate">{{ ch.name }}</span>
