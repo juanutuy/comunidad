@@ -150,18 +150,18 @@ const visLabel = (c: Channel) => c.visibility === 'secret' ? 'Secreta' : c.visib
             draggedChannelId === ch.id ? 'opacity-40' : '',
             dropTargetChannelId === ch.id ? 'border-s-primary bg-elevated/50' : '',
           ]"
+          :draggable="isAdmin && reorderingGroupId !== ch.groupId"
+          @dragstart="startChannelDrag($event, ch)"
+          @dragend="draggedChannelId = null; dropTargetChannelId = null"
           @dragover="allowChannelDrop($event, ch)"
           @drop="dropChannel($event, ch)"
         >
           <UButton
             v-if="isAdmin" size="xs" color="neutral" variant="ghost" icon="i-lucide-grip-vertical"
-            :draggable="reorderingGroupId !== ch.groupId"
             :disabled="reorderingGroupId === ch.groupId"
             :aria-label="`Arrastrar ${ch.name} para reordenar`"
             title="Arrastrar para reordenar"
             class="cursor-grab touch-none active:cursor-grabbing"
-            @dragstart.stop="startChannelDrag($event, ch)"
-            @dragend="draggedChannelId = null; dropTargetChannelId = null"
           />
           <UIcon :name="ch.icon" class="shrink-0 text-lg" />
           <div class="min-w-0 flex-1">
