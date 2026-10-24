@@ -274,7 +274,7 @@ const mainLinks = computed(() => {
                 <div class="community-channel-row flex items-center rounded-xl" :data-active="$route.path === `/channels/${ch.slug}`">
                   <NuxtLink
                     :to="`/channels/${ch.slug}`"
-                    class="flex min-w-0 flex-1 items-center gap-3 px-2 py-2 text-[15px]"
+                    class="community-channel-link flex min-w-0 flex-1 items-center gap-3 px-2 py-2 text-[15px]"
                     active-class="font-semibold"
                     @click="closePanel"
                   >

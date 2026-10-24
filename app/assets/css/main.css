@@ -29,7 +29,8 @@ body { -webkit-font-smoothing: antialiased; }
 .community-header { background: var(--community-sidebar); }
 .community-sidebar { background: var(--community-sidebar); border-right: 1px solid var(--ui-border); }
 .community-sidebar a { min-height: 44px; border-radius: 12px; gap: 12px; padding: 10px 12px; font-size: 0.9375rem; }
-.community-sidebar a[aria-current="page"] { background: color-mix(in srgb, var(--ui-primary) 12%, transparent); color: var(--ui-primary); }
+.community-sidebar a[aria-current="page"] { color: var(--ui-primary); }
+.community-sidebar a[aria-current="page"]:not(.community-channel-link) { background: color-mix(in srgb, var(--ui-primary) 12%, transparent); }
 /* One shared surface for the channel link and its context-menu trigger. */
 .community-channel-row { width: 100%; background: transparent; transition: background-color 150ms ease; }
 .community-channel-row:hover,
