@@ -22,13 +22,18 @@ const { data, refresh } = await useAsyncData('feed',
 <template>
   <div class="space-y-6">
     <CommunityBanner />
-    <UCard v-if="user" :ui="{ body: 'p-0 sm:p-0' }">
-      <div class="flex items-center gap-3 px-5 py-4">
+    <div class="sticky top-0 z-30 -mx-1 px-1 py-2 bg-default/95 backdrop-blur supports-[backdrop-filter]:bg-default/85">
+      <div class="flex min-h-12 items-center gap-3 border-b border-default px-2 pb-3">
         <h2 class="text-lg font-bold">{{ t('feed.title') }}</h2>
         <span class="flex-1" />
-        <USelect v-model="sort" :items="sortOptions" size="sm" class="w-40" />
+        <PostComposer v-if="user" variant="bare" @published="refresh">
+          <template #trigger="{ openModal }">
+            <UButton size="sm" icon="i-lucide-plus" :label="t('composer.publish')" @click="openModal()" />
+          </template>
+        </PostComposer>
+        <USelect v-model="sort" :items="sortOptions" size="sm" class="w-36 sm:w-40" />
       </div>
-    </UCard>
+    </div>
 
     <UButton v-if="user" to="/get-started" variant="soft" icon="i-lucide-list-checks" :label="t('improvements.start')" />
 
