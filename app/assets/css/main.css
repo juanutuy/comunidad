@@ -56,6 +56,7 @@ body { -webkit-font-smoothing: antialiased; }
 .community-hero {
   position: relative; isolation: isolate; overflow: hidden;
   background: linear-gradient(115deg, color-mix(in srgb, var(--community-brand, #2563eb) 28%, #101d32), color-mix(in srgb, var(--community-brand, #2563eb) 60%, #14243c));
+  background-size: cover; background-position: center;
   color: #fff;
 }
 .community-hero::after {

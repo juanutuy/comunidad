@@ -402,6 +402,9 @@ export const en: typeof es = {
     reactFailed: 'The reaction could not be saved',
   },
   channel: {
+    pinnedPosts: 'Pinned posts',
+    previousPinned: 'Previous pinned post',
+    nextPinned: 'Next pinned post',
     following: 'Following',
     follow: 'Follow',
     paidBadge: 'Paid · {price}',

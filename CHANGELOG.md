@@ -1,5 +1,16 @@
 # Historial de cambios
 
+## 2026-10-24 — Banner editable y carrusel de publicaciones fijadas
+
+La portada de comunidad se configura en Administración → Ajustes → General
+y se muestra en `/feeds` y antes del encabezado de cada canal; no reemplaza
+las portadas individuales de canales. Cada canal separa hasta 20 publicaciones
+fijadas en un carrusel con controles anterior/siguiente y mantiene el feed
+normal sin duplicarlas. Respeta los filtros de publicación, el acceso y la
+visibilidad vigentes. Migración D1 `community-banner-pinned-v1` aplicada.
+Desplegado en Cloudflare como Worker `0774a26c-a971-40f2-9365-a37890ad7b6a`.
+Se compiló para producción; no se ejecutaron pruebas ni navegación manual.
+
 ## 2026-10-24 — Canales con estado activo y hover unificado
 
 El enlace del canal ocupa ahora toda la fila del menú lateral y queda debajo

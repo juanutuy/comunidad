@@ -1,10 +1,10 @@
 # Activación de eventos, Google y facturación
 
-Implementación desplegada en Cloudflare el 24 de octubre de 2026, versión Worker `3cf2c037-856c-420c-9d9e-5d3428251d99`. La compilación de producción terminó y la migración D1 remota se aplicó. No se ejecutaron pruebas automatizadas ni navegación manual. La infraestructura externa descrita abajo sigue requiriendo configuración.
+Implementación incluida en Cloudflare el 24 de octubre de 2026, versión Worker `0774a26c-a971-40f2-9365-a37890ad7b6a`. La compilación de producción terminó y la migración D1 remota se aplicó. No se ejecutaron pruebas automatizadas ni navegación manual. La infraestructura externa descrita abajo sigue requiriendo configuración.
 
 ## Base de datos y despliegue
 
-La versión de esquema pasa a `event-oauth-billing-v1`. La migración remota ya fue aplicada antes del despliegue. Agrega identidades/flujos OAuth, registro de recordatorios, identificador/zona de series y estado de renovación. No necesita usuarios ni contenido seed.
+La versión de esquema de esta fase fue `event-oauth-billing-v1`; posteriormente el esquema avanzó a `community-banner-pinned-v1`. Las migraciones remotas se aplicaron antes de cada despliegue. Incluyen identidades/flujos OAuth, registro de recordatorios, series, estado de renovación y la portada del tenant. No necesitan usuarios ni contenido seed.
 
 No desplegar solamente los archivos de interfaz: estos cambios requieren servidor y esquema compatibles.
 

@@ -112,7 +112,7 @@ CREATE TABLE IF NOT EXISTS event_reminders (tenant_id INTEGER NOT NULL, event_id
 // tablas nuevas (arriba) y columnas nuevas (abajo). Los ALTER corren en
 // try/catch: si la columna ya existe, SQLite/D1 lanzan "duplicate column"
 // y se ignora. Idempotente y seguro en ambos motores.
-export const SCHEMA_VERSION = 'event-oauth-billing-v1'
+export const SCHEMA_VERSION = 'community-banner-pinned-v1'
 export const MIGRATIONS = [
   `ALTER TABLE member_subscriptions ADD COLUMN cancel_at_period_end INTEGER NOT NULL DEFAULT 0`,
   `ALTER TABLE events ADD COLUMN series_id TEXT NOT NULL DEFAULT ''`,
@@ -291,6 +291,7 @@ export const MIGRATIONS = [
   // hasta que alguien elige otro idioma).
   `ALTER TABLE users ADD COLUMN locale TEXT`,
   `ALTER TABLE tenants ADD COLUMN default_locale TEXT NOT NULL DEFAULT 'es'`,
+  `ALTER TABLE tenants ADD COLUMN banner_url TEXT NOT NULL DEFAULT ''`,
   // Fase 16-F: canales como el original. TRES columnas aditivas y
   // un eje nuevo, sin repurpose de `type` (que sigue siendo el eje
   // de ACCESO: 'free'|'private'|'paid'):

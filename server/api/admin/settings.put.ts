@@ -19,6 +19,7 @@ interface SettingsBody {
   paidMediaMode?: string, paidTitleMode?: string, paidLockedWhere?: string
   feedSidebar?: SidebarBlock[], navMenu?: NavItem[], anyoneCanRegister?: boolean
   logoUrl?: string, logoDarkUrl?: string, iconUrl?: string, faviconUrl?: string
+  bannerUrl?: string
   supportEmail?: string, websiteUrl?: string, socialLinks?: SocialLink[]
   // Fase 17: pagos.
   currency?: string, manualPaymentsEnabled?: boolean
@@ -143,6 +144,11 @@ export default defineEventHandler(async (event) => {
     if (url !== '' && !url.startsWith('/api/files/') && !['/branding/servgt/symbol.svg', '/branding/servgt/symbol-black.svg', '/branding/servgt/favicon.ico'].includes(url))
       throw createError({ statusCode: 400, message: 'Las imágenes de marca tienen que subirse desde esta misma pantalla.' })
     await db.prepare(`UPDATE tenants SET ${column} = ? WHERE id = ?`).run(url.slice(0, 300), tenant.id).catch(() => {})
+  }
+  if (body.bannerUrl !== undefined) {
+    const url = String(body.bannerUrl).trim()
+    if (url !== '' && !url.startsWith('/api/files/')) throw createError({ statusCode: 400, message: 'La portada debe subirse desde esta pantalla.' })
+    await db.prepare('UPDATE tenants SET banner_url = ? WHERE id = ?').run(url.slice(0, 300), tenant.id)
   }
   if (body.supportEmail !== undefined) {
     const email = String(body.supportEmail || '').trim().slice(0, 120)

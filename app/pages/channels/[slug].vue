@@ -23,12 +23,17 @@ interface ChannelDetail {
     contentType?: 'post' | 'image', coverUrl?: string, visibility?: 'public' | 'private' | 'secret', groupId?: number | null
     following: boolean, hasAccess: boolean, archived?: boolean, postPermission?: string, visibilityLocked?: boolean
   }
+  pinnedPosts: PostView[]
   posts: PostView[]
   nextOffset: number | null
 }
 const offset = ref(0)
 watch(slug, () => { offset.value = 0 })
 const { data, refresh } = await useAsyncData(() => `channel-${slug.value}`, () => api<ChannelDetail>(`/api/channels/${slug.value}`, { query: { offset: offset.value } }), { watch: [slug, offset] })
+const pinnedIndex = ref(0)
+watch(slug, () => { pinnedIndex.value = 0 })
+watch(() => data.value?.pinnedPosts.length, (count) => { if (!count || pinnedIndex.value >= count) pinnedIndex.value = 0 })
+const currentPinned = computed(() => data.value?.pinnedPosts[pinnedIndex.value])
 const tab = ref('posts')
 const tabItems = computed(() => [
   { label: t('channel.postsTab'), value: 'posts', icon: 'i-lucide-newspaper' },
@@ -100,6 +105,7 @@ async function buyAccess() {
 
 <template>
   <div v-if="data" class="space-y-5">
+    <CommunityBanner />
     <!-- Cabecera propia del canal: portada (o la franja de marca),
          # nombre, descripción y SU menú «⋯» con la administración
          en contexto. -->
@@ -158,6 +164,16 @@ async function buyAccess() {
       </UAlert>
     </UCard>
 
+    <section v-if="data.pinnedPosts.length" aria-labelledby="pinned-posts-heading" class="space-y-3">
+      <div class="flex items-center gap-2">
+        <h2 id="pinned-posts-heading" class="flex-1 text-lg font-bold">{{ t('channel.pinnedPosts') }}</h2>
+        <span v-if="data.pinnedPosts.length > 1" class="text-sm text-muted">{{ pinnedIndex + 1 }} / {{ data.pinnedPosts.length }}</span>
+        <UButton v-if="data.pinnedPosts.length > 1" size="sm" color="neutral" variant="ghost" icon="i-lucide-chevron-left" :aria-label="t('channel.previousPinned')" @click="pinnedIndex = (pinnedIndex - 1 + data.pinnedPosts.length) % data.pinnedPosts.length" />
+        <UButton v-if="data.pinnedPosts.length > 1" size="sm" color="neutral" variant="ghost" icon="i-lucide-chevron-right" :aria-label="t('channel.nextPinned')" @click="pinnedIndex = (pinnedIndex + 1) % data.pinnedPosts.length" />
+      </div>
+      <PostCard v-if="currentPinned" :key="currentPinned.id" :post="currentPinned" @changed="refresh" />
+    </section>
+
     <UAlert
       v-if="data.channel.archived" color="neutral" variant="soft" icon="i-lucide-archive"
       :title="t('channel.archivedTitle')"
@@ -194,7 +210,7 @@ async function buyAccess() {
           <template v-if="!isImageChannel || view === 'feed'">
             <PostComposer v-if="user && data.channel.hasAccess" :channel-slug="slug" @published="refresh" />
             <PostCard v-for="post in data.posts" :key="post.id" :post="post" @changed="refresh" />
-            <UAlert v-if="!data.posts.length" color="neutral" variant="soft" :title="t('channel.noPostsTitle')" :description="t('channel.noPostsText')" />
+            <UAlert v-if="!data.posts.length && !data.pinnedPosts.length" color="neutral" variant="soft" :title="t('channel.noPostsTitle')" :description="t('channel.noPostsText')" />
           </template>
 
           <!-- Galería: cuadrícula con la imagen de cada publicación
@@ -224,7 +240,7 @@ async function buyAccess() {
               </h3>
               <PostCard v-for="post in g.posts" :key="post.id" :post="post" @changed="refresh" />
             </div>
-            <UAlert v-if="!data.posts.length" color="neutral" variant="soft" :title="t('channel.noPostsTitle')" :description="t('channel.noPostsText')" />
+            <UAlert v-if="!data.posts.length && !data.pinnedPosts.length" color="neutral" variant="soft" :title="t('channel.noPostsTitle')" :description="t('channel.noPostsText')" />
           </template>
           <ListPagination :offset="offset" :next-offset="data.nextOffset" @update:offset="offset = $event" />
         </div>

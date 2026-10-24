@@ -402,6 +402,9 @@ export const es = {
     reactFailed: 'No se pudo reaccionar',
   },
   channel: {
+    pinnedPosts: 'Publicaciones fijadas',
+    previousPinned: 'Publicación fijada anterior',
+    nextPinned: 'Siguiente publicación fijada',
     following: 'Siguiendo',
     follow: 'Seguir',
     paidBadge: 'Pago · {price}',

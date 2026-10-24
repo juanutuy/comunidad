@@ -28,7 +28,7 @@ interface SettingsData {
     paidPreviewMode?: string, paidPreviewPct?: number, paidPreviewChars?: number
     paidMediaMode?: string, paidTitleMode?: string, paidLockedWhere?: string
     feedSidebar?: SidebarBlockForm[], navMenu?: NavItemForm[], anyoneCanRegister?: boolean
-    logoUrl?: string, logoDarkUrl?: string, iconUrl?: string, faviconUrl?: string
+    logoUrl?: string, logoDarkUrl?: string, iconUrl?: string, faviconUrl?: string, bannerUrl?: string
     supportEmail?: string, websiteUrl?: string, socialLinks?: SocialLinkForm[]
     // Fase 17: pagos.
     currency?: string, manualPaymentsEnabled?: boolean
@@ -52,7 +52,7 @@ const form = reactive({
   paidMediaMode: 'count', paidTitleMode: 'full', paidLockedWhere: 'feed',
   feedSidebar: [] as SidebarBlockForm[], navMenu: [] as NavItemForm[],
   anyoneCanRegister: true,
-  logoUrl: '', logoDarkUrl: '', iconUrl: '', faviconUrl: '',
+  logoUrl: '', logoDarkUrl: '', iconUrl: '', faviconUrl: '', bannerUrl: '',
   supportEmail: '', websiteUrl: '', socialLinks: [] as SocialLinkForm[],
   // Fase 17: pagos.
   currency: 'USD', manualPaymentsEnabled: false,
@@ -90,6 +90,7 @@ watchEffect(() => {
     form.logoDarkUrl = data.value.settings.logoDarkUrl || ''
     form.iconUrl = data.value.settings.iconUrl || ''
     form.faviconUrl = data.value.settings.faviconUrl || ''
+    form.bannerUrl = data.value.settings.bannerUrl || ''
     form.supportEmail = data.value.settings.supportEmail || ''
     form.websiteUrl = data.value.settings.websiteUrl || ''
     form.socialLinks = (data.value.settings.socialLinks || []).map(s => ({ ...s }))
@@ -215,7 +216,7 @@ function removeSocial(i: number) {
 // Subida de imágenes de marca (logos, icono, favicon): el archivo va
 // por la vía de siempre y acá solo queda su URL hasta guardar.
 const uploadingBrand = ref('')
-async function onBrandFile(e: Event, field: 'logoUrl' | 'logoDarkUrl' | 'iconUrl' | 'faviconUrl') {
+async function onBrandFile(e: Event, field: 'logoUrl' | 'logoDarkUrl' | 'iconUrl' | 'faviconUrl' | 'bannerUrl') {
   const input = e.target as HTMLInputElement
   const file = input.files?.[0]
   input.value = ''
@@ -277,6 +278,7 @@ async function save() {
         logoDarkUrl: form.logoDarkUrl,
         iconUrl: form.iconUrl,
         faviconUrl: form.faviconUrl,
+        bannerUrl: form.bannerUrl,
         supportEmail: form.supportEmail,
         websiteUrl: form.websiteUrl,
         socialLinks: form.socialLinks.filter(s => s.url.trim()),
@@ -321,6 +323,20 @@ async function save() {
           </UFormField>
           <UFormField label="Lema / descripción corta">
             <UInput v-model="form.tagline" class="w-full" />
+          </UFormField>
+          <UFormField label="Banner de la comunidad" description="Portada que aparece en el feed y encima de los canales. Recomendado: imagen panorámica de al menos 1600 × 400 px.">
+            <div class="space-y-3">
+              <div v-if="form.bannerUrl" class="overflow-hidden rounded-lg border border-default">
+                <img :src="form.bannerUrl" alt="Vista previa del banner de la comunidad" class="h-32 w-full object-cover sm:h-44">
+              </div>
+              <div class="flex items-center gap-2">
+                <label class="cursor-pointer">
+                  <UButton as="span" size="sm" variant="soft" icon="i-lucide-upload" :label="uploadingBrand === 'bannerUrl' ? 'Subiendo…' : form.bannerUrl ? 'Cambiar banner' : 'Subir banner'" :loading="uploadingBrand === 'bannerUrl'" />
+                  <input type="file" accept="image/png,image/jpeg,image/webp,image/gif" class="hidden" @change="e => onBrandFile(e, 'bannerUrl')">
+                </label>
+                <UButton v-if="form.bannerUrl" size="sm" color="error" variant="ghost" icon="i-lucide-trash-2" label="Quitar" @click="form.bannerUrl = ''" />
+              </div>
+            </div>
           </UFormField>
           <UFormField label="Color de marca">
             <div class="mb-3 flex flex-wrap gap-2">

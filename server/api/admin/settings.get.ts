@@ -20,6 +20,7 @@ export default defineEventHandler(async (event) => {
   return {
     settings: {
       name: tenant.nameEs || tenant.name, nameEn: tenant.name_en || '', tagline: tenant.tagline, brandColor: tenant.brand_color,
+      bannerUrl: tenant.banner_url || '',
       guidelines: JSON.parse(tenant.guidelines || '[]') as string[],
       terms: row?.terms || '', privacy: row?.privacy || '',
       // Fase 12: revisión previa opcional de publicaciones.

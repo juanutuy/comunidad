@@ -43,12 +43,16 @@ export default defineEventHandler(async (event) => {
   await publishDuePosts(event, tenant.id)
   const hf = hiddenFilterSql(user?.id ?? null)
   const { limit, offset } = pagination(event)
-  const rows = hideLockedPosts || visibilityLocked ? [] : await db.prepare(`${POST_SELECT} WHERE p.tenant_id = ? AND p.channel_id = ?
+  const pinnedRows = hideLockedPosts || visibilityLocked ? [] : await db.prepare(`${POST_SELECT} WHERE p.tenant_id = ? AND p.channel_id = ? AND p.pinned = 1
     AND (p.status = 'published' OR (p.status = 'review' AND (? = 'admin' OR p.author_id = ?)))${hf.sql}
-    ORDER BY p.pinned DESC, p.created_at DESC, p.id DESC LIMIT ? OFFSET ?`)
+    ORDER BY p.created_at DESC, p.id DESC LIMIT 20`)
+    .all(tenant.id, channel.id, role, user?.id ?? null, ...hf.params) as Record<string, unknown>[]
+  const rows = hideLockedPosts || visibilityLocked ? [] : await db.prepare(`${POST_SELECT} WHERE p.tenant_id = ? AND p.channel_id = ? AND p.pinned = 0
+    AND (p.status = 'published' OR (p.status = 'review' AND (? = 'admin' OR p.author_id = ?)))${hf.sql}
+    ORDER BY p.created_at DESC, p.id DESC LIMIT ? OFFSET ?`)
     .all(tenant.id, channel.id, role, user?.id ?? null, ...hf.params, limit + 1, offset) as Record<string, unknown>[]
   const page = rows.slice(0, limit)
-  const metadata = await postMetadata(event, page, user?.id ?? null)
+  const metadata = await postMetadata(event, [...pinnedRows, ...page], user?.id ?? null)
   return {
     channel: {
       id: channel.id, slug: channel.slug, name: channel.name, icon: channel.icon,
@@ -63,6 +67,7 @@ export default defineEventHandler(async (event) => {
       visibilityLocked,
     },
     nextOffset: rows.length > limit ? offset + limit : null,
+    pinnedPosts: await Promise.all(pinnedRows.map(r => serializePost(event, r, user?.id ?? null, access, role, { metadata: metadata.get(Number(r.id)) }))),
     posts: await Promise.all(page.map(r => serializePost(event, r, user?.id ?? null, access, role, { metadata: metadata.get(Number(r.id)) }))),
   }
 })

@@ -2,7 +2,7 @@
 
 ## Despliegue actual
 
-El Worker `comunidad-mvp` quedó publicado el 24 de octubre de 2026 en la versión `3cf2c037-856c-420c-9d9e-5d3428251d99`. Incluye los cambios de código hasta `23877f8` y la migración D1 aplicada (`event-oauth-billing-v1`). El destino workers.dev es `https://comunidad-mvp.j94390833.workers.dev`; el dominio de comunidad configurado es `hub.servgt.me`.
+El Worker `comunidad-mvp` quedó publicado el 24 de octubre de 2026 en la versión `0774a26c-a971-40f2-9365-a37890ad7b6a`. Incluye los cambios de código de banner de comunidad y carrusel de publicaciones fijadas, y la migración D1 aplicada (`community-banner-pinned-v1`). El destino workers.dev es `https://comunidad-mvp.j94390833.workers.dev`; el dominio de comunidad configurado es `hub.servgt.me`.
 
 Se compiló para producción antes de desplegar. Por instrucción del usuario no se corrieron suites de pruebas ni se hizo navegación visual. El despliegue confirma que Cloudflare aceptó y publicó el Worker, no que cada flujo se haya validado de extremo a extremo.
 
@@ -14,6 +14,8 @@ Se compiló para producción antes de desplegar. Por instrucción del usuario no
 - Acceso invitado a canales y publicaciones públicas; acciones que requieren cuenta muestran el modal de acceso.
 - Enlaces de publicaciones, vista individual y comentarios; perfiles y comentarios muestran acceso al invitado.
 - Navegación de canales con un mismo fondo activo/hover a lo ancho de la fila, con las acciones de tres puntos superpuestas en el extremo.
+- Portada editable de la comunidad en Administración → Ajustes → General, visible en el feed y encima del encabezado de canal. Se mantiene independiente de la portada propia de cada canal.
+- Carrusel de hasta 20 publicaciones fijadas en cada canal, aparte del feed cronológico; las tarjetas y permisos de cada publicación conservan las reglas actuales. Los fijados dejan de duplicarse en el feed normal del canal.
 - Eventos recurrentes, recordatorios, vinculación de Google y centro de facturación de miembros, con detalles en [Activación de eventos, Google y facturación](ACTIVAR-EVENTOS-GOOGLE-FACTURACION.md).
 - Remediación de seguridad documentada en [Remediación de seguridad](REMEDIACION-2026-10-23.md).
 

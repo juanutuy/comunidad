@@ -42,10 +42,11 @@ export async function findFilesLocations(db: AsyncDb, tenantId: number, uploads:
     `SELECT s.id, 'Publicación «' || p.title || '»', NULL FROM selected s JOIN posts p ON p.media_url = s.url OR instr(p.body_html, s.url) > 0 WHERE p.tenant_id = s.tenant_id`,
     `SELECT s.id, 'Comentario en «' || p.title || '»', NULL FROM selected s JOIN comments cm ON cm.media_url = s.url JOIN posts p ON p.id = cm.post_id WHERE p.tenant_id = s.tenant_id`,
     `SELECT s.id, 'Portada del canal «' || c.name || '»', NULL FROM selected s JOIN channels c ON c.cover_url = s.url WHERE c.tenant_id = s.tenant_id`,
+    `SELECT s.id, 'Banner de la comunidad', NULL FROM selected s JOIN tenants t ON t.banner_url = s.url WHERE t.id = s.tenant_id`,
     `SELECT s.id, 'Imagen del curso «' || c.title || '»', NULL FROM selected s JOIN courses c ON c.image_url = s.url OR c.banner_url = s.url WHERE c.tenant_id = s.tenant_id`,
     `SELECT s.id, 'Archivo de la lección «' || l.title || '»', NULL FROM selected s JOIN lessons l ON l.file_url = s.url OR l.resource_url = s.url OR l.video_url = s.url OR instr(l.content_html, s.url) > 0 JOIN chapters ch ON ch.id = l.chapter_id JOIN courses c ON c.id = ch.course_id WHERE c.tenant_id = s.tenant_id`,
     `SELECT s.id, 'Ítem de biblioteca «' || l.title || '»', l.id FROM selected s JOIN library_items l ON l.file_key = s.key WHERE l.tenant_id = s.tenant_id`,
-    `SELECT s.id, 'Marca de la comunidad', NULL FROM selected s JOIN tenants t ON t.logo_url = s.url OR t.logo_dark_url = s.url OR t.icon_url = s.url OR t.favicon_url = s.url WHERE t.id = s.tenant_id`,
+    `SELECT s.id, 'Marca de la comunidad', NULL FROM selected s JOIN tenants t ON t.logo_url = s.url OR t.logo_dark_url = s.url OR t.icon_url = s.url OR t.favicon_url = s.url OR t.banner_url = s.url WHERE t.id = s.tenant_id`,
   ]
   const rows: { upload_id: number, label: string, library_id: number | null }[] = []
   // Remote D1 limits compound SELECT terms more strictly than local SQLite.

@@ -32,6 +32,7 @@ export default defineEventHandler(async (event) => {
     tenant: {
       id: tenant.id, slug: tenant.slug, name: tenant.name, nameEs: tenant.nameEs, nameEn: tenant.name_en || tenant.nameEs, tagline: tenant.tagline,
       brandColor: tenant.brand_color,
+      bannerUrl: tenant.banner_url || '',
       currency: pay.currency,
       manualPaymentsEnabled: pay.manualPaymentsEnabled,
       // Fase 18: idioma por defecto de la comunidad.

@@ -25,6 +25,7 @@ export interface TenantInfo {
   name: string
   tagline: string
   brandColor: string
+  bannerUrl?: string
   guidelines: string[]
   // Fase 15: visibilidad, registro, marca, contacto y menú resuelto.
   visibility?: string

@@ -27,7 +27,7 @@ export interface TenantRow {
   default_locale?: string
   // Fase 15: marca del tenant (la usa el certificado de la Fase 16
   // cuando el diseño pide mostrar el logo).
-  logo_url?: string, logo_dark_url?: string, icon_url?: string, favicon_url?: string
+  logo_url?: string, logo_dark_url?: string, icon_url?: string, favicon_url?: string, banner_url?: string
 }
 export interface UserRow { id: number, name: string, slug: string, email: string, bio: string, location: string, avatar_url: string, created_at: string, cover_url?: string, website?: string, last_seen_at?: string, locale?: string | null }
 export interface ChannelRow { id: number, tenant_id: number, group_id: number | null, slug: string, name: string, icon: string, description: string, type: string, price_cents: number, archived_at?: string, post_permission?: string, content_type?: string, cover_url?: string, visibility?: string }
