@@ -171,7 +171,7 @@ async function buyAccess() {
         <UButton v-if="data.pinnedPosts.length > 1" size="sm" color="neutral" variant="ghost" icon="i-lucide-chevron-left" :aria-label="t('channel.previousPinned')" @click="pinnedIndex = (pinnedIndex - 1 + data.pinnedPosts.length) % data.pinnedPosts.length" />
         <UButton v-if="data.pinnedPosts.length > 1" size="sm" color="neutral" variant="ghost" icon="i-lucide-chevron-right" :aria-label="t('channel.nextPinned')" @click="pinnedIndex = (pinnedIndex + 1) % data.pinnedPosts.length" />
       </div>
-      <PostCard v-if="currentPinned" :key="currentPinned.id" :post="currentPinned" @changed="refresh" />
+      <PostCard v-if="currentPinned" :key="currentPinned.id" :post="currentPinned" photo-source="channel" @changed="refresh" />
     </section>
 
     <UAlert
@@ -209,7 +209,7 @@ async function buyAccess() {
 
           <template v-if="!isImageChannel || view === 'feed'">
             <PostComposer v-if="user && data.channel.hasAccess" :channel-slug="slug" @published="refresh" />
-            <PostCard v-for="post in data.posts" :key="post.id" :post="post" @changed="refresh" />
+            <PostCard v-for="post in data.posts" :key="post.id" :post="post" photo-source="channel" @changed="refresh" />
             <UAlert v-if="!data.posts.length && !data.pinnedPosts.length" color="neutral" variant="soft" :title="t('channel.noPostsTitle')" :description="t('channel.noPostsText')" />
           </template>
 
@@ -219,7 +219,7 @@ async function buyAccess() {
             <div v-if="galleryPosts.length" class="grid grid-cols-2 gap-2 sm:grid-cols-3">
               <NuxtLink
                 v-for="post in galleryPosts" :key="post.id"
-                :to="`/p/${post.channel.slug}/${post.slug}`"
+                :to="{ path: `/p/${post.channel.slug}/${post.slug}`, query: { photo: post.slug, pi: '1', from: 'channel' } }"
                 class="group relative block overflow-hidden rounded-lg"
               >
                 <img :src="post.mediaUrl" :alt="post.title" class="aspect-square w-full object-cover transition group-hover:scale-105">
@@ -238,7 +238,7 @@ async function buyAccess() {
                 {{ g.name || t('channel.noAlbum') }}
                 <span class="text-sm font-normal text-muted">{{ t('channel.albumCount', { count: g.posts.length }) }}</span>
               </h3>
-              <PostCard v-for="post in g.posts" :key="post.id" :post="post" @changed="refresh" />
+              <PostCard v-for="post in g.posts" :key="post.id" :post="post" photo-source="channel" @changed="refresh" />
             </div>
             <UAlert v-if="!data.posts.length && !data.pinnedPosts.length" color="neutral" variant="soft" :title="t('channel.noPostsTitle')" :description="t('channel.noPostsText')" />
           </template>

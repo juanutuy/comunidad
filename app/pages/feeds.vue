@@ -22,8 +22,8 @@ const { data, refresh } = await useAsyncData('feed',
 <template>
   <div class="space-y-6">
     <CommunityBanner />
-    <UCard>
-      <div class="flex items-center gap-3 border-t border-default px-6 py-4">
+    <UCard v-if="user" :ui="{ body: 'p-0 sm:p-0' }">
+      <div class="flex items-center gap-3 px-5 py-4">
         <h2 class="text-lg font-bold">{{ t('feed.title') }}</h2>
         <span class="flex-1" />
         <USelect v-model="sort" :items="sortOptions" size="sm" class="w-40" />

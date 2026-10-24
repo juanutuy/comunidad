@@ -2,7 +2,7 @@ import type { H3Event } from 'h3'
 import { currentAuth, resolveTenant, canAccessChannel } from './community'
 import type { ChannelRow } from './community'
 import { dbFor } from './db'
-import { requireSessionUnlessPublic, hasPaidEntitlement } from './privacy'
+import { getPrivacySettings, hasPaidEntitlement } from './privacy'
 import { courseAccessible, courseCurriculum, flattenLessons, completedLessonIds, enrollmentOf, lessonAvailability } from './courses'
 import type { CourseRow } from './courses'
 
@@ -12,10 +12,13 @@ export async function authorizeFile(event: H3Event, key: string): Promise<boolea
   const tenant = await resolveTenant(event)
   const { user, role } = await currentAuth(event, tenant.id)
   const db = await dbFor(event)
+  const tenantIsPublic = user ? true : (await getPrivacySettings(event, tenant.id)).visibility === 'public'
   const upload = await db.prepare('SELECT user_id FROM uploads WHERE key = ? AND tenant_id = ?').get(key, tenant.id)
   if (!upload) return false
   if (role === 'admin') return true
-  await requireSessionUnlessPublic(event, tenant.id, user)
+  // A private tenant may still expose explicitly public channels to
+  // guests. Authorize referenced files through the owning resource
+  // below, rather than requiring the whole tenant to be public first.
   const url = `/api/files/${key}`
   const posts = await db.prepare(`SELECT DISTINCT p.* FROM posts p LEFT JOIN comments cm ON cm.post_id = p.id
     WHERE p.tenant_id = ? AND (p.media_url = ? OR instr(p.body_html, ?) > 0 OR (cm.media_url = ? AND ? IS NOT NULL))`)
@@ -31,7 +34,7 @@ export async function authorizeFile(event: H3Event, key: string): Promise<boolea
     const channel = await db.prepare('SELECT * FROM channels WHERE id = ? AND tenant_id = ?').get(post.channel_id, tenant.id)
     if (channel && await canAccessChannel(event, user?.id ?? null, role, channel)) return true
   }
-  for (const course of courses) {
+  for (const course of tenantIsPublic ? courses : []) {
     const enrollment = await enrollmentOf(event, tenant.id, course.id, user?.id ?? null)
     if (!courseAccessible(course, { loggedIn: !!user, isAdmin: false, enrolled: !!enrollment })) continue
     const flat = flattenLessons(await courseCurriculum(event, course.id))
@@ -43,7 +46,7 @@ export async function authorizeFile(event: H3Event, key: string): Promise<boolea
       if ((lesson.is_free || enrollment) && !available.locked) return true
     }
   }
-  for (const item of library) if (!item.locked || (user && await hasPaidEntitlement(event, tenant.id, user.id, role))) return true
+  for (const item of tenantIsPublic ? library : []) if (!item.locked || (user && await hasPaidEntitlement(event, tenant.id, user.id, role))) return true
   // Authors may preview uploads before attaching them, never after a resource denies access.
   return !posts.length && !courses.length && !library.length && !channels.length && upload.user_id === user?.id
 }

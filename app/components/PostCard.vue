@@ -42,7 +42,7 @@ export interface PostView {
 // `inlineComments: false` (detalle): la sección vive debajo de la
 // tarjeta y el botón de comentarios ancla hasta ella, en vez de
 // expandir una segunda copia dentro de la tarjeta.
-const props = withDefaults(defineProps<{ post: PostView, linkable?: boolean, inlineComments?: boolean }>(), { linkable: true, inlineComments: false })
+const props = withDefaults(defineProps<{ post: PostView, linkable?: boolean, inlineComments?: boolean, showMedia?: boolean, photoSource?: string }>(), { linkable: true, inlineComments: false, showMedia: true, photoSource: 'feed' })
 const postUrl = computed(() => `/p/${props.post.channel.slug}/${props.post.slug}`)
 function openCard(event: MouseEvent) {
   if (!props.linkable || event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
@@ -51,7 +51,7 @@ function openCard(event: MouseEvent) {
   if (window.getSelection()?.toString()) return
   navigateTo(postUrl.value)
 }
-const emit = defineEmits<{ changed: [], deleted: [] }>()
+const emit = defineEmits<{ changed: [], deleted: [], openPhoto: [] }>()
 const { user } = useAuth()
 const { t } = useI18n()
 const { openReport } = useReportDialog()
@@ -313,7 +313,7 @@ async function deletePost() {
               {{ post.channel.name }}
             </NuxtLink>
             <span class="text-muted">· {{ timeAgo(post.createdAt) }}</span>
-            <span v-if="displayEdited" class="flex items-center gap-1 text-muted">
+            <span v-if="displayEdited && user" class="flex items-center gap-1 text-muted">
               · <UIcon name="i-lucide-pencil" class="text-xs" /> {{ t('post.edited') }}
             </span>
             <UBadge v-if="post.pinned" color="warning" variant="subtle" icon="i-lucide-pin">
@@ -372,17 +372,33 @@ async function deletePost() {
           <p v-else class="mt-2 whitespace-pre-line text-[15px] leading-relaxed">
             {{ displayBody }}
           </p>
-          <div v-if="post.mediaType === 'video' && youtubeEmbed" class="mt-3 aspect-video overflow-hidden rounded-lg">
+          <div v-if="showMedia && post.mediaType === 'video' && youtubeEmbed" class="mt-3 aspect-video overflow-hidden rounded-lg">
             <iframe :src="youtubeEmbed" class="h-full w-full" allowfullscreen :title="t('post.postVideoTitle')" />
           </div>
-          <div v-else-if="post.mediaType === 'image' && post.mediaUrl" class="mt-3">
-            <img :src="post.mediaUrl" :alt="t('post.postImageAlt')" class="max-h-96 w-full rounded-lg object-cover">
+          <div v-else-if="showMedia && post.mediaType === 'image' && post.mediaUrl" class="mt-3">
+            <NuxtLink
+              v-if="linkable"
+              :to="{ path: postUrl, query: { photo: post.slug, pi: '1', from: photoSource } }"
+              class="group/image block cursor-pointer overflow-hidden rounded-lg focus-visible:outline-2 focus-visible:outline-primary"
+              :aria-label="`${t('post.openPost')}: ${displayTitle}`"
+            >
+              <img :src="post.mediaUrl" :alt="t('post.postImageAlt')" class="max-h-96 w-full rounded-lg object-cover transition group-hover/image:brightness-95">
+            </NuxtLink>
+            <button
+              v-else
+              type="button"
+              class="group/image block w-full cursor-zoom-in overflow-hidden rounded-lg focus-visible:outline-2 focus-visible:outline-primary"
+              :aria-label="t('post.openImage')"
+              @click="emit('openPhoto')"
+            >
+              <img :src="post.mediaUrl" :alt="t('post.postImageAlt')" class="max-h-96 w-full rounded-lg object-cover transition group-hover/image:brightness-95">
+            </button>
           </div>
-          <div v-else-if="post.mediaType === 'video' && post.mediaUrl" class="mt-3 text-sm">
+          <div v-else-if="showMedia && post.mediaType === 'video' && post.mediaUrl" class="mt-3 text-sm">
             <a :href="post.mediaUrl" target="_blank" rel="noopener" class="text-primary hover:underline">{{ t('post.viewVideo') }}</a>
           </div>
           <a
-            v-else-if="post.mediaType === 'file' && post.mediaUrl" :href="post.mediaUrl" download
+            v-else-if="showMedia && post.mediaType === 'file' && post.mediaUrl" :href="post.mediaUrl" download
             class="mt-3 flex items-center gap-3 rounded-lg border border-default p-3 text-sm transition hover:bg-elevated"
           >
             <UIcon name="i-lucide-paperclip" class="shrink-0 text-lg text-muted" />
