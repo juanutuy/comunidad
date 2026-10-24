@@ -32,7 +32,12 @@ body { -webkit-font-smoothing: antialiased; }
 .community-sidebar a[aria-current="page"] { color: var(--ui-primary); }
 .community-sidebar a[aria-current="page"]:not(.community-channel-link) { background: color-mix(in srgb, var(--ui-primary) 12%, transparent); }
 /* One shared surface for the channel link and its context-menu trigger. */
-.community-channel-row { width: 100%; background: transparent; transition: background-color 150ms ease; }
+.community-channel-row { position: relative; width: 100%; background: transparent; transition: background-color 150ms ease; }
+/* The link spans the whole row; actions overlay its reserved end space. */
+.community-channel-row > .community-channel-link { width: 100%; padding-inline-end: 44px; }
+.community-channel-actions { position: absolute; inset-inline-end: 0; top: 50%; transform: translateY(-50%); }
+.community-channel-link:focus { outline: none; }
+.community-channel-row:has(.community-channel-link:focus-visible) { outline: 2px solid var(--ui-primary); outline-offset: 2px; }
 .community-channel-row:hover,
 .community-channel-row:focus-within,
 .community-channel-row:has([data-state="open"]),

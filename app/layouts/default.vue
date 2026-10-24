@@ -250,7 +250,7 @@ const hideRightRail = computed(() => route.path.startsWith('/profile/') || route
                     <UIcon v-if="ch.type === 'paid'" name="i-lucide-crown" class="shrink-0 text-amber-500" />
                     <UIcon v-else-if="ch.type === 'private'" name="i-lucide-lock" class="shrink-0 text-muted" />
                   </NuxtLink>
-                  <span class="shrink-0 pr-1 opacity-0 transition group-hover/ch:opacity-100 max-md:opacity-70 focus-within:opacity-100">
+                  <span class="community-channel-actions pr-1 opacity-0 transition group-hover/ch:opacity-100 max-md:opacity-70 focus-within:opacity-100">
                     <ChannelContextMenu :channel="ch" />
                   </span>
                 </div>

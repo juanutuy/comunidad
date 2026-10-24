@@ -285,7 +285,9 @@ const mainLinks = computed(() => {
                     <UIcon v-if="ch.type === 'paid'" name="i-lucide-crown" class="shrink-0 text-amber-500" />
                     <UIcon v-else-if="ch.type === 'private'" name="i-lucide-lock" class="shrink-0 text-muted" />
                   </NuxtLink>
-                  <ChannelContextMenu :channel="ch" size="sm" />
+                  <span class="community-channel-actions pr-1">
+                    <ChannelContextMenu :channel="ch" size="sm" />
+                  </span>
                 </div>
               </li>
             </ul>
