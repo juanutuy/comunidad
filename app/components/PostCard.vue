@@ -42,7 +42,7 @@ export interface PostView {
 // `inlineComments: false` (detalle): la sección vive debajo de la
 // tarjeta y el botón de comentarios ancla hasta ella, en vez de
 // expandir una segunda copia dentro de la tarjeta.
-const props = withDefaults(defineProps<{ post: PostView, linkable?: boolean, inlineComments?: boolean, commentsInitiallyOpen?: boolean, showMedia?: boolean, photoSource?: string }>(), { linkable: true, inlineComments: false, commentsInitiallyOpen: false, showMedia: true, photoSource: 'feed' })
+const props = withDefaults(defineProps<{ post: PostView, linkable?: boolean, inlineComments?: boolean, commentsInitiallyOpen?: boolean, showMedia?: boolean, photoSource?: string, viewer?: boolean }>(), { linkable: true, inlineComments: false, commentsInitiallyOpen: false, showMedia: true, photoSource: 'feed', viewer: false })
 const postUrl = computed(() => `/p/${props.post.channel.slug}/${props.post.slug}`)
 const router = useRouter()
 function openRichImage(event: MouseEvent) {
@@ -301,7 +301,12 @@ async function deletePost() {
 </script>
 
 <template>
-  <UCard v-if="!locallyHidden" :class="linkable ? 'cursor-pointer transition-colors hover:border-primary/40' : ''" @click="openCard">
+  <UCard
+    v-if="!locallyHidden"
+    :ui="viewer ? { root: 'border-0 bg-transparent shadow-none', body: 'p-0 sm:p-0' } : undefined"
+    :class="linkable ? 'cursor-pointer transition-colors hover:border-primary/40' : ''"
+    @click="openCard"
+  >
     <div class="flex items-start gap-3">
       <span class="relative shrink-0">
         <UAvatar v-if="post.author.anonymous && !post.author.mine" icon="i-lucide-venetian-mask" size="md" :ui="{ root: 'bg-elevated' }" />
@@ -355,6 +360,7 @@ async function deletePost() {
           <UDropdownMenu v-if="user && postMenuItems[0]?.length" :items="postMenuItems" class="shrink-0">
             <UButton size="sm" color="neutral" variant="ghost" icon="i-lucide-more-horizontal" :title="t('post.moreActions')" />
           </UDropdownMenu>
+          <slot name="header-actions" />
         </div>
 
         <NuxtLink v-if="linkable !== false" :to="`/p/${post.channel.slug}/${post.slug}`" class="mt-1 block text-lg font-bold leading-snug hover:underline">

@@ -20,7 +20,7 @@ const { data, refresh } = await useAsyncData('feed',
 </script>
 
 <template>
-  <div class="space-y-6">
+  <div class="space-y-6 pt-7">
     <CommunityBanner />
     <div class="sticky top-0 z-30 -mx-1 px-1 py-2 bg-default/95 backdrop-blur supports-[backdrop-filter]:bg-default/85">
       <div class="flex min-h-12 items-center gap-3 border-b border-default px-2 pb-3">

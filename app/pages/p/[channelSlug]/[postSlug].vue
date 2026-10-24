@@ -37,7 +37,10 @@ const photoModalOpen = computed({
 })
 
 interface PhotoChannelData { pinnedPosts: PostView[], posts: PostView[] }
-const { data: photoChannel } = await useAsyncData(
+// El post se pinta con los datos ya cargados; el resto del canal solo
+// sirve para habilitar anterior/siguiente. No bloquear la apertura
+// del visor esperando hasta 30 publicaciones del canal.
+const { data: photoChannel } = useLazyAsyncData(
   () => `photo-channel-${channelSlug.value}`,
   () => photoOpen.value
     ? api<PhotoChannelData>(`/api/channels/${channelSlug.value}`, { query: { limit: 30 } })
@@ -133,22 +136,28 @@ watch([() => route.fullPath, data], focusComments, { flush: 'post' })
       v-if="photoOpen"
       v-model:open="photoModalOpen"
       :title="t('post.photoViewerTitle')"
-      :ui="{ content: '!h-[100dvh] !w-screen !max-w-none !max-h-[100dvh] !rounded-none !p-0', body: 'h-full p-0' }"
+      :ui="{ content: '!h-dvh !w-screen !max-w-none !max-h-none !rounded-none !border-0 !p-0 !shadow-2xl sm:!h-[calc(100dvh-2rem)] sm:!w-[calc(100vw-2rem)] sm:!rounded-2xl sm:!border sm:!border-default', body: 'h-full p-0' }"
     >
       <template #content>
-        <div v-if="data" class="grid h-[100dvh] min-h-0 grid-rows-[minmax(38vh,1fr)_minmax(0,1fr)] bg-black sm:grid-cols-[minmax(0,1fr)_400px] sm:grid-rows-1">
+        <div v-if="data" class="grid h-full min-h-0 grid-rows-[minmax(38vh,1fr)_minmax(0,1fr)] overflow-hidden bg-black sm:grid-cols-[minmax(0,1fr)_minmax(360px,34vw)] sm:grid-rows-1">
           <section class="relative flex min-h-0 min-w-0 items-center justify-center overflow-hidden bg-black" :aria-label="t('post.photoViewerTitle')">
             <img :src="selectedPhotoUrl" :alt="t('post.postImageAlt')" class="h-full w-full object-contain">
             <UButton v-if="(route.query.image ? inlineImages.length : photoPosts.length) > 1" color="neutral" variant="solid" icon="i-lucide-chevron-left" class="absolute left-4 top-1/2 -translate-y-1/2 rounded-full bg-black/50 text-white hover:bg-black/75" :aria-label="t('post.previousPhoto')" :disabled="route.query.image ? inlineImageIndex === 0 : photoIndex === 0" @click="movePhoto(-1)" />
             <UButton v-if="(route.query.image ? inlineImages.length : photoPosts.length) > 1" color="neutral" variant="solid" icon="i-lucide-chevron-right" class="absolute right-4 top-1/2 -translate-y-1/2 rounded-full bg-black/50 text-white hover:bg-black/75" :aria-label="t('post.nextPhoto')" :disabled="route.query.image ? inlineImageIndex === inlineImages.length - 1 : photoIndex === photoPosts.length - 1" @click="movePhoto(1)" />
             <span v-if="(route.query.image ? inlineImages.length : photoPosts.length) > 1" class="absolute bottom-4 left-1/2 -translate-x-1/2 rounded-full bg-black/55 px-3 py-1 text-xs text-white">{{ (route.query.image ? inlineImageIndex : photoIndex) + 1 }} / {{ route.query.image ? inlineImages.length : photoPosts.length }}</span>
           </section>
-          <aside class="flex min-h-0 flex-col border-l border-default bg-default text-default">
-            <div class="flex justify-end border-b border-default p-2">
-              <UButton color="neutral" variant="ghost" icon="i-lucide-x" :aria-label="t('post.closePhoto')" @click="closePhotoViewer" />
-            </div>
-            <div class="photo-viewer-post min-h-0 flex-1 overflow-y-auto p-4">
-              <PostCard :key="`photo-card-${data.post.id}`" :post="data.post" :linkable="false" :show-media="false" :inline-comments="true" :comments-initially-open="true" @changed="refresh" @deleted="onPostDeleted" />
+          <aside class="photo-viewer-sidebar flex min-h-0 flex-col border-l border-default bg-default text-default">
+            <div class="photo-viewer-post min-h-0 flex-1 overflow-y-auto p-5 sm:p-6">
+              <PostCard :key="`photo-card-${data.post.id}`" :post="data.post" :linkable="false" :show-media="false" :inline-comments="true" :comments-initially-open="true" viewer @changed="refresh" @deleted="onPostDeleted">
+                <template #header-actions>
+                  <UButton
+                    color="neutral" variant="ghost" icon="i-lucide-x"
+                    class="size-10 shrink-0 rounded-full p-0 hover:bg-elevated focus-visible:ring-2 focus-visible:ring-primary"
+                    :aria-label="t('post.closePhoto')"
+                    @click.stop="closePhotoViewer"
+                  />
+                </template>
+              </PostCard>
             </div>
           </aside>
         </div>

@@ -317,7 +317,7 @@ const hideRightRail = computed(() => route.path.startsWith('/profile/') || route
            final de ESTE scroll (ya no bajo el marco, donde quedaría
            fuera de la ventana) y el respiro de la barra inferior
            móvil también, para que no tape el final del contenido. -->
-      <main ref="centerScroller" data-scroll-region="center" class="min-h-0 min-w-0 flex-1 overflow-y-auto py-7">
+      <main ref="centerScroller" data-scroll-region="center" class="min-h-0 min-w-0 flex-1 overflow-y-auto pb-7" :class="route.path === '/feeds' ? 'pt-0' : 'pt-7'">
         <slot />
         <footer class="mt-10 border-t border-default">
           <div class="flex flex-wrap items-center gap-x-4 gap-y-1 py-4 text-xs text-muted">
