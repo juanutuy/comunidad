@@ -31,14 +31,12 @@ body { -webkit-font-smoothing: antialiased; }
 .community-sidebar a { min-height: 44px; border-radius: 12px; gap: 12px; padding: 10px 12px; font-size: 0.9375rem; }
 .community-sidebar a[aria-current="page"] { background: color-mix(in srgb, var(--ui-primary) 12%, transparent); color: var(--ui-primary); }
 /* One shared surface for the channel link and its context-menu trigger. */
-.community-channel-row { background: transparent; transition: background-color 150ms ease; }
+.community-channel-row { width: 100%; background: transparent; transition: background-color 150ms ease; }
 .community-channel-row:hover,
 .community-channel-row:focus-within,
-.community-channel-row:has([data-state="open"]) { background: var(--ui-bg-elevated); }
-.community-channel-row[data-active="true"] { background: color-mix(in srgb, var(--ui-primary) 12%, transparent); }
-.community-channel-row[data-active="true"]:hover,
-.community-channel-row[data-active="true"]:focus-within,
-.community-channel-row[data-active="true"]:has([data-state="open"]) { background: color-mix(in srgb, var(--ui-primary) 20%, transparent); }
+.community-channel-row:has([data-state="open"]),
+.community-channel-row[data-active="true"],
+.community-channel-row:has(a[aria-current="page"]) { background: var(--ui-bg-elevated); }
 .community-channel-row > a,
 .community-channel-row > a:hover,
 .community-channel-row > a:active,
