@@ -145,26 +145,21 @@ watch([() => route.fullPath, data], focusComments, { flush: 'post' })
       :ui="{ content: '!h-dvh !w-screen !max-w-none !max-h-none !rounded-none !border-0 !p-0 !shadow-2xl sm:!h-[calc(100dvh-2rem)] sm:!w-[calc(100vw-2rem)] sm:!rounded-2xl sm:!border sm:!border-default', body: 'h-full p-0' }"
     >
       <template #content>
-        <div v-if="data" class="grid h-full min-h-0 grid-rows-[minmax(38vh,1fr)_minmax(0,1fr)] overflow-hidden bg-black sm:grid-cols-[minmax(0,1fr)_minmax(360px,34vw)] sm:grid-rows-1">
-          <section class="relative flex min-h-0 min-w-0 items-center justify-center overflow-hidden bg-black" :aria-label="t('post.photoViewerTitle')">
-            <img :src="selectedPhotoUrl" :alt="t('post.postImageAlt')" class="h-full w-full object-contain">
+        <div v-if="data" class="grid h-full min-h-0 grid-rows-[minmax(38vh,1fr)_minmax(0,1fr)] overflow-hidden bg-black sm:grid-cols-[minmax(0,1fr)_minmax(360px,36vw)] sm:grid-rows-1">
+          <section class="relative flex min-h-0 min-w-0 flex-col overflow-hidden bg-black" :aria-label="t('post.photoViewerTitle')">
+            <div class="flex min-h-0 w-full flex-1 items-center justify-center p-3 sm:p-5">
+              <img :src="selectedPhotoUrl" :alt="t('post.postImageAlt')" class="h-full w-full object-contain">
+            </div>
+            <div class="flex w-full shrink-0 items-center justify-between border-t border-white/10 px-5 py-3">
+              <img :src="selectedPhotoUrl" :alt="t('post.postImageAlt')" class="h-12 w-14 rounded object-contain ring-2 ring-primary">
+              <span class="text-xs text-white/70">{{ (route.query.image ? Math.max(0, inlineImageIndex) : photoIndex) + 1 }} / {{ Math.max(1, route.query.image ? inlineImages.length : photoPosts.length) }}</span>
+            </div>
             <UButton v-if="(route.query.image ? inlineImages.length : photoPosts.length) > 1" color="neutral" variant="solid" icon="i-lucide-chevron-left" class="absolute left-4 top-1/2 -translate-y-1/2 rounded-full bg-black/50 text-white hover:bg-black/75" :aria-label="t('post.previousPhoto')" :disabled="route.query.image ? inlineImageIndex === 0 : photoIndex === 0" @click="movePhoto(-1)" />
             <UButton v-if="(route.query.image ? inlineImages.length : photoPosts.length) > 1" color="neutral" variant="solid" icon="i-lucide-chevron-right" class="absolute right-4 top-1/2 -translate-y-1/2 rounded-full bg-black/50 text-white hover:bg-black/75" :aria-label="t('post.nextPhoto')" :disabled="route.query.image ? inlineImageIndex === inlineImages.length - 1 : photoIndex === photoPosts.length - 1" @click="movePhoto(1)" />
             <span v-if="(route.query.image ? inlineImages.length : photoPosts.length) > 1" class="absolute bottom-4 left-1/2 -translate-x-1/2 rounded-full bg-black/55 px-3 py-1 text-xs text-white">{{ (route.query.image ? inlineImageIndex : photoIndex) + 1 }} / {{ route.query.image ? inlineImages.length : photoPosts.length }}</span>
           </section>
           <aside class="photo-viewer-sidebar flex min-h-0 flex-col border-l border-default bg-default text-default">
-            <div class="photo-viewer-post min-h-0 flex-1 overflow-y-auto p-5 sm:p-6">
-              <PostCard :key="`photo-card-${data.post.id}`" :post="data.post" :linkable="false" :show-media="false" :inline-comments="true" :comments-initially-open="true" viewer @changed="refresh" @deleted="onPostDeleted">
-                <template #header-actions>
-                  <UButton
-                    color="neutral" variant="ghost" icon="i-lucide-x"
-                    class="size-10 shrink-0 rounded-full p-0 hover:bg-elevated focus-visible:ring-2 focus-visible:ring-primary"
-                    :aria-label="t('post.closePhoto')"
-                    @click.stop="closePhotoViewer"
-                  />
-                </template>
-              </PostCard>
-            </div>
+            <PhotoViewerPanel :key="data.post.id" :post="data.post" :initial="commentsInitial" @close="closePhotoViewer" @changed="refresh" />
           </aside>
         </div>
       </template>

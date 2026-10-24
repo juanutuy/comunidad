@@ -16,6 +16,7 @@ const guestAccess = useGuestAccess()
 import type { CommentNode } from '~/utils/reactions'
 
 const props = defineProps<{
+  viewer?: boolean
   postId: number
   allowComments: boolean
   canInteract: boolean
@@ -53,7 +54,29 @@ async function submitComment(payload: { body: string, media: { mediaType: string
 </script>
 
 <template>
-  <div class="border-t border-default pt-4">
+  <div v-if="viewer" class="flex min-h-0 flex-1 flex-col">
+    <div class="min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 py-5">
+      <slot name="intro" />
+      <div v-if="s.loading && !s.loaded" class="flex justify-center py-6 text-muted"><UIcon name="i-lucide-loader-2" class="animate-spin" /></div>
+      <template v-else-if="!s.withheld && s.total">
+        <div class="mb-5 flex items-center justify-between gap-3 text-sm text-muted">
+          <span>{{ t('comments.countLabel', { count: s.total }) }}</span>
+          <USelect v-model="s.sort" :items="sortItems" size="xs" class="w-36" />
+        </div>
+        <div class="space-y-5">
+          <PostCommentItem v-for="root in roots" :key="root.id" :post-id="postId" :node="root" :allow-comments="allowComments" :can-interact="canInteract" />
+        </div>
+      </template>
+    </div>
+    <div class="shrink-0 border-t border-default p-4 sm:p-5">
+      <UButton v-if="!user" block color="primary" icon="i-lucide-log-in" :label="t('postDetail.loginToComment')" @click="guestAccess.requestAccess()" />
+      <p v-else-if="s.withheld" class="text-sm text-muted">{{ t('postDetail.commentsMembersOnly') }}</p>
+      <p v-else-if="!allowComments" class="text-sm text-muted">{{ t('postDetail.commentsDisabledText') }}</p>
+      <p v-else-if="!canInteract" class="text-sm text-muted">{{ t('postDetail.readOnlyText') }}</p>
+      <CommentComposer v-else framed :placeholder="t('comments.addPlaceholder')" :submit-label="t('comments.commentButton')" @submit="submitComment" />
+    </div>
+  </div>
+  <div v-else class="border-t border-default pt-4">
     <div v-if="s.loading && !s.loaded" class="flex items-center gap-2 text-sm text-muted">
       <UIcon name="i-lucide-loader-2" class="animate-spin" /> {{ t('common.loading') }}
     </div>

@@ -10,6 +10,7 @@
 import type { CommentMediaInput } from '~/composables/usePostComments'
 
 const props = defineProps<{
+  framed?: boolean
   placeholder: string
   submitLabel: string
   initialBody?: string
@@ -75,10 +76,12 @@ async function submit() {
 </script>
 
 <template>
-  <div class="min-w-0 flex-1">
+  <div class="min-w-0 flex-1" :class="framed ? 'rounded-2xl border border-default bg-muted/30 p-3' : undefined">
     <UTextarea
       v-model="body"
       :rows="2"
+      :variant="framed ? 'none' : 'outline'"
+      :ui="framed ? { base: 'resize-none p-0 shadow-none ring-0 focus:ring-0' } : undefined"
       :placeholder="placeholder"
       :autofocus="autofocus"
       class="w-full"
@@ -109,7 +112,7 @@ async function submit() {
       <UButton size="xs" color="neutral" variant="ghost" icon="i-lucide-file" :title="t('comments.attachFile')" :loading="uploading" @click="fileInput?.click()" />
       <span class="flex-1" />
       <UButton v-if="cancelLabel" size="sm" color="neutral" variant="ghost" :label="cancelLabel" @click="emit('cancel')" />
-      <UButton size="sm" :label="submitLabel" icon="i-lucide-send" :disabled="!canSubmit" @click="submit" />
+      <UButton size="sm" :class="framed ? 'rounded-full' : undefined" :label="submitLabel" icon="i-lucide-send" :disabled="!canSubmit" @click="submit" />
     </div>
   </div>
 </template>

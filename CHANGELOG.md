@@ -1,5 +1,14 @@
 # Historial de cambios
 
+## 2026-10-24 — Panel del visor de fotos
+
+Se reemplazó la tarjeta de publicación anidada por un panel dedicado: autor
+y cierre circular en cabecera, contenido y conversación con scroll propio,
+y compositor de comentarios fijo al pie. Se conserva la lógica compartida
+de comentarios, adjuntos, permisos y reacciones. La imagen incluye una franja
+de miniatura y contador, con marco exterior y distribución adaptable.
+Validación: typecheck y compilación de producción.
+
 ## 2026-10-24 — Banner editable y carrusel de publicaciones fijadas
 
 La portada de comunidad se configura en Administración → Ajustes → General
