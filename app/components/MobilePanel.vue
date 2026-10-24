@@ -271,7 +271,7 @@ const mainLinks = computed(() => {
             <div v-for="group in displayGroups" :key="group.id" class="mb-0.5">
             <ul class="space-y-0.5">
               <li v-for="ch in group.channels" :key="ch.id">
-                <div class="flex items-center rounded-lg hover:bg-elevated">
+                <div class="community-channel-row flex items-center rounded-xl">
                   <NuxtLink
                     :to="`/channels/${ch.slug}`"
                     class="flex min-w-0 flex-1 items-center gap-3 px-2 py-2 text-[15px]"
