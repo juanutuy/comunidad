@@ -147,8 +147,8 @@ watch([() => route.fullPath, data], focusComments, { flush: 'post' })
             <div class="flex justify-end border-b border-default p-2">
               <UButton color="neutral" variant="ghost" icon="i-lucide-x" :aria-label="t('post.closePhoto')" @click="closePhotoViewer" />
             </div>
-            <div class="min-h-0 flex-1 overflow-y-auto p-4">
-              <PostCard :key="`photo-card-${data.post.id}`" :post="data.post" :linkable="false" :show-media="false" :inline-comments="true" @changed="refresh" @deleted="onPostDeleted" />
+            <div class="photo-viewer-post min-h-0 flex-1 overflow-y-auto p-4">
+              <PostCard :key="`photo-card-${data.post.id}`" :post="data.post" :linkable="false" :show-media="false" :inline-comments="true" :comments-initially-open="true" @changed="refresh" @deleted="onPostDeleted" />
             </div>
           </aside>
         </div>

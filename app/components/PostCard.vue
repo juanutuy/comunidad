@@ -42,7 +42,7 @@ export interface PostView {
 // `inlineComments: false` (detalle): la sección vive debajo de la
 // tarjeta y el botón de comentarios ancla hasta ella, en vez de
 // expandir una segunda copia dentro de la tarjeta.
-const props = withDefaults(defineProps<{ post: PostView, linkable?: boolean, inlineComments?: boolean, showMedia?: boolean, photoSource?: string }>(), { linkable: true, inlineComments: false, showMedia: true, photoSource: 'feed' })
+const props = withDefaults(defineProps<{ post: PostView, linkable?: boolean, inlineComments?: boolean, commentsInitiallyOpen?: boolean, showMedia?: boolean, photoSource?: string }>(), { linkable: true, inlineComments: false, commentsInitiallyOpen: false, showMedia: true, photoSource: 'feed' })
 const postUrl = computed(() => `/p/${props.post.channel.slug}/${props.post.slug}`)
 const router = useRouter()
 function openRichImage(event: MouseEvent) {
@@ -136,7 +136,7 @@ async function toggleReaction(type: string) {
 // cargó la conversación.
 const postComments = usePostComments()
 const commentsState = postComments.state(props.post.id)
-const commentsOpen = ref(false)
+const commentsOpen = ref(props.commentsInitiallyOpen)
 const displayCommentCount = computed(() => commentsState.loaded ? commentsState.total : props.post.commentCount)
 
 async function toggleBookmark() {

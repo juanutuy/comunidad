@@ -96,6 +96,7 @@ body { -webkit-font-smoothing: antialiased; }
 .rich-area a, .rich-content a { color: var(--ui-primary); text-decoration: underline; text-underline-offset: 2px; }
 .rich-area img, .rich-content img { max-width: 100%; height: auto; border-radius: 0.6rem; margin: 0.5em 0; }
 .post-rich-content img { cursor: zoom-in; }
+.photo-viewer-post .post-rich-content img { display: none; }
 .rich-area audio, .rich-content audio { width: 100%; margin: 0.5em 0; }
 .rich-area hr, .rich-content hr { border: none; border-top: 1px solid var(--ui-border); margin: 1em 0; }
 .rich-video { position: relative; aspect-ratio: 16 / 9; margin: 0.6em 0; border-radius: 0.6rem; overflow: hidden; background: #000; }
