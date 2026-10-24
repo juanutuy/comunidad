@@ -52,37 +52,36 @@ function editChannel(ch: Channel & { groupName: string }) {
   })
 }
 
-function startChannelDrag(event: DragEvent, channel: Channel) {
-  if (!isAdmin.value || channel.groupId == null || reorderingGroupId.value != null) {
-    event.preventDefault()
-    return
-  }
+function startChannelDrag(event: PointerEvent, channel: Channel) {
+  if (!isAdmin.value || channel.groupId == null || reorderingGroupId.value != null || !event.isPrimary) return
+  event.preventDefault()
   draggedChannelId.value = channel.id
-  if (event.dataTransfer) {
-    event.dataTransfer.effectAllowed = 'move'
-    event.dataTransfer.setData('text/plain', String(channel.id))
-  }
+  ;(event.currentTarget as HTMLElement).setPointerCapture(event.pointerId)
 }
 
-function allowChannelDrop(event: DragEvent, target: Channel) {
+function moveChannelDrag(event: PointerEvent) {
+  if (draggedChannelId.value == null) return
+  const row = document.elementFromPoint(event.clientX, event.clientY)?.closest<HTMLElement>('[data-channel-id]')
+  const targetId = Number(row?.dataset.channelId)
+  const target = all.value.find(channel => channel.id === targetId)
   const source = all.value.find(channel => channel.id === draggedChannelId.value)
-  if (!source || source.groupId == null || source.groupId !== target.groupId || source.id === target.id || reorderingGroupId.value != null) return
-  event.preventDefault()
-  if (event.dataTransfer) event.dataTransfer.dropEffect = 'move'
-  dropTargetChannelId.value = target.id
+  dropTargetChannelId.value = target && source && source.groupId != null && source.groupId === target.groupId && source.id !== target.id
+    ? target.id
+    : null
 }
 
-async function dropChannel(event: DragEvent, target: Channel) {
-  event.preventDefault()
+async function finishChannelDrag() {
   const sourceId = draggedChannelId.value
+  const targetId = dropTargetChannelId.value
   draggedChannelId.value = null
   dropTargetChannelId.value = null
-  const groupId = target.groupId
-  if (sourceId == null || groupId == null || sourceId === target.id) return
+  const target = all.value.find(channel => channel.id === targetId)
+  const groupId = target?.groupId
+  if (sourceId == null || targetId == null || groupId == null || sourceId === targetId) return
 
   const groupChannels = all.value.filter(channel => channel.groupId === groupId)
   const from = groupChannels.findIndex(channel => channel.id === sourceId)
-  const to = groupChannels.findIndex(channel => channel.id === target.id)
+  const to = groupChannels.findIndex(channel => channel.id === targetId)
   if (from < 0 || to < 0) return
   const [moved] = groupChannels.splice(from, 1)
   if (!moved) return
@@ -146,22 +145,22 @@ const visLabel = (c: Channel) => c.visibility === 'secret' ? 'Secreta' : c.visib
         <li
           v-for="ch in all" :key="ch.id"
           class="flex flex-wrap items-center gap-x-3 gap-y-2 border-s-2 border-transparent py-3 transition-colors"
+          :data-channel-id="ch.id"
           :class="[
             draggedChannelId === ch.id ? 'opacity-40' : '',
             dropTargetChannelId === ch.id ? 'border-s-primary bg-elevated/50' : '',
           ]"
-          :draggable="isAdmin && reorderingGroupId !== ch.groupId"
-          @dragstart="startChannelDrag($event, ch)"
-          @dragend="draggedChannelId = null; dropTargetChannelId = null"
-          @dragover="allowChannelDrop($event, ch)"
-          @drop="dropChannel($event, ch)"
         >
           <UButton
             v-if="isAdmin" size="xs" color="neutral" variant="ghost" icon="i-lucide-grip-vertical"
             :disabled="reorderingGroupId === ch.groupId"
             :aria-label="`Arrastrar ${ch.name} para reordenar`"
             title="Arrastrar para reordenar"
-            class="cursor-grab touch-none active:cursor-grabbing"
+            class="cursor-grab touch-none select-none active:cursor-grabbing"
+            @pointerdown="startChannelDrag($event, ch)"
+            @pointermove="moveChannelDrag"
+            @pointerup="finishChannelDrag"
+            @pointercancel="finishChannelDrag"
           />
           <UIcon :name="ch.icon" class="shrink-0 text-lg" />
           <div class="min-w-0 flex-1">
