@@ -27,6 +27,15 @@ function onPostDeleted() {
 const commentsInitial = computed(() => data.value
   ? { comments: data.value.comments, total: data.value.commentTotal ?? data.value.comments.length, withheld: !!data.value.commentsWithheld }
   : null)
+async function focusComments() {
+  if (!import.meta.client || route.hash !== '#post-comments' || !data.value || data.value.post.locked) return
+  await nextTick()
+  const section = document.getElementById('post-comments')
+  section?.scrollIntoView({ block: 'start' })
+  section?.focus({ preventScroll: true })
+}
+onMounted(focusComments)
+watch([() => route.fullPath, data], focusComments, { flush: 'post' })
 </script>
 
 <template>
@@ -34,7 +43,7 @@ const commentsInitial = computed(() => data.value
     <UButton to="/feeds" color="neutral" variant="ghost" icon="i-lucide-arrow-left" :label="t('postDetail.backToFeed')" class="-ml-2" />
     <PostCard :key="`card-${data.post.id}`" :post="data.post" :linkable="false" :inline-comments="false" @changed="refresh" @deleted="onPostDeleted" />
 
-    <UCard v-if="!data.post.locked" id="post-comments">
+    <UCard v-if="!data.post.locked" id="post-comments" tabindex="-1" class="scroll-mt-4 focus:outline-none">
       <PostComments
         :key="`comments-${data.post.id}`"
         :post-id="data.post.id"

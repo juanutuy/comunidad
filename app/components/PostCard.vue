@@ -42,7 +42,15 @@ export interface PostView {
 // `inlineComments: false` (detalle): la sección vive debajo de la
 // tarjeta y el botón de comentarios ancla hasta ella, en vez de
 // expandir una segunda copia dentro de la tarjeta.
-const props = defineProps<{ post: PostView, linkable?: boolean, inlineComments?: boolean }>()
+const props = withDefaults(defineProps<{ post: PostView, linkable?: boolean, inlineComments?: boolean }>(), { linkable: true, inlineComments: false })
+const postUrl = computed(() => `/p/${props.post.channel.slug}/${props.post.slug}`)
+function openCard(event: MouseEvent) {
+  if (!props.linkable || event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
+  const target = event.target as HTMLElement
+  if (target.closest('a,button,input,textarea,select,label,video,audio,iframe,[role="button"],[role="dialog"],[contenteditable="true"]')) return
+  if (window.getSelection()?.toString()) return
+  navigateTo(postUrl.value)
+}
 const emit = defineEmits<{ changed: [], deleted: [] }>()
 const { user } = useAuth()
 const { t } = useI18n()
@@ -275,7 +283,7 @@ async function deletePost() {
 </script>
 
 <template>
-  <UCard v-if="!locallyHidden">
+  <UCard v-if="!locallyHidden" :class="linkable ? 'cursor-pointer transition-colors hover:border-primary/40' : ''" @click="openCard">
     <div class="flex items-start gap-3">
       <span class="relative shrink-0">
         <UAvatar v-if="post.author.anonymous && !post.author.mine" icon="i-lucide-venetian-mask" size="md" :ui="{ root: 'bg-elevated' }" />
@@ -423,7 +431,7 @@ async function deletePost() {
                detalle (pantalla de acceso); en el resto EXPANDE la
                sección dentro de la tarjeta. -->
           <UButton v-if="localAllowComments && !user" size="sm" color="neutral" variant="ghost" icon="i-lucide-message-circle" :label="t('post.commentsCount', { count: displayCommentCount })" class="ml-1" @click="guestAccess.requestAccess()" />
-          <UButton v-else-if="localAllowComments && post.locked" :to="`/p/${post.channel.slug}/${post.slug}`" class="ml-1" size="sm" color="neutral" variant="ghost" icon="i-lucide-message-circle" :label="t('post.commentsCount', { count: displayCommentCount })" />
+          <UButton v-else-if="localAllowComments && linkable" :to="`${postUrl}#post-comments`" class="ml-1" size="sm" color="neutral" variant="ghost" icon="i-lucide-message-circle" :label="t('post.commentsCount', { count: displayCommentCount })" />
           <UButton v-else-if="localAllowComments && inlineComments === false" to="#post-comments" class="ml-1" size="sm" color="neutral" variant="ghost" icon="i-lucide-message-circle" :label="t('post.commentsCount', { count: displayCommentCount })" />
           <UButton
             v-else-if="localAllowComments"
