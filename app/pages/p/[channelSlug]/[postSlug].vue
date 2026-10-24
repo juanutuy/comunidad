@@ -26,9 +26,15 @@ function bodyImageSources(html: string) {
 }
 const inlineImages = computed(() => bodyImageSources(data.value?.post.bodyHtml || ''))
 const inlineImageIndex = computed(() => Number(route.query.image || 0) - 1)
+const postMediaImage = computed(() => data.value?.post.mediaType === 'image' ? data.value.post.mediaUrl : '')
 const selectedPhotoUrl = computed(() => {
-  if (route.query.image) return inlineImages.value[inlineImageIndex.value] || ''
-  return data.value?.post.mediaType === 'image' ? data.value.post.mediaUrl : ''
+  if (route.query.image) {
+    // `image=1` is used for rich-body images, while feed media images
+    // may carry the same parameter for older/shared links. Keep either
+    // link opening the image instead of leaving the viewer blank.
+    return inlineImages.value[inlineImageIndex.value] || postMediaImage.value || ''
+  }
+  return postMediaImage.value || inlineImages.value[0] || ''
 })
 const photoOpen = computed(() => String(route.query.photo || '') === postSlug.value && !!selectedPhotoUrl.value)
 const photoModalOpen = computed({
