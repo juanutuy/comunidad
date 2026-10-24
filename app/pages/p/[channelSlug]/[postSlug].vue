@@ -106,6 +106,7 @@ watch([() => route.fullPath, data], focusComments, { flush: 'post' })
     </UCard>
 
     <UModal
+      v-if="photoOpen"
       v-model:open="photoModalOpen"
       :title="t('post.photoViewerTitle')"
       :ui="{ content: '!h-[100dvh] !w-screen !max-w-none !max-h-[100dvh] !rounded-none !p-0', body: 'h-full p-0' }"
