@@ -210,7 +210,7 @@ const hideRightRail = computed(() => route.path.startsWith('/profile/') || route
          interno (overflow-y-auto en su contenedor: desplazar dentro
          de un lado no mueve el centro, y viceversa) y la columna
          central como desplazador principal del contenido. -->
-    <div class="mx-auto flex min-h-0 w-full max-w-[1560px] flex-1 gap-3 px-3 lg:gap-5 lg:px-4">
+    <div class="mx-auto flex min-h-0 w-full max-w-[1560px] flex-1 gap-3 lg:gap-5">
       <!-- Lateral fijo desde tableta (md) con scroll interno propio;
            en teléfono la navegación vive en el panel deslizable
            (Fase 10). -->

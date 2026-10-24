@@ -389,7 +389,7 @@ async function deletePost() {
               type="button"
               class="group/image block w-full cursor-zoom-in overflow-hidden rounded-lg focus-visible:outline-2 focus-visible:outline-primary"
               :aria-label="t('post.openImage')"
-              @click="emit('openPhoto')"
+              @click.stop="emit('openPhoto')"
             >
               <img :src="post.mediaUrl" :alt="t('post.postImageAlt')" class="max-h-96 w-full rounded-lg object-cover transition group-hover/image:brightness-95">
             </button>

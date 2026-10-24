@@ -20,6 +20,10 @@ const { data, refresh } = await useAsyncData(
   { watch: [channelSlug, postSlug] },
 )
 const photoOpen = computed(() => String(route.query.photo || '') === postSlug.value && !!route.query.photo && data.value?.post.mediaType === 'image' && !!data.value.post.mediaUrl)
+const photoModalOpen = computed({
+  get: () => photoOpen.value,
+  set: (open: boolean) => { if (!open) closePhotoViewer() },
+})
 
 interface PhotoChannelData { pinnedPosts: PostView[], posts: PostView[] }
 const { data: photoChannel } = await useAsyncData(
@@ -102,10 +106,9 @@ watch([() => route.fullPath, data], focusComments, { flush: 'post' })
     </UCard>
 
     <UModal
-      :open="photoOpen"
+      v-model:open="photoModalOpen"
       :title="t('post.photoViewerTitle')"
       :ui="{ content: '!h-[100dvh] !w-screen !max-w-none !max-h-[100dvh] !rounded-none !p-0', body: 'h-full p-0' }"
-      @update:open="(open: boolean) => { if (!open) closePhotoViewer() }"
     >
       <template #content>
         <div v-if="data" class="grid h-[100dvh] min-h-0 grid-rows-[minmax(38vh,1fr)_minmax(0,1fr)] bg-black sm:grid-cols-[minmax(0,1fr)_400px] sm:grid-rows-1">
