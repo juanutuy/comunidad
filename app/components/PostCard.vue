@@ -45,11 +45,6 @@ export interface PostView {
 const props = withDefaults(defineProps<{ post: PostView, linkable?: boolean, inlineComments?: boolean, showMedia?: boolean, photoSource?: string }>(), { linkable: true, inlineComments: false, showMedia: true, photoSource: 'feed' })
 const postUrl = computed(() => `/p/${props.post.channel.slug}/${props.post.slug}`)
 const router = useRouter()
-function richImageSources(html: string) {
-  return [...html.matchAll(/<img\b[^>]*\bsrc\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/gi)]
-    .map(match => match[1] || match[2] || match[3] || '')
-    .filter(Boolean)
-}
 function openRichImage(event: MouseEvent) {
   const image = (event.target as HTMLElement).closest('img')
   if (!image) return
@@ -57,11 +52,11 @@ function openRichImage(event: MouseEvent) {
   if (!source) return
   event.preventDefault()
   event.stopPropagation()
+  const imageIndex = [...(image.closest('.post-rich-content')?.querySelectorAll('img') || [])].indexOf(image)
   if (!props.linkable) {
-    emit('openPhoto', source)
+    emit('openPhoto', source, imageIndex)
     return
   }
-  const imageIndex = richImageSources(props.post.bodyHtml || '').findIndex(candidate => candidate === source)
   void router.push({
     path: postUrl.value,
     query: { photo: props.post.slug, image: String(Math.max(0, imageIndex) + 1), from: props.photoSource },
@@ -74,7 +69,7 @@ function openCard(event: MouseEvent) {
   if (window.getSelection()?.toString()) return
   navigateTo(postUrl.value)
 }
-const emit = defineEmits<{ changed: [], deleted: [], openPhoto: [source?: string] }>()
+const emit = defineEmits<{ changed: [], deleted: [], openPhoto: [source?: string, inlineImageIndex?: number] }>()
 const { user } = useAuth()
 const { t } = useI18n()
 const { openReport } = useReportDialog()

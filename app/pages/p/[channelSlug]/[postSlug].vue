@@ -51,8 +51,8 @@ const photoPosts = computed(() => {
 })
 const photoIndex = computed(() => Math.max(0, photoPosts.value.findIndex(post => post.slug === postSlug.value)))
 
-function openPhotoViewer(source?: string) {
-  const imageIndex = source ? inlineImages.value.findIndex(candidate => candidate === source) : -1
+function openPhotoViewer(source?: string, inlineImageIndex?: number) {
+  const imageIndex = inlineImageIndex ?? (source ? inlineImages.value.findIndex(candidate => candidate === source) : -1)
   void router.push({
     path: `/p/${channelSlug.value}/${postSlug.value}`,
     query: {
