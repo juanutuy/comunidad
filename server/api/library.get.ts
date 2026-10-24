@@ -32,8 +32,10 @@ export default defineEventHandler(async (event) => {
   const { user, role } = await currentAuth(event, tenant.id)
   const premium = user ? await hasPaidEntitlement(event, tenant.id, user.id, role) : false
   return {
-    items: rows.map(i => ({
+    folders: await db.prepare('SELECT id, name FROM library_folders WHERE tenant_id = ? ORDER BY name COLLATE NOCASE').all(tenant.id),
+    items: rows.filter(i => !i.archived_at || (role === 'admin' && getQuery(event).archived === '1')).map(i => ({
       id: i.id, title: i.title, kind: i.kind, category: i.category,
+      folderId: i.folder_id || null, archived: !!i.archived_at,
       sizeLabel: i.size_label, downloads: i.downloads, locked: !!i.locked, createdAt: i.created_at,
       hasFile: !!i.file_key,
       canDownload: !!i.file_key && (!i.locked || premium),

@@ -14,9 +14,10 @@ export default defineEventHandler(async (event) => {
     id: e.id, slug: e.slug, title: e.title, description: e.description,
     startsAt: e.starts_at, endsAt: e.ends_at, location: e.location, category: e.category,
     host: { name: e.host_name, slug: e.host_slug },
+    hosting: !!user && Number(e.host_id) === user.id,
     going: (await db.prepare('SELECT COUNT(*) AS n FROM rsvps WHERE event_id = ?').get(e.id) as unknown as { n: number }).n,
     myRsvp: user ? !!await db.prepare('SELECT id FROM rsvps WHERE event_id = ? AND user_id = ?').get(e.id, user.id) : false,
-    past: new Date(e.starts_at as string) < new Date(),
+    past: new Date((e.ends_at || e.starts_at) as string) < new Date(),
   })))
   return { events }
 })

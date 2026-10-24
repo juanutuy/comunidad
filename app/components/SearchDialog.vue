@@ -12,41 +12,52 @@ const router = useRouter()
 const { initials } = useFormat()
 
 interface SearchResults {
+  resources: { id: string, type: 'comments' | 'events' | 'lessons' | 'library', title: string, text: string, to: string }[]
   posts: PostView[]
   channels: { id: number, slug: string, name: string, icon: string, description: string, type: string, priceCents: number, hasAccess: boolean }[]
   courses: { id: number, slug: string, title: string, description: string, level: string, priceCents: number }[]
   members: { id: number, name: string, slug: string, bio: string, avatarUrl: string }[]
 }
-const empty: SearchResults = { posts: [], channels: [], courses: [], members: [] }
+const empty: SearchResults = { posts: [], channels: [], courses: [], members: [], resources: [] }
 
 const q = ref('')
-const results = ref<SearchResults>(empty)
+const rawResults = ref<SearchResults>(empty)
+const filter = ref('all')
+const results = computed(() => ({ ...rawResults.value,
+  posts: ['all', 'posts'].includes(filter.value) ? rawResults.value.posts : [],
+  channels: ['all', 'channels'].includes(filter.value) ? rawResults.value.channels : [],
+  courses: ['all', 'courses'].includes(filter.value) ? rawResults.value.courses : [],
+  members: ['all', 'members'].includes(filter.value) ? rawResults.value.members : [],
+  resources: (rawResults.value.resources || []).filter(item => filter.value === 'all' || item.type === filter.value),
+}))
 const loading = ref(false)
+const failed = ref(false)
 let timer: ReturnType<typeof setTimeout> | undefined
 let seq = 0
 
-const total = computed(() => results.value.posts.length + results.value.channels.length + results.value.courses.length + results.value.members.length)
+const total = computed(() => results.value.posts.length + results.value.channels.length + results.value.courses.length + results.value.members.length + (results.value.resources?.length || 0))
 const ready = computed(() => q.value.trim().length >= 2)
 
 watch(q, (value) => {
   if (timer) clearTimeout(timer)
-  const term = value.trim()
-  if (term.length < 2) { results.value = empty; loading.value = false; return }
-  loading.value = true
   const mySeq = ++seq
+  failed.value = false
+  const term = value.trim()
+  if (term.length < 2) { rawResults.value = empty; loading.value = false; return }
+  loading.value = true
   timer = setTimeout(async () => {
     try {
       const res = await api<SearchResults>('/api/search', { query: { q: term } })
-      if (mySeq === seq) results.value = res
+      if (mySeq === seq) rawResults.value = res
     }
-    catch { if (mySeq === seq) results.value = empty }
+    catch { if (mySeq === seq) { rawResults.value = empty; failed.value = true } }
     finally { if (mySeq === seq) loading.value = false }
   }, 280)
 })
 
 // Al cerrar, el diálogo nace limpio la próxima vez.
 watch(open, (isOpen) => {
-  if (!isOpen) { q.value = ''; results.value = empty; loading.value = false }
+  if (!isOpen) { ++seq; if (timer) clearTimeout(timer); q.value = ''; filter.value = 'all'; rawResults.value = empty; loading.value = false }
 })
 
 // Atajo global Cmd+K / Ctrl+K, como en la referencia.
@@ -57,7 +68,7 @@ function onKeydown(e: KeyboardEvent) {
   }
 }
 onMounted(() => window.addEventListener('keydown', onKeydown))
-onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
+onBeforeUnmount(() => { ++seq; if (timer) clearTimeout(timer); window.removeEventListener('keydown', onKeydown) })
 
 function go(to: string) {
   closeSearch()
@@ -84,10 +95,12 @@ function seeAll() {
           <UButton color="neutral" variant="ghost" icon="i-lucide-x" :aria-label="t('search.closeSearch')" @click="closeSearch" />
         </div>
 
+        <SearchTypeFilter v-model="filter" class="border-b border-default p-3" />
         <div class="max-h-[55vh] overflow-y-auto p-2">
           <p v-if="!ready" class="px-3 py-6 text-center text-sm text-muted">
             {{ t('search.dialogHint') }}
           </p>
+          <p v-else-if="failed" role="alert" class="px-3 py-6 text-center text-sm text-error">{{ t('improvements.loadFailed') }}</p>
           <p v-else-if="!loading && !total" class="px-3 py-6 text-center text-sm text-muted">
             {{ t('search.dialogNoResults', { q: q.trim() }) }}
           </p>
@@ -138,6 +151,13 @@ function seeAll() {
             </button>
           </template>
 
+          <template v-if="results.resources?.length">
+            <p class="px-3 pt-2 pb-1 text-xs font-bold text-muted">{{ t('improvements.resources') }}</p>
+            <button v-for="item in results.resources" :key="item.id" type="button" class="flex w-full flex-col rounded-lg px-3 py-2 text-left hover:bg-elevated" @click="go(item.to)">
+              <span class="text-xs text-muted">{{ t(`improvements.${item.type}`) }}</span>
+              <span class="font-medium">{{ item.title }}</span><span class="line-clamp-2 text-xs text-muted">{{ item.text }}</span>
+            </button>
+          </template>
           <template v-if="results.members.length">
             <p class="px-3 pt-2 pb-1 text-xs font-bold tracking-wider text-muted uppercase">{{ t('search.members') }}</p>
             <button

@@ -5,7 +5,8 @@ import { postMetadata } from '../utils/postMetadata'
 // nunca con el cuerpo completo.
 import { POST_SELECT, canAccessChannel, channelBySlug, channelContentType, channelVisibility, currentAuth, isChannelArchived, resolveTenant, serializePost } from '../utils/community'
 import type { ChannelRow } from '../utils/community'
-import { getPrivacySettings } from '../utils/privacy'
+import { getPrivacySettings, hasPaidEntitlement } from '../utils/privacy'
+import { completedLessonIds, courseAccessible, courseCurriculum, enrollmentOf, flattenLessons, lessonAvailability } from '../utils/courses'
 import { courseListed } from '../utils/courses'
 import type { CourseRow } from '../utils/courses'
 import { dbFor } from '../utils/db'
@@ -14,7 +15,7 @@ import { hiddenFilterSql } from '../utils/blocks'
 export default defineEventHandler(async (event) => {
   const tenant = await resolveTenant(event)
   const q = String(getQuery(event).q || '').trim()
-  if (q.length < 2) return { posts: [], channels: [], courses: [], members: [] }
+  if (q.length < 2) return { posts: [], channels: [], courses: [], members: [], resources: [] }
   const like = `%${q}%`
   const db = await dbFor(event)
   const { user, role } = await currentAuth(event, tenant.id)
@@ -84,10 +85,49 @@ export default defineEventHandler(async (event) => {
   // show_in_search = '0') no sale como miembro; sus publicaciones y
   // comentarios de arriba siguen apareciendo igual.
   const memberRows = await db.prepare(`SELECT u.id, u.name, u.slug, u.bio, u.avatar_url FROM users u JOIN memberships m ON m.user_id = u.id AND m.tenant_id = ?
-    WHERE u.name LIKE ?
+    WHERE m.status IN ('active', 'restricted') AND u.name LIKE ?
     AND NOT EXISTS (SELECT 1 FROM user_prefs up WHERE up.tenant_id = ? AND up.user_id = u.id AND up.key = 'show_in_search' AND up.value = '0')
     LIMIT 10`).all(tenant.id, like, tenant.id) as Record<string, unknown>[]
   const members = memberRows.map(m => ({ id: m.id, name: m.name, slug: m.slug, bio: m.bio, avatarUrl: m.avatar_url || '' }))
 
-  return { posts, channels, courses, members }
+  const resources: { id: string, type: 'comments' | 'events' | 'lessons' | 'library', title: string, text: string, to: string }[] = []
+  const comments = await db.prepare(`SELECT cm.id, cm.body, p.title, p.slug, c.slug AS channel_slug FROM comments cm
+    JOIN posts p ON p.id = cm.post_id AND p.tenant_id = cm.tenant_id
+    JOIN channels c ON c.id = p.channel_id AND c.tenant_id = p.tenant_id
+    WHERE cm.tenant_id = ? AND cm.body LIKE ? AND p.status = 'published'
+    AND cm.author_id NOT IN (SELECT blocked_id FROM user_blocks WHERE tenant_id = ? AND blocker_id = ?)${hf.sql}
+    ORDER BY cm.id DESC LIMIT 30`).all(tenant.id, like, tenant.id, user.id, ...hf.params)
+  for (const comment of comments) {
+    const channel = await channelBySlug(event, tenant.id, comment.channel_slug)
+    if (!channel || (isChannelArchived(channel) && role !== 'admin') || !await canAccessChannel(event, user.id, role, channel)) continue
+    resources.push({ id: `comment-${comment.id}`, type: 'comments', title: comment.title, text: String(comment.body).replace(/<[^>]*>/g, '').slice(0, 180), to: `/p/${comment.channel_slug}/${comment.slug}#post-comments` })
+    if (resources.length >= 10) break
+  }
+  const events = await db.prepare('SELECT id, slug, title, starts_at FROM events WHERE tenant_id = ? AND (title LIKE ? OR description LIKE ?) ORDER BY starts_at DESC LIMIT 10').all(tenant.id, like, like)
+  for (const e of events) resources.push({ id: `event-${e.id}`, type: 'events', title: e.title, text: e.starts_at, to: `/events/${e.slug}` })
+  const premium = await hasPaidEntitlement(event, tenant.id, user.id, role)
+  const library = await db.prepare("SELECT id, title, category, locked FROM library_items WHERE tenant_id = ? AND archived_at = '' AND (title LIKE ? OR category LIKE ?) ORDER BY created_at DESC LIMIT 10").all(tenant.id, like, like)
+  for (const item of library) {
+    if (item.locked && !premium) continue
+    resources.push({ id: `library-${item.id}`, type: 'library', title: item.title, text: item.category, to: `/library#resource-${item.id}` })
+  }
+  // Search lesson titles only after applying the viewer's enrollment, drip and prerequisite rules.
+  const lessonCourses = await db.prepare(`SELECT DISTINCT c.* FROM courses c JOIN chapters ch ON ch.course_id = c.id AND ch.tenant_id = c.tenant_id
+    JOIN lessons l ON l.chapter_id = ch.id AND l.tenant_id = c.tenant_id
+    WHERE c.tenant_id = ? AND c.status = 'published' AND l.status = 'published' AND l.title LIKE ? LIMIT 20`).all(tenant.id, like) as CourseRow[]
+  let lessonCount = 0
+  for (const course of lessonCourses) {
+    const enrollment = await enrollmentOf(event, tenant.id, Number(course.id), user.id)
+    if (!courseAccessible(course, { loggedIn: true, isAdmin: role === 'admin', enrolled: !!enrollment })) continue
+    const flat = flattenLessons(await courseCurriculum(event, Number(course.id)))
+    const completed = await completedLessonIds(event, tenant.id, Number(course.id), user.id)
+    for (const [index, lesson] of flat.entries()) {
+      if (lessonCount >= 10 || !lesson.title.toLocaleLowerCase().includes(q.toLocaleLowerCase())) continue
+      const availability = lessonAvailability(course, lesson, { isAdmin: role === 'admin', enrolledAt: enrollment?.created_at || null, completedIds: completed, prevLessonId: index ? Number(flat[index - 1]!.id) : null })
+      if (availability.locked || (!lesson.is_free && !enrollment && role !== 'admin')) continue
+      resources.push({ id: `lesson-${lesson.id}`, type: 'lessons', title: lesson.title, text: course.title, to: `/courses/${course.slug}/lessons/${lesson.id}` })
+      lessonCount++
+    }
+  }
+  return { posts, channels, courses, members, resources }
 })

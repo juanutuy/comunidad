@@ -98,12 +98,11 @@ const levelPct = computed(() => {
 // actividad (Fase 6, fila secundaria de la misma tarjeta).
 const levelBadgesEarned = computed(() => (data.value?.profile.levels || []).filter(b => b.earned).length)
 const activityEarned = computed(() => (data.value?.profile.badges || []).filter(b => b.earned).length)
-// «Sin insignia aún»: todavía no alcanzó el primer nivel con puntos > 0.
+// The level card and earned badge list use the same rule, including level zero.
 const hasLevelBadge = computed(() => {
   const p = data.value?.profile
   if (!p) return false
-  const firstPositive = (p.levels || []).find(l => l.min > 0)
-  return !firstPositive || p.points >= firstPositive.min
+  return (p.levels || []).some(l => l.earned)
 })
 const levelCardIcon = computed(() => {
   const p = data.value?.profile

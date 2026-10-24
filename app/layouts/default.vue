@@ -17,7 +17,8 @@ const { openSearch } = useSearchDialog()
 const guestAccess = useGuestAccess()
 
 const { data: channelData, refresh: refreshChannels } = await useAsyncData('layout-channels', () =>
-  api<{ groups: { id: number, name: string, sort?: number, isDefault?: boolean, channels: { id: number, slug: string, name: string, icon: string, description?: string, type: string, priceCents: number, contentType?: 'post' | 'image', coverUrl?: string, visibility?: 'public' | 'private' | 'secret', groupId?: number | null, postPermission?: string, archived?: boolean, following: boolean, hasAccess?: boolean }[] }[] }>('/api/channels'))
+  api<{ groups: { id: number, name: string, sort?: number, isDefault?: boolean, channels: { id: number, slug: string, name: string, icon: string, description?: string, type: string, priceCents: number, contentType?: 'post' | 'image', coverUrl?: string, visibility?: 'public' | 'private' | 'secret', groupId?: number | null, postPermission?: string, archived?: boolean, following: boolean, hasAccess?: boolean }[] }[] }>('/api/channels'),
+  { watch: [() => user.value?.id, () => tenant.value?.id] })
 
 // Fase 16-F: el lateral muestra SOLO los canales que el usuario
 // SIGUE (seguir/dejar de seguir vive en el menú «⋯» de cada canal;

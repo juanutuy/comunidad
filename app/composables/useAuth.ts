@@ -99,6 +99,7 @@ export function useAuth() {
     user.value = data.user
     status.value = data.status ?? 'active'
     await fetchMe()
+    await nuxtApp.runWithContext(() => refreshNuxtData())
     return data
   }
 
@@ -111,6 +112,7 @@ export function useAuth() {
     user.value = data.user
     status.value = data.status ?? 'active'
     await fetchMe()
+    await nuxtApp.runWithContext(() => refreshNuxtData())
     return data
   }
 
@@ -120,6 +122,7 @@ export function useAuth() {
     user.value = null
     status.value = null
     gates.value = null
+    await nuxtApp.runWithContext(() => refreshNuxtData(['layout-channels', 'right-rail', 'feed']))
   }
 
   const localizedTenant = computed(() => tenant.value ? { ...tenant.value, name: (i18n.locale.value === 'en' ? tenant.value.nameEn : tenant.value.nameEs) || tenant.value.name } : null)

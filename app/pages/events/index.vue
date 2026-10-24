@@ -5,10 +5,15 @@ const api = useApi()
 const { user } = useAuth()
 const { t, locale } = useI18n()
 const { fmtDateTime } = useFormat()
-interface EventCard { id: number, slug: string, title: string, description: string, startsAt: string, endsAt: string, location: string, category: string, host: { name: string }, going: number, myRsvp: boolean, past: boolean }
+interface EventCard { id: number, slug: string, title: string, description: string, startsAt: string, endsAt: string, location: string, category: string, host: { name: string }, going: number, myRsvp: boolean, past: boolean, hosting: boolean }
 const { data } = await useAsyncData('events', () => api<{ events: EventCard[] }>('/api/events'))
-const upcoming = computed(() => (data.value?.events || []).filter(e => !e.past))
-const past = computed(() => (data.value?.events || []).filter(e => e.past))
+const category = ref('all')
+const participation = ref('all')
+const categories = computed(() => [{ value: 'all', label: t('improvements.all') }, ...[...new Set((data.value?.events || []).map(e => e.category))].filter(Boolean).map(value => ({ value, label: value }))])
+const participationOptions = computed(() => [{ value: 'all', label: t('improvements.all') }, { value: 'registered', label: t('improvements.registered') }, { value: 'hosting', label: t('improvements.hosting') }])
+const filteredEvents = computed(() => (data.value?.events || []).filter(e => (category.value === 'all' || e.category === category.value) && (participation.value === 'all' || (participation.value === 'hosting' ? e.hosting : e.myRsvp))))
+const upcoming = computed(() => filteredEvents.value.filter(e => !e.past))
+const past = computed(() => filteredEvents.value.filter(e => e.past))
 
 const view = ref<'lista' | 'calendario'>('lista')
 const viewOptions = computed(() => [
@@ -45,7 +50,7 @@ const calCells = computed(() => {
   for (let d = 1; d <= daysInMonth; d++) {
     cells.push({
       day: d,
-      events: (data.value?.events || []).filter(e => sameLocalDay(e.startsAt, calYear.value, calMonth.value, d)),
+      events: filteredEvents.value.filter(e => sameLocalDay(e.startsAt, calYear.value, calMonth.value, d)),
       isToday: sameLocalDay(nowDate.toISOString(), calYear.value, calMonth.value, d) && nowDate.getDate() === d,
     })
   }
@@ -57,6 +62,10 @@ const weekDays = computed(() => t('events.weekdays').split('|'))
 
 <template>
   <div class="space-y-6">
+    <div class="flex flex-wrap gap-3">
+      <USelect v-model="category" :items="categories" :aria-label="t('improvements.category')" />
+      <USelect v-if="user" v-model="participation" :items="participationOptions" :aria-label="t('improvements.eventFilter')" />
+    </div>
     <div class="flex flex-wrap items-end justify-between gap-3">
       <div>
         <h1 class="text-2xl font-bold">{{ t('events.title') }}</h1>

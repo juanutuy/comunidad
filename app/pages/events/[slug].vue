@@ -24,7 +24,7 @@ async function toggleRsvp() {
       <UBadge color="primary" variant="subtle">{{ data.event.category }}</UBadge>
       <h1 class="mt-3 text-2xl font-bold">{{ data.event.title }}</h1>
       <p class="mt-1 text-sm text-muted">
-        {{ t('event.hostedBy') }} <NuxtLink :to="`/profile/${data.event.host.slug}`" class="font-medium hover:underline">{{ data.event.host.name }}</NuxtLink>
+        {{ t('event.hostedBy') }} <NuxtLink v-if="data.event.host.slug && !data.event.host.slug.startsWith('deleted-')" :to="`/profile/${data.event.host.slug}`" class="font-medium hover:underline">{{ data.event.host.name }}</NuxtLink><span v-else class="font-medium">{{ data.event.host.name }}</span>
       </p>
       <div class="mt-4 grid gap-3 text-sm sm:grid-cols-3">
         <p class="flex items-center gap-2"><UIcon name="i-lucide-calendar" /> {{ fmtDateTime(data.event.startsAt) }}</p>

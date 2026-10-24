@@ -37,11 +37,14 @@ const { data, refresh } = await useAsyncData('feed',
       </div>
     </UCard>
 
+    <UButton v-if="user" to="/get-started" variant="soft" icon="i-lucide-list-checks" :label="t('improvements.start')" />
+
     <PostComposer v-if="user" @published="refresh" />
 
 
     <PostCard v-for="post in data?.posts || []" :key="post.id" :post="post" @changed="refresh" />
     <ListPagination :offset="offset" :next-offset="data?.nextOffset ?? null" @update:offset="offset = $event" />
     <UAlert v-if="!(data?.posts?.length)" color="neutral" variant="soft" :title="t('feed.emptyTitle')" :description="t('feed.emptyText')" />
+    <UButton v-if="!(data?.posts?.length)" to="/channels" variant="soft" icon="i-lucide-compass" :label="t('improvements.channels')" />
   </div>
 </template>

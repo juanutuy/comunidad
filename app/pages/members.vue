@@ -20,9 +20,13 @@ const api = useApi()
 
 const q = ref('')
 const role = ref('all')
+const sort = ref('online')
+const sortOptions = computed(() => [{ value: 'online', label: t('improvements.online') }, { value: 'newest', label: t('improvements.newest') }, { value: 'name', label: t('improvements.name') }])
 const roleTabs = computed(() => [
   { label: t('members.tabAll'), value: 'all' },
   { label: t('members.tabAdmins'), value: 'admin' },
+  { label: t('improvements.moderators'), value: 'moderator' },
+  { label: t('improvements.managers'), value: 'course_manager' },
   { label: t('members.tabMembers'), value: 'member' },
 ])
 // Fase 15: el directorio puede abrirse a visitantes (modo público +
@@ -31,7 +35,7 @@ const roleTabs = computed(() => [
 // cuando no hay acceso, en vez de asumir que falta la sesión.
 interface DirectoryData { members: DirectoryMember[], total: number, error?: string }
 const { data, refresh } = await useAsyncData('members-directory', (): Promise<DirectoryData> =>
-  api<DirectoryData>('/api/members/directory', { query: { q: q.value, role: role.value } })
+  api<DirectoryData>('/api/members/directory', { query: { q: q.value, role: role.value, sort: sort.value } })
     .catch((e: { data?: { message?: string } }) => ({ members: [] as DirectoryMember[], total: 0, error: e?.data?.message || t('members.loadError') })))
 
 let debounce: ReturnType<typeof setTimeout> | null = null
@@ -39,7 +43,8 @@ watch(q, () => {
   if (debounce) clearTimeout(debounce)
   debounce = setTimeout(refresh, 300)
 })
-watch(role, () => refresh())
+watch([role, sort], () => refresh())
+onBeforeUnmount(() => { if (debounce) clearTimeout(debounce) })
 </script>
 
 <template>
@@ -57,6 +62,7 @@ watch(role, () => refresh())
     <template v-else>
       <div class="flex flex-wrap items-center gap-3">
         <UInput v-model="q" :placeholder="t('members.searchPlaceholder')" icon="i-lucide-search" class="w-64" />
+        <USelect v-model="sort" :items="sortOptions" :aria-label="t('improvements.sort')" />
         <UTabs v-model="role" :items="roleTabs" :content="false" size="sm" />
         <span class="text-sm text-muted">{{ t((data?.total ?? 0) === 1 ? 'members.countOne' : 'members.countMany', { count: data?.total ?? 0 }) }}</span>
       </div>

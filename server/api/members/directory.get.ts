@@ -45,7 +45,7 @@ export default defineEventHandler(async (event) => {
   const db = await dbFor(event)
   const rows = await db.prepare(`SELECT u.id, u.name, u.slug, u.bio, u.avatar_url, u.last_seen_at, u.created_at, m.role
     FROM users u JOIN memberships m ON m.user_id = u.id AND m.tenant_id = ?
-    WHERE NOT EXISTS (SELECT 1 FROM user_prefs pr WHERE pr.tenant_id = ? AND pr.user_id = u.id AND pr.key = 'directory_visible' AND pr.value = '0')
+    WHERE m.status IN ('active', 'restricted') AND NOT EXISTS (SELECT 1 FROM user_prefs pr WHERE pr.tenant_id = ? AND pr.user_id = u.id AND pr.key = 'directory_visible' AND pr.value = '0')
     ORDER BY u.name`).all(tenant.id, tenant.id) as Record<string, unknown>[]
   let members = rows.map(r => ({
     id: r.id, name: r.name, slug: r.slug, bio: r.bio || '', avatarUrl: r.avatar_url || '',
@@ -56,8 +56,9 @@ export default defineEventHandler(async (event) => {
     lastSeenAt: visitorView ? '' : (r.last_seen_at || ''),
   }))
   if (q) members = members.filter(m => String(m.name).toLowerCase().includes(q.toLowerCase()))
-  if (roleFilter === 'admin' || roleFilter === 'member') members = members.filter(m => m.role === roleFilter)
+  if (['admin', 'moderator', 'course_manager', 'member'].includes(roleFilter)) members = members.filter(m => m.role === roleFilter)
   // Primero los que están en línea, después por nombre.
-  members.sort((a, b) => Number(b.online) - Number(a.online) || String(a.name).localeCompare(String(b.name)))
+  const sort = String(getQuery(event).sort || 'online')
+  members.sort((a, b) => sort === 'newest' ? String(b.memberSince).localeCompare(String(a.memberSince)) || Number(b.id) - Number(a.id) : sort === 'name' ? String(a.name).localeCompare(String(b.name)) : Number(b.online) - Number(a.online) || String(a.name).localeCompare(String(b.name)))
   return { members, total: members.length }
 })

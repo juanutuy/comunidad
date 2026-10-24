@@ -20,7 +20,10 @@ export default defineEventHandler(async (event) => {
   const direct = new Set(user ? (await db.prepare('SELECT channel_id FROM channel_access WHERE tenant_id = ? AND user_id = ?').all(tenant.id, user.id)).map(r => r.channel_id) : [])
   const subscribed = user ? await activeSubscription((sql, ...params) => db.prepare(sql).get(...params), tenant.id, user.id) : false
   const access = new Map(channels.map(c => [c.id, channelAccessDecision(c, user?.id ?? null, role, direct.has(c.id), subscribed)]))
+  const followingOnly = user ? (await db.prepare("SELECT value FROM user_prefs WHERE tenant_id = ? AND user_id = ? AND key = 'feed_following'").get(tenant.id, user.id))?.value === '1' : false
+  const followed = followingOnly ? new Set((await db.prepare('SELECT channel_id FROM follows WHERE tenant_id = ? AND user_id = ?').all(tenant.id, user!.id)).map(r => r.channel_id)) : null
   const visible = channels.filter(c => {
+    if (followed && !followed.has(c.id)) return false
     if (!user && channelVisibility(c) !== 'public') return false
     if (c.archived_at && role !== 'admin') return false
     if (access.get(c.id)) return true

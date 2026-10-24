@@ -10,7 +10,9 @@ const { t } = useI18n()
 const { initials, fmtMoney } = useFormat()
 
 const q = ref(String(route.query.q || ''))
+const filter = ref('all')
 interface SearchResults {
+  resources: { id: string, type: 'comments' | 'events' | 'lessons' | 'library', title: string, text: string, to: string }[]
   posts: PostView[]
   channels: { id: number, slug: string, name: string, icon: string, description: string, type: string, priceCents: number, hasAccess: boolean }[]
   courses: { id: number, slug: string, title: string, description: string, level: string, priceCents: number }[]
@@ -20,13 +22,13 @@ const { data, refresh } = await useAsyncData(
   () => `search-${String(route.query.q || '')}`,
   () => {
     const term = String(route.query.q || '').trim()
-    if (term.length < 2) return Promise.resolve({ posts: [], channels: [], courses: [], members: [] } as SearchResults)
+    if (term.length < 2) return Promise.resolve({ posts: [], channels: [], courses: [], members: [], resources: [] } as SearchResults)
     return api<SearchResults>('/api/search', { query: { q: term } })
   },
   { watch: [() => route.query.q] },
 )
 
-const total = computed(() => (data.value?.posts.length || 0) + (data.value?.channels.length || 0) + (data.value?.courses.length || 0) + (data.value?.members.length || 0))
+const total = computed(() => (data.value?.posts.length || 0) + (data.value?.channels.length || 0) + (data.value?.courses.length || 0) + (data.value?.members.length || 0) + (data.value?.resources?.length || 0))
 
 function submit() {
   const term = q.value.trim()
@@ -47,15 +49,16 @@ watch(() => route.query.q, v => { q.value = String(v || '') })
       <UButton type="submit" :label="t('search.button')" />
     </form>
 
+    <SearchTypeFilter v-model="filter" />
     <template v-if="String(route.query.q || '').trim().length >= 2">
       <p class="text-sm text-muted">{{ t('search.resultsFor', { count: total, q: String(route.query.q) }) }}</p>
 
-      <section v-if="data?.posts.length" class="space-y-4">
+      <section v-if="data?.posts.length && ['all', 'posts'].includes(filter)" class="space-y-4">
         <h2 class="flex items-center gap-2 font-bold"><UIcon name="i-lucide-newspaper" /> {{ t('search.posts') }}</h2>
         <PostCard v-for="p in data.posts" :key="p.id" :post="p" />
       </section>
 
-      <section v-if="data?.channels.length" class="space-y-3">
+      <section v-if="data?.channels.length && ['all', 'channels'].includes(filter)" class="space-y-3">
         <h2 class="flex items-center gap-2 font-bold"><UIcon name="i-lucide-hash" /> {{ t('search.channels') }}</h2>
         <div class="grid gap-3 sm:grid-cols-2">
           <UCard v-for="c in data.channels" :key="c.id">
@@ -68,7 +71,7 @@ watch(() => route.query.q, v => { q.value = String(v || '') })
         </div>
       </section>
 
-      <section v-if="data?.courses.length" class="space-y-3">
+      <section v-if="data?.courses.length && ['all', 'courses'].includes(filter)" class="space-y-3">
         <h2 class="flex items-center gap-2 font-bold"><UIcon name="i-lucide-graduation-cap" /> {{ t('search.courses') }}</h2>
         <div class="grid gap-3 sm:grid-cols-2">
           <UCard v-for="c in data.courses" :key="c.id">
@@ -82,7 +85,16 @@ watch(() => route.query.q, v => { q.value = String(v || '') })
         </div>
       </section>
 
-      <section v-if="data?.members.length" class="space-y-3">
+      <section v-if="data?.resources?.length" class="space-y-3">
+        <h2 class="font-bold">{{ t('improvements.resources') }}</h2>
+        <UCard v-for="item in data.resources.filter(item => filter === 'all' || item.type === filter)" :key="item.id">
+          <p class="text-xs text-muted">{{ t(`improvements.${item.type}`) }}</p>
+          <NuxtLink :to="item.to" class="font-semibold hover:underline">{{ item.title }}</NuxtLink>
+          <p class="mt-1 line-clamp-2 text-sm text-muted">{{ item.text }}</p>
+        </UCard>
+      </section>
+
+      <section v-if="data?.members.length && ['all', 'members'].includes(filter)" class="space-y-3">
         <h2 class="flex items-center gap-2 font-bold"><UIcon name="i-lucide-users" /> {{ t('search.members') }}</h2>
         <div class="grid gap-3 sm:grid-cols-2">
           <UCard v-for="m in data.members" :key="m.id">

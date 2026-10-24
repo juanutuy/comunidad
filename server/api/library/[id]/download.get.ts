@@ -15,6 +15,7 @@ export default defineEventHandler(async (event) => {
   const db = await dbFor(event)
   const item = await db.prepare('SELECT * FROM library_items WHERE id = ? AND tenant_id = ?').get(id, tenant.id) as Record<string, unknown> | undefined
   if (!item) throw createError({ statusCode: 404, message: 'Recurso no encontrado.' })
+  if (item.archived_at) throw createError({ statusCode: 404, message: 'Recurso no disponible.' })
   if (!item.file_key) throw createError({ statusCode: 404, message: 'Este recurso es un registro de referencia y no tiene archivo descargable.' })
   const { user, role } = await currentAuth(event, tenant.id)
   if (!user) {

@@ -99,6 +99,9 @@ CREATE UNIQUE INDEX IF NOT EXISTS certificates_code ON certificates (code);
 CREATE UNIQUE INDEX IF NOT EXISTS certificates_unique ON certificates (tenant_id, user_id, course_id);
 CREATE TABLE IF NOT EXISTS app_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL DEFAULT '');
 CREATE TABLE IF NOT EXISTS community_owners (tenant_id INTEGER PRIMARY KEY, user_id INTEGER NOT NULL UNIQUE, request_key TEXT NOT NULL, created_at TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS library_folders (id INTEGER PRIMARY KEY AUTOINCREMENT, tenant_id INTEGER NOT NULL, name TEXT NOT NULL, created_at TEXT NOT NULL);
+CREATE UNIQUE INDEX IF NOT EXISTS library_folder_names ON library_folders (tenant_id, name COLLATE NOCASE);
+CREATE TABLE IF NOT EXISTS saved_messages (tenant_id INTEGER NOT NULL, user_id INTEGER NOT NULL, kind TEXT NOT NULL, message_id INTEGER NOT NULL, created_at TEXT NOT NULL, PRIMARY KEY (tenant_id, user_id, kind, message_id));
 `
 
 // Migraciones aditivas (Fase 2) para bases creadas en la Fase 1 — ya hay
@@ -106,8 +109,12 @@ CREATE TABLE IF NOT EXISTS community_owners (tenant_id INTEGER PRIMARY KEY, user
 // tablas nuevas (arriba) y columnas nuevas (abajo). Los ALTER corren en
 // try/catch: si la columna ya existe, SQLite/D1 lanzan "duplicate column"
 // y se ignora. Idempotente y seguro en ambos motores.
-export const SCHEMA_VERSION = 'community-provisioning-v1'
+export const SCHEMA_VERSION = 'member-library-v1'
 export const MIGRATIONS = [
+  `ALTER TABLE dm_messages ADD COLUMN reply_to INTEGER`,
+  `ALTER TABLE chat_room_messages ADD COLUMN reply_to INTEGER`,
+  `ALTER TABLE library_items ADD COLUMN folder_id INTEGER`,
+  `ALTER TABLE library_items ADD COLUMN archived_at TEXT NOT NULL DEFAULT ''`,
   `ALTER TABLE tenants ADD COLUMN name_en TEXT NOT NULL DEFAULT ''`,
   `ALTER TABLE memberships ADD COLUMN status_reason TEXT NOT NULL DEFAULT ''`,
   `ALTER TABLE memberships ADD COLUMN status_changed_at TEXT NOT NULL DEFAULT ''`,

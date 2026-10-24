@@ -24,6 +24,7 @@ export async function otherMember(event: H3Event, tenantId: number, slug: string
 export interface ChatMessageRow {
   id: number
   body: string
+  reply_to?: number | null
   created_at: string
   author_id: number
   author_name: string
@@ -35,6 +36,7 @@ export function serializeChatMessage(r: ChatMessageRow) {
   return {
     id: r.id,
     body: r.body,
+    replyTo: r.reply_to || null,
     createdAt: r.created_at,
     author: { id: r.author_id, name: r.author_name, slug: r.author_slug, avatarUrl: r.author_avatar || '' },
   }
@@ -44,6 +46,6 @@ export const CHAT_SELECT = `SELECT m.id, m.body, m.created_at, m.author_id,
   u.name AS author_name, u.slug AS author_slug, u.avatar_url AS author_avatar
   FROM chat_messages m JOIN users u ON u.id = m.author_id`
 
-export const DM_SELECT = `SELECT m.id, m.body, m.created_at, m.sender_id AS author_id, m.read_at,
+export const DM_SELECT = `SELECT m.id, m.body, m.created_at, m.reply_to, m.sender_id AS author_id, m.read_at,
   u.name AS author_name, u.slug AS author_slug, u.avatar_url AS author_avatar
   FROM dm_messages m JOIN users u ON u.id = m.sender_id`

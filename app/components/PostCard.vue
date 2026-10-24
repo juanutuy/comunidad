@@ -423,12 +423,8 @@ async function deletePost() {
                detalle (pantalla de acceso); en el resto EXPANDE la
                sección dentro de la tarjeta. -->
           <UButton v-if="localAllowComments && !user" size="sm" color="neutral" variant="ghost" icon="i-lucide-message-circle" :label="t('post.commentsCount', { count: displayCommentCount })" class="ml-1" @click="guestAccess.requestAccess()" />
-          <NuxtLink v-else-if="localAllowComments && post.locked" :to="`/p/${post.channel.slug}/${post.slug}`" class="ml-1">
-            <UButton size="sm" color="neutral" variant="ghost" icon="i-lucide-message-circle" :label="t('post.commentsCount', { count: displayCommentCount })" />
-          </NuxtLink>
-          <a v-else-if="localAllowComments && inlineComments === false" href="#post-comments" class="ml-1">
-            <UButton size="sm" color="neutral" variant="ghost" icon="i-lucide-message-circle" :label="t('post.commentsCount', { count: displayCommentCount })" />
-          </a>
+          <UButton v-else-if="localAllowComments && post.locked" :to="`/p/${post.channel.slug}/${post.slug}`" class="ml-1" size="sm" color="neutral" variant="ghost" icon="i-lucide-message-circle" :label="t('post.commentsCount', { count: displayCommentCount })" />
+          <UButton v-else-if="localAllowComments && inlineComments === false" to="#post-comments" class="ml-1" size="sm" color="neutral" variant="ghost" icon="i-lucide-message-circle" :label="t('post.commentsCount', { count: displayCommentCount })" />
           <UButton
             v-else-if="localAllowComments"
             size="sm" color="neutral" :variant="commentsOpen ? 'soft' : 'ghost'" icon="i-lucide-message-circle"

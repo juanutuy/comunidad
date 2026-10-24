@@ -4,11 +4,13 @@ const { user } = useAuth()
 const { t } = useI18n()
 const { fmtMoney } = useFormat()
 const q = ref('')
+const sort = ref('newest')
+const view = ref('grid')
+const sortOptions = computed(() => ['newest', 'oldest', 'name'].map(value => ({ value, label: t(`improvements.${value}` as 'improvements.newest') })))
 interface CourseCard { id: number, slug: string, title: string, description: string, level: string, priceCents: number, imageUrl: string, chapters: number, lessons: number, enrolled: boolean, progress: { completed: number, total: number, pct: number } }
 const { data, refresh } = await useAsyncData('courses', () => api<{ courses: CourseCard[] }>('/api/courses'))
-async function search() {
-  data.value = await api<{ courses: CourseCard[] }>('/api/courses', { query: { q: q.value } })
-}
+const filteredCourses = computed(() => [...(data.value?.courses || [])].filter(c => `${c.title} ${c.description}`.toLocaleLowerCase().includes(q.value.trim().toLocaleLowerCase())).sort((a, b) => sort.value === 'name' ? a.title.localeCompare(b.title) : sort.value === 'oldest' ? a.id - b.id : b.id - a.id))
+function search() { /* filtering is reactive */ }
 </script>
 
 <template>
@@ -24,8 +26,12 @@ async function search() {
         <UButton :label="t('common.search')" @click="search" />
       </div>
     </div>
-    <div class="grid gap-4 sm:grid-cols-2">
-      <UCard v-for="c in data?.courses || []" :key="c.id">
+    <div class="flex flex-wrap items-center gap-3">
+      <USelect v-model="sort" :items="sortOptions" :aria-label="t('improvements.sort')" />
+      <UButton v-for="mode in ['grid', 'list']" :key="mode" :icon="mode === 'grid' ? 'i-lucide-grid-2x2' : 'i-lucide-list'" :variant="view === mode ? 'solid' : 'soft'" :aria-label="mode === 'grid' ? t('improvements.grid') : t('improvements.list')" :aria-pressed="view === mode" @click="view = mode" />
+    </div>
+    <div class="grid gap-4" :class="view === 'grid' ? 'sm:grid-cols-2' : ''">
+      <UCard v-for="c in filteredCourses" :key="c.id">
         <img v-if="c.imageUrl" :src="c.imageUrl" alt="" class="mb-3 h-36 w-full rounded-lg object-cover">
         <div class="flex items-start justify-between gap-2">
           <UBadge color="primary" variant="subtle">{{ c.level }}</UBadge>
@@ -48,6 +54,6 @@ async function search() {
         </div>
       </UCard>
     </div>
-    <UAlert v-if="!(data?.courses?.length)" color="neutral" variant="soft" :title="t('courses.noResultsTitle')" :description="t('courses.noResultsText')" />
+    <UAlert v-if="!filteredCourses.length" color="neutral" variant="soft" :title="t('courses.noResultsTitle')" :description="t('courses.noResultsText')" />
   </div>
 </template>

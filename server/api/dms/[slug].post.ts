@@ -1,3 +1,4 @@
+import { accessibleMessage } from '../../utils/messageActions'
 // Enviar un mensaje directo (Fase 3): persiste en dm_messages, avisa
 // en vivo a la sala de la conversación (Durable Object) y crea la
 // notificación in-app del destinatario (que además empuja su campana
@@ -24,18 +25,24 @@ export default defineEventHandler(async (event) => {
   // pueden enviar mensajes directos.
   if (await blockBetween(event, tenant.id, me.id, other.id as number))
     throw createError({ statusCode: 403, message: 'No se pueden enviar mensajes: hay un bloqueo entre vos y esta persona. Revisá tus ajustes de cuenta.' })
-  const body = await readBody<{ body?: string }>(event)
+  const body = await readBody<{ body?: string, replyTo?: number }>(event)
   const text = (body?.body || '').trim()
   if (!text) throw createError({ statusCode: 400, message: 'El mensaje no puede estar vacío.' })
   if (text.length > 2000) throw createError({ statusCode: 400, message: 'El mensaje es demasiado largo (máx. 2000 caracteres).' })
 
   const db = await dbFor(event)
+  let replyTo = body.replyTo == null ? null : Number(body.replyTo)
+  if (replyTo !== null) {
+    const parent = await accessibleMessage(event, tenant.id, me.id, 'dm', replyTo)
+    if (!((parent.sender_id === me.id && parent.recipient_id === other.id) || (parent.sender_id === other.id && parent.recipient_id === me.id))) throw createError({ statusCode: 400, message: 'Respuesta fuera de la conversación. / Reply outside conversation.' })
+    if (parent.reply_to) replyTo = Number(parent.reply_to)
+  }
   const created = nowIso()
-  const res = await db.prepare('INSERT INTO dm_messages (tenant_id, sender_id, recipient_id, body, read_at, created_at) VALUES (?, ?, ?, ?, ?, ?)')
-    .run(tenant.id, me.id, other.id, text, '', created)
+  const res = await db.prepare('INSERT INTO dm_messages (tenant_id, sender_id, recipient_id, body, read_at, created_at, reply_to) VALUES (?, ?, ?, ?, ?, ?, ?)')
+    .run(tenant.id, me.id, other.id, text, '', created, replyTo)
   const message = {
     ...serializeChatMessage({
-      id: Number(res.lastInsertRowId), body: text, created_at: created,
+      id: Number(res.lastInsertRowId), body: text, created_at: created, reply_to: replyTo,
       author_id: me.id, author_name: me.name, author_slug: me.slug, author_avatar: me.avatar_url,
     } as ChatMessageRow),
     readAt: '', mine: true,

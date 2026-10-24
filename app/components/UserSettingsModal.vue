@@ -45,7 +45,7 @@ const loading = ref(false)
 const profile = reactive({ name: '', bio: '', location: '', website: '' })
 const prefs = reactive<Record<string, boolean>>({
   notify_reaction: true, notify_comment: true, notify_mention: true, notify_new_post: true, notify_dm: true, notify_follow: true,
-  directory_visible: true, show_in_search: true,
+  directory_visible: true, show_in_search: true, feed_following: false,
 })
 
 async function load() {
@@ -166,6 +166,7 @@ async function savePrefs() {
   savingPrefs.value = true
   try {
     await api('/api/settings/prefs', { method: 'PUT', body: { ...prefs } })
+    await refreshNuxtData('feed')
     toast.add({ title: t('settings.prefsSaved'), color: 'success' })
   }
   catch { toast.add({ title: t('settings.prefsFailed'), color: 'error' }) }
@@ -303,6 +304,11 @@ const notifyItems = computed(() => [
 
             <!-- Privacidad -->
             <div v-else-if="section === 'privacidad'" class="space-y-4">
+              <div class="flex items-center gap-3">
+                <UIcon name="i-lucide-list-filter" class="text-muted" />
+                <span class="flex-1 text-sm">{{ t('improvements.followingFeed') }}<span class="block text-xs text-muted">{{ t('improvements.followingFeedHint') }}</span></span>
+                <USwitch v-model="prefs.feed_following" />
+              </div>
               <div class="flex items-center gap-3">
                 <UIcon name="i-lucide-users" class="text-muted" />
                 <span class="flex-1 text-sm">{{ t('settings.directoryVisible') }} <span class="block text-xs text-muted">{{ t('settings.directoryVisibleText') }}</span></span>

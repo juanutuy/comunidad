@@ -14,6 +14,7 @@ export default defineEventHandler(async (event) => {
   for (const k of NOTIFY_PREF_KEYS) prefs[k] = true
   prefs.directory_visible = true
   prefs.show_in_search = true
+  prefs.feed_following = false
   for (const r of rows) prefs[r.key] = r.value !== '0'
   return {
     profile: { name: user.name, bio: user.bio, location: user.location, email: user.email, avatarUrl: user.avatar_url || '', coverUrl: user.cover_url || '', website: user.website || '' },

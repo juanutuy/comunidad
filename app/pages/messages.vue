@@ -128,21 +128,32 @@ async function selectRoom(id: number) {
   }
 }
 
-async function send(body: string) {
+async function send(body: string, replyTo?: number): Promise<boolean> {
   try {
     if (mode.value === 'room' && selectedRoom.value) {
-      const data = await api<{ message: DmMessage }>(`/api/rooms/${selectedRoom.value}`, { method: 'POST', body: { body } })
+      const data = await api<{ message: DmMessage }>(`/api/rooms/${selectedRoom.value}`, { method: 'POST', body: { body, replyTo } })
       upsert(data.message)
       await refreshRooms()
     }
     else if (selected.value) {
-      const data = await api<{ message: DmMessage }>(`/api/dms/${selected.value}`, { method: 'POST', body: { body } })
+      const data = await api<{ message: DmMessage }>(`/api/dms/${selected.value}`, { method: 'POST', body: { body, replyTo } })
       upsert(data.message)
     }
+    else return false
+    return true
   }
   catch (e) {
     toast.add({ title: t('messages.sendFailed'), description: (e as { data?: { message?: string } }).data?.message || t('chat.retryText'), color: 'error' })
+    return false
   }
+}
+
+async function saveMessage(message: ThreadMessage) {
+  try {
+    const result = await api<{ saved: boolean }>('/api/messages/save', { method: 'POST', body: { kind: mode.value, id: message.id, saved: !message.saved } })
+    message.saved = result.saved
+  }
+  catch { toast.add({ title: t('improvements.loadFailed'), color: 'error' }) }
 }
 
 // Crear sala: nombre + al menos 2 miembros más.
@@ -171,7 +182,9 @@ const live = computed(() => !!handle?.connected.value)
 onMounted(() => {
   const withSlug = typeof route.query.with === 'string' ? route.query.with : ''
   const initial = withSlug && members.value.some(m => m.slug === withSlug) ? withSlug : members.value[0]?.slug
-  if (initial) select(initial)
+  const initialRoom = Number(route.query.room)
+  if (Number.isInteger(initialRoom) && initialRoom > 0) selectRoom(initialRoom)
+  else if (initial) select(initial)
   pollTimer = setInterval(() => {
     if (handle?.connected.value) return
     if (mode.value === 'dm' && selected.value) loadConversation(selected.value).catch(() => {})
@@ -256,9 +269,9 @@ onUnmounted(() => {
           </div>
         </template>
         <ChatThread
-          :messages="messages" :live="live" :typing-name="typingName" :me-id="user?.id ?? null"
+          :key="`${mode}-${selected}-${selectedRoom}`" :messages="messages" :live="live" message-actions :send-message="send" @save="saveMessage" :typing-name="typingName" :me-id="user?.id ?? null"
           :blocked-message="dmBlockedMessage"
-          :placeholder="t('messages.dmPlaceholder')" @send="send" @typing="handle?.sendTyping()"
+          :placeholder="t('messages.dmPlaceholder')" @typing="handle?.sendTyping()"
         />
       </UCard>
       <UCard v-else-if="mode === 'room' && roomInfo">
@@ -274,8 +287,8 @@ onUnmounted(() => {
           </div>
         </template>
         <ChatThread
-          :messages="messages" :live="live" :typing-name="typingName" :me-id="user?.id ?? null"
-          :placeholder="t('messages.roomPlaceholder')" @send="send" @typing="handle?.sendTyping()"
+          :key="`${mode}-${selected}-${selectedRoom}`" :messages="messages" :live="live" message-actions :send-message="send" @save="saveMessage" :typing-name="typingName" :me-id="user?.id ?? null"
+          :placeholder="t('messages.roomPlaceholder')" @typing="handle?.sendTyping()"
         />
       </UCard>
       <UCard v-else>

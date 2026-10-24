@@ -7,6 +7,8 @@
 export interface ThreadMessage {
   id: number
   body: string
+  replyTo?: number | null
+  saved?: boolean
   createdAt: string
   mine?: boolean
   author: { id: number, name: string, slug: string, avatarUrl: string }
@@ -16,6 +18,8 @@ export interface PresenceUser { id: number, name: string, slug: string, avatarUr
 const props = defineProps<{
   messages: ThreadMessage[]
   live: boolean
+  messageActions?: boolean
+  sendMessage?: (body: string, replyTo?: number) => Promise<boolean>
   presence?: PresenceUser[]
   typingName?: string
   meId?: number | null
@@ -26,11 +30,15 @@ const props = defineProps<{
   // rechazaría con 403.
   blockedMessage?: string
 }>()
-const emit = defineEmits<{ send: [body: string], typing: [] }>()
+const emit = defineEmits<{ send: [body: string, replyTo?: number], typing: [], save: [message: ThreadMessage] }>()
 
 const { t } = useI18n()
 const { timeAgo, initials } = useFormat()
 const draft = ref('')
+const reply = ref<ThreadMessage | null>(null)
+const savedOnly = ref(false)
+const threadRoot = ref<number | null>(null)
+const displayedMessages = computed(() => props.messages.filter(m => (!savedOnly.value || m.saved) && (!threadRoot.value || m.id === threadRoot.value || m.replyTo === threadRoot.value)))
 const scroller = ref<HTMLElement | null>(null)
 const sending = ref(false)
 
@@ -56,7 +64,9 @@ async function submit() {
   if (!body || sending.value) return
   sending.value = true
   try {
-    emit('send', body)
+    if (props.sendMessage) { if (!await props.sendMessage(body, reply.value?.id)) return }
+    else emit('send', body, reply.value?.id)
+    reply.value = null
     draft.value = ''
     await nextTick()
     scrollDown()
@@ -83,8 +93,12 @@ async function submit() {
       </template>
     </div>
 
+    <div v-if="messageActions" class="mb-3 flex flex-wrap gap-2">
+      <UButton size="sm" :variant="savedOnly ? 'solid' : 'soft'" :aria-pressed="savedOnly" :label="t('improvements.savedMessages')" icon="i-lucide-bookmark" @click="savedOnly = !savedOnly" />
+      <UButton v-if="threadRoot" size="sm" variant="soft" :label="t('improvements.allMessages')" @click="threadRoot = null" />
+    </div>
     <div ref="scroller" class="max-h-[480px] space-y-4 overflow-y-auto pr-1">
-      <div v-for="m in messages" :key="m.id" class="flex gap-2.5">
+      <div v-for="m in displayedMessages" :key="m.id" class="flex gap-2.5">
         <NuxtLink :to="`/profile/${m.author.slug}`" class="shrink-0">
           <UAvatar :src="m.author.avatarUrl || undefined" :text="initials(m.author.name)" size="sm" />
         </NuxtLink>
@@ -93,16 +107,23 @@ async function submit() {
             <NuxtLink :to="`/profile/${m.author.slug}`" class="font-semibold hover:underline" :class="{ 'text-primary': meId && m.author.id === meId }">{{ m.author.name }}</NuxtLink>
             <span class="ml-2 text-xs text-muted">{{ timeAgo(m.createdAt) }}</span>
           </p>
+          <button v-if="m.replyTo" type="button" class="mb-1 block max-w-full truncate border-l-2 border-primary pl-2 text-xs text-muted hover:text-primary" @click="threadRoot = m.replyTo || null">{{ t('improvements.replying') }} #{{ m.replyTo }} · {{ messages.find(parent => parent.id === m.replyTo)?.body?.slice(0, 100) }}</button>
           <p class="text-sm whitespace-pre-line">{{ m.body }}</p>
+          <div v-if="messageActions" class="mt-1 flex flex-wrap gap-1">
+            <UButton size="xs" color="neutral" variant="ghost" icon="i-lucide-reply" :label="t('improvements.reply')" @click="reply = m" />
+            <UButton size="xs" color="neutral" variant="ghost" icon="i-lucide-messages-square" :aria-label="t('improvements.thread')" @click="threadRoot = m.replyTo || m.id" />
+            <UButton size="xs" color="neutral" variant="ghost" :icon="m.saved ? 'i-lucide-bookmark-check' : 'i-lucide-bookmark'" :aria-label="m.saved ? t('improvements.unsaveMessage') : t('improvements.saveMessage')" :aria-pressed="!!m.saved" @click="emit('save', m)" />
+          </div>
         </div>
       </div>
-      <p v-if="!messages.length" class="py-6 text-center text-sm text-muted">{{ t('chat.empty') }}</p>
+      <p v-if="!displayedMessages.length" class="py-6 text-center text-sm text-muted">{{ t('chat.empty') }}</p>
     </div>
 
     <p class="mt-2 h-4 text-xs text-muted italic">{{ typingName ? t('chat.typing', { name: typingName }) : '' }}</p>
 
     <UAlert v-if="blockedMessage" class="mt-1" color="warning" variant="soft" icon="i-lucide-lock" :title="blockedMessage" />
-    <form v-else class="mt-1 flex items-end gap-2" @submit.prevent="submit">
+    <div v-if="reply" class="my-2 flex items-center gap-2 rounded-lg bg-muted p-3 text-sm"><span class="min-w-0 flex-1 truncate">{{ t('improvements.replying') }} {{ reply.author.name }}: {{ reply.body }}</span><UButton size="xs" color="neutral" variant="ghost" icon="i-lucide-x" :aria-label="t('improvements.cancel')" @click="reply = null" /></div>
+    <form v-if="!blockedMessage" class="mt-1 flex items-end gap-2" @submit.prevent="submit">
       <UTextarea v-model="draft" :rows="2" :placeholder="placeholder || t('chat.writeMessage')" class="flex-1" @input="emit('typing')" @keydown.enter.exact.prevent="submit" />
       <UButton type="submit" icon="i-lucide-send" :label="t('chat.send')" :loading="sending" />
     </form>
